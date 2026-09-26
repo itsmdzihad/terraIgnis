@@ -43,6 +43,7 @@ Thumbs.db
 # ==============================
 # Data
 # ==============================
+data/reports/*
 data/raw/*
 data/processed/*
 data/parquet/*
