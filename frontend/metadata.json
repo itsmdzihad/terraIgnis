@@ -1,0 +1,5 @@
+{
+  "name": "TerraIgnis",
+  "description": "Active fire harmonization and visualization system, syncing MODIS and VIIRS satellite active fire telemetry.",
+  "requestFramePermissions": [],
+}
