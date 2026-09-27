@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { REGIONAL_SITES, DIURNAL_PROFILE, LAND_COVER_CORRELATION, ACTIVE_FIRE_HOTSPOTS } from '../mockData';
+import { REGIONAL_SITES, DIURNAL_PROFILE, LAND_COVER_CORRELATION } from '../mockData';
 import { MapPin, Sliders, Activity, Sunset, Layers, BarChart3, ChevronDown, Flame, AlertTriangle } from 'lucide-react';
 import TerraIgnisMap from './TerraIgnisMap';
 
@@ -8,10 +8,18 @@ export default function RegionalDeepDive() {
   const [selectedYear, setSelectedYear] = useState<number>(2026);
 
   const activeSite = REGIONAL_SITES.find(s => s.id === activeSiteId) || REGIONAL_SITES[0];
+  const [backendHotspots, setBackendHotspots] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/active-hotspots')
+      .then(res => res.json())
+      .then(data => setBackendHotspots(data))
+      .catch(err => console.error(err));
+  }, []);
 
   const regionalFirePoints = useMemo(() => {
     if (activeSiteId === 'amazon') {
-      return ACTIVE_FIRE_HOTSPOTS.filter(h => h.region === 'The Amazon').map(h => ({
+      return backendHotspots.filter((h: any) => h.region === 'The Amazon').map((h: any) => ({
         lat: h.lat,
         lng: h.lng,
         intensity: h.intensity,
@@ -30,7 +38,7 @@ export default function RegionalDeepDive() {
         { lat: 21.95, lng: 89.05, intensity: 180, frp: 180 }
       ];
     } else if (activeSiteId === 'boreal') {
-      return ACTIVE_FIRE_HOTSPOTS.filter(h => h.region === 'Siberia').map(h => ({
+      return backendHotspots.filter((h: any) => h.region === 'Siberia').map((h: any) => ({
         lat: h.lat,
         lng: h.lng,
         intensity: h.intensity,
@@ -38,14 +46,14 @@ export default function RegionalDeepDive() {
       }));
     } else {
       // australia
-      return ACTIVE_FIRE_HOTSPOTS.filter(h => h.region.includes('Australia')).map(h => ({
+      return backendHotspots.filter((h: any) => h.region.includes('Australia')).map((h: any) => ({
         lat: h.lat,
         lng: h.lng,
         intensity: h.intensity,
         frp: h.intensity
       }));
     }
-  }, [activeSiteId]);
+  }, [activeSiteId, backendHotspots]);
 
   return (
     <div className="flex flex-col h-full bg-slate-950 p-6 gap-6 overflow-hidden">

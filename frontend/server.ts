@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -15,47 +15,38 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Initialize the server-side Gemini SDK using the process.env key
-  const apiKey = process.env.GEMINI_API_KEY;
-  const ai = new GoogleGenAI({
-    apiKey: apiKey || '',
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
+
+
+  app.get('/api/annual-series', (req, res) => {
+    import('./src/mockData.js').then((module) => {
+      res.json(module.GLOBAL_ANNUAL_SERIES);
+    }).catch(err => {
+      res.status(500).json({ error: 'Failed to load data', details: err.message });
+    });
   });
 
-  // Server-side route for generating live telemetry and fire anomaly insights
-  app.post('/api/ai-analyze', async (req, res) => {
-    try {
-      const { year, region, additionalPrompt } = req.body;
-      
-      if (!apiKey) {
-        return res.status(400).json({ error: 'API key is not configured inside settings.' });
-      }
+  app.get('/api/active-hotspots', (req, res) => {
+    import('./src/mockData.js').then((module) => {
+      res.json(module.ACTIVE_FIRE_HOTSPOTS);
+    }).catch(err => {
+      res.status(500).json({ error: 'Failed to load data', details: err.message });
+    });
+  });
 
-      const prompt = `You are a NASA senior satellite data scientist and wildfire analyst specializing in active fire remote sensing.
-Analyze the following fire event context using the MODIS and VIIRS harmonized dataset.
-Year: ${year}
-Region: ${region || "Global Fire Systems"}
-Context details: ${additionalPrompt || "General anomaly interpretation"}
+  app.get('/api/h3-fire-data', (req, res) => {
+    import('./src/mockData.js').then((module) => {
+      res.json(module.MOCK_H3_FIRE_DATA);
+    }).catch(err => {
+      res.status(500).json({ error: 'Failed to load data', details: err.message });
+    });
+  });
 
-Provide a concise, 2-3 paragraph scientific analysis of this fire anomaly. Talk about specific drivers (climatic phenomena such as El Niño, Indian Ocean Dipole, severe dry spells, land use changes, fuel accumulation). 
-Discuss how the harmonization of MODIS (polar orbiters Terra/Aqua, coarser 1km pixels, longer baseline since 2000) and VIIRS (SNPP/JPSS-1, higher-resolution 375m pixels, active since 2011/2017) resolves discrepancies, e.g. how VIIRS captures smaller, under-canopy fires that MODIS misses, while MODIS preserves historical context.
-
-Write in a highly authoritative, precise, yet accessible scientific journal style. Use paragraph breaks and do not output any markdown headings, list items, or conversational chatter.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-      });
-
-      res.json({ analysis: response.text });
-    } catch (error: any) {
-      console.error('Error generating analysis:', error);
-      res.status(500).json({ error: error.message || 'Error occurred during AI modeling.' });
-    }
+  app.get('/api/regional-sites', (req, res) => {
+    import('./src/mockData.js').then((module) => {
+      res.json(module.REGIONAL_SITES);
+    }).catch(err => {
+      res.status(500).json({ error: 'Failed to load data', details: err.message });
+    });
   });
 
   // Mount Vite's development server as middleware inside Express

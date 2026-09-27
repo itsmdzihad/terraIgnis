@@ -134,13 +134,13 @@ export default function TerraIgnisMap({
           stroked: true,
           filled: true,
           radiusScale: isRegional ? 4 : 8,
-          radiusMinPixels: 4,
-          radiusMaxPixels: 24,
+          radiusMinPixels: 2,
+          radiusMaxPixels: 12,
           lineWidthMinPixels: 1,
           getPosition: (d: any) => [d.lng, d.lat],
           getRadius: (d: any) => {
             const size = d.intensity || d.frp || 100;
-            return Math.max(500, size * 20);
+            return Math.max(100, size * 2);
           },
           getFillColor: (d: any) => {
             const intensity = d.intensity || d.frp || 100;

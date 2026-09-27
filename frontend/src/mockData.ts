@@ -123,35 +123,35 @@ export const GLOBAL_ANNUAL_SERIES: YearData[] = [
 // Active global hotspots (simulated for the global projection, focused on major fire zones)
 export const ACTIVE_FIRE_HOTSPOTS: FireHotspot[] = [
   // Amazon Region
-  { id: 'am-1', lat: -6.5, lng: -62.3, intensity: 450, sensor: 'VIIRS', region: 'The Amazon', confidence: 92, landCover: 'Dense Forest' },
-  { id: 'am-2', lat: -9.2, lng: -58.4, intensity: 120, sensor: 'MODIS', region: 'The Amazon', confidence: 81, landCover: 'Deforested / Pasture' },
-  { id: 'am-3', lat: -11.8, lng: -52.1, intensity: 320, sensor: 'VIIRS', region: 'The Amazon', confidence: 89, landCover: 'Wooded Savanna' },
-  { id: 'am-4', lat: -3.1, lng: -60.0, intensity: 75, sensor: 'MODIS', region: 'The Amazon', confidence: 74, landCover: 'Dense Forest' },
+  { id: 'am-1', lat: -6.5134, lng: -62.3452, intensity: 450, sensor: 'VIIRS', region: 'The Amazon', confidence: 92, landCover: 'Dense Forest' },
+  { id: 'am-2', lat: -9.2451, lng: -58.4891, intensity: 120, sensor: 'MODIS', region: 'The Amazon', confidence: 81, landCover: 'Deforested / Pasture' },
+  { id: 'am-3', lat: -11.8901, lng: -52.1234, intensity: 320, sensor: 'VIIRS', region: 'The Amazon', confidence: 89, landCover: 'Wooded Savanna' },
+  { id: 'am-4', lat: -3.1567, lng: -60.0123, intensity: 75, sensor: 'MODIS', region: 'The Amazon', confidence: 74, landCover: 'Dense Forest' },
   
   // Central/Sub-Saharan Africa
-  { id: 'af-1', lat: -7.8, lng: 18.2, intensity: 280, sensor: 'MODIS', region: 'Sub-Saharan Africa', confidence: 85, landCover: 'Dry Savanna' },
-  { id: 'af-2', lat: -5.4, lng: 22.9, intensity: 620, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 98, landCover: 'Woodland Grassland' },
-  { id: 'af-3', lat: -9.6, lng: 25.1, intensity: 310, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 91, landCover: 'Savanna / Agriculture' },
-  { id: 'af-4', lat: 4.2, lng: 11.5, intensity: 140, sensor: 'MODIS', region: 'Sub-Saharan Africa', confidence: 78, landCover: 'Rainforest Fringe' },
-  { id: 'af-5', lat: -12.3, lng: 16.7, intensity: 190, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 87, landCover: 'Dry Savanna' },
+  { id: 'af-1', lat: -7.8123, lng: 18.2345, intensity: 280, sensor: 'MODIS', region: 'Sub-Saharan Africa', confidence: 85, landCover: 'Dry Savanna' },
+  { id: 'af-2', lat: -5.4567, lng: 22.9123, intensity: 620, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 98, landCover: 'Woodland Grassland' },
+  { id: 'af-3', lat: -9.6789, lng: 25.1234, intensity: 310, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 91, landCover: 'Savanna / Agriculture' },
+  { id: 'af-4', lat: 4.2345, lng: 11.5678, intensity: 140, sensor: 'MODIS', region: 'Sub-Saharan Africa', confidence: 78, landCover: 'Rainforest Fringe' },
+  { id: 'af-5', lat: -12.3456, lng: 16.7890, intensity: 190, sensor: 'VIIRS', region: 'Sub-Saharan Africa', confidence: 87, landCover: 'Dry Savanna' },
 
   // Australia
-  { id: 'au-1', lat: -18.4, lng: 124.6, intensity: 550, sensor: 'VIIRS', region: 'Northern Australia', confidence: 94, landCover: 'Spinifex Grassland' },
-  { id: 'au-2', lat: -21.2, lng: 133.4, intensity: 210, sensor: 'MODIS', region: 'Northern Australia', confidence: 83, landCover: 'Arid Shrubland' },
-  { id: 'au-3', lat: -14.1, lng: 131.8, intensity: 890, sensor: 'VIIRS', region: 'Northern Australia', confidence: 99, landCover: 'Eucalyptus Savanna' },
-  { id: 'au-4', lat: -33.9, lng: 150.3, intensity: 110, sensor: 'MODIS', region: 'Southeast Australia', confidence: 76, landCover: 'Temperate Sclerophyll' },
+  { id: 'au-1', lat: -18.4567, lng: 124.6789, intensity: 550, sensor: 'VIIRS', region: 'Northern Australia', confidence: 94, landCover: 'Spinifex Grassland' },
+  { id: 'au-2', lat: -21.2345, lng: 133.4567, intensity: 210, sensor: 'MODIS', region: 'Northern Australia', confidence: 83, landCover: 'Arid Shrubland' },
+  { id: 'au-3', lat: -14.1234, lng: 131.8901, intensity: 890, sensor: 'VIIRS', region: 'Northern Australia', confidence: 99, landCover: 'Eucalyptus Savanna' },
+  { id: 'au-4', lat: -33.9876, lng: 150.3456, intensity: 110, sensor: 'MODIS', region: 'Southeast Australia', confidence: 76, landCover: 'Temperate Sclerophyll' },
 
   // North America
-  { id: 'na-1', lat: 53.4, lng: -115.8, intensity: 1450, sensor: 'VIIRS', region: 'Western Canada', confidence: 100, landCover: 'Boreal Conifer Forest' },
-  { id: 'na-2', lat: 55.1, lng: -121.2, intensity: 820, sensor: 'MODIS', region: 'Western Canada', confidence: 92, landCover: 'Boreal Conifer Forest' },
-  { id: 'na-3', lat: 40.2, lng: -121.6, intensity: 980, sensor: 'VIIRS', region: 'California/Pacific Northwest', confidence: 96, landCover: 'Montane Pine Forest' },
-  { id: 'na-4', lat: 38.5, lng: -119.8, intensity: 310, sensor: 'MODIS', region: 'California/Pacific Northwest', confidence: 84, landCover: 'Chaparral Shrubland' },
+  { id: 'na-1', lat: 53.4567, lng: -115.8901, intensity: 1450, sensor: 'VIIRS', region: 'Western Canada', confidence: 100, landCover: 'Boreal Conifer Forest' },
+  { id: 'na-2', lat: 55.1234, lng: -121.2345, intensity: 820, sensor: 'MODIS', region: 'Western Canada', confidence: 92, landCover: 'Boreal Conifer Forest' },
+  { id: 'na-3', lat: 40.2345, lng: -121.6789, intensity: 980, sensor: 'VIIRS', region: 'California/Pacific Northwest', confidence: 96, landCover: 'Montane Pine Forest' },
+  { id: 'na-4', lat: 38.5678, lng: -119.8901, intensity: 310, sensor: 'MODIS', region: 'California/Pacific Northwest', confidence: 84, landCover: 'Chaparral Shrubland' },
 
   // Southeast Asia / Boreal Siberia
-  { id: 'as-1', lat: 62.1, lng: 129.5, intensity: 750, sensor: 'VIIRS', region: 'Siberia', confidence: 95, landCover: 'Taiga Larch Forest' },
-  { id: 'as-2', lat: 59.4, lng: 112.3, intensity: 380, sensor: 'MODIS', region: 'Siberia', confidence: 89, landCover: 'Taiga Larch Forest' },
-  { id: 'as-3', lat: -1.8, lng: 113.9, intensity: 1150, sensor: 'VIIRS', region: 'Indonesia / Kalimantan', confidence: 97, landCover: 'Peatland Swamp Forest' },
-  { id: 'as-4', lat: -3.2, lng: 104.5, intensity: 670, sensor: 'MODIS', region: 'Indonesia / Sumatra', confidence: 90, landCover: 'Peatland Swamp Forest' }
+  { id: 'as-1', lat: 62.1234, lng: 129.5678, intensity: 750, sensor: 'VIIRS', region: 'Siberia', confidence: 95, landCover: 'Taiga Larch Forest' },
+  { id: 'as-2', lat: 59.4567, lng: 112.3456, intensity: 380, sensor: 'MODIS', region: 'Siberia', confidence: 89, landCover: 'Taiga Larch Forest' },
+  { id: 'as-3', lat: -1.8901, lng: 113.9123, intensity: 1150, sensor: 'VIIRS', region: 'Indonesia / Kalimantan', confidence: 97, landCover: 'Peatland Swamp Forest' },
+  { id: 'as-4', lat: -3.2345, lng: 104.5678, intensity: 670, sensor: 'MODIS', region: 'Indonesia / Sumatra', confidence: 90, landCover: 'Peatland Swamp Forest' }
 ];
 
 // Diurnal fire cycle analysis

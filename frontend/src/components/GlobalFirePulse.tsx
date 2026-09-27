@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Flame, ShieldAlert, Zap, Globe, HeartPulse, Sparkles, Radio, HelpCircle, Layers } from 'lucide-react';
-import { GLOBAL_ANNUAL_SERIES, ACTIVE_FIRE_HOTSPOTS, SATELLITE_METADATA, MOCK_H3_FIRE_DATA } from '../mockData';
+import { GLOBAL_ANNUAL_SERIES, SATELLITE_METADATA } from '../mockData';
 import TerraIgnisMap from './TerraIgnisMap';
 
 export default function GlobalFirePulse() {
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [backendHotspots, setBackendHotspots] = useState<any[]>([]);
+  const [backendH3, setBackendH3] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/active-hotspots')
+      .then(res => res.json())
+      .then(data => setBackendHotspots(data))
+      .catch(err => console.error(err));
+
+    fetch('/api/h3-fire-data')
+      .then(res => res.json())
+      .then(data => setBackendH3(data))
+      .catch(err => console.error(err));
+  }, []);
 
   const yearsList = GLOBAL_ANNUAL_SERIES.map(d => d.year);
   const selectedYearData = GLOBAL_ANNUAL_SERIES.find(d => d.year === selectedYear) || GLOBAL_ANNUAL_SERIES[GLOBAL_ANNUAL_SERIES.length - 1];
@@ -159,8 +173,8 @@ export default function GlobalFirePulse() {
                 longitude={0}
                 zoom={1.2}
                 fireData={[
-                  ...ACTIVE_FIRE_HOTSPOTS.map(h => ({ lat: h.lat, lng: h.lng, intensity: h.intensity, frp: h.intensity })),
-                  ...MOCK_H3_FIRE_DATA
+                  ...backendHotspots.map(h => ({ lat: h.lat, lng: h.lng, intensity: h.intensity, frp: h.intensity })),
+                  ...backendH3
                 ]}
                 isRegional={false}
               />
