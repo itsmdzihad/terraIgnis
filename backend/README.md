@@ -1,6 +1,8 @@
 # TerraIgnis 🔥🌍
 
-> A satellite-powered wildfire monitoring and fire-activity analysis platform that harmonizes NASA FIRMS MODIS and VIIRS active-fire observations into a common spatial and analytical framework.
+> A satellite-powered wildfire monitoring and fire-activity analysis
+> platform that harmonizes NASA FIRMS MODIS and VIIRS active-fire
+> observations into a common spatial and analytical framework.
 
 ---
 
@@ -16,7 +18,7 @@
   - [1. FIRMS Data Ingestion](#1-firms-data-ingestion)
   - [2. Fire Data Profiling](#2-fire-data-profiling)
   - [3. H3 Spatial Aggregation](#3-h3-spatial-aggregation)
-  - [4. MODIS–VIIRS Harmonization](#4-modisviirs-harmonization)
+  - [4. MODIS--VIIRS Harmonization](#4-modisviirs-harmonization)
   - [5. Burn Index](#5-burn-index)
   - [6. Anomaly Detection](#6-anomaly-detection)
 - [Scientific Methodology](#scientific-methodology)
@@ -27,11 +29,13 @@
 - [Installation](#installation)
 - [Environment Setup](#environment-setup)
 - [Running the Pipeline](#running-the-pipeline)
+- [Running the FastAPI Server](#running-the-fastapi-server)
 - [Running Tests](#running-tests)
 - [Generated Datasets](#generated-datasets)
 - [Data Schema](#data-schema)
 - [API Architecture](#api-architecture)
 - [API Endpoints](#api-endpoints)
+- [Postman Collection](#postman-collection)
 - [Data Quality & Validation](#data-quality--validation)
 - [Important Limitations](#important-limitations)
 - [Development Workflow](#development-workflow)
@@ -43,16 +47,20 @@
 
 # About TerraIgnis
 
-TerraIgnis is a wildfire-monitoring and fire-activity analysis platform built around NASA FIRMS active-fire observations.
+TerraIgnis is a wildfire-monitoring and fire-activity analysis platform
+built around NASA FIRMS active-fire observations.
 
 The system processes observations from two satellite sensor families:
 
 - MODIS
 - VIIRS
 
-Because MODIS and VIIRS have different spatial resolutions and observation characteristics, their observations are not treated as directly equivalent.
+Because MODIS and VIIRS have different spatial resolutions and
+observation characteristics, their observations are not treated as
+directly equivalent.
 
-TerraIgnis therefore transforms the raw observations through a multi-stage analytical pipeline:
+TerraIgnis therefore transforms the raw observations through a
+multi-stage analytical pipeline:
 
 ````text
 NASA FIRMS
@@ -104,25 +112,27 @@ or:
 MODIS FRP = VIIRS FRP
 ```
 
-Instead, the system creates a common spatial framework and derives relative sensor-normalized indicators before combining them.
+Instead, the system creates a common spatial framework and derives
+relative sensor-normalized indicators before combining them.
 
 ---
 
 # Solution
 
-TerraIgnis addresses this problem through a structured processing pipeline.
+TerraIgnis addresses this problem through a structured processing
+pipeline.
 
 The system:
 
-1. Ingests NASA FIRMS MODIS and VIIRS data.
-2. Converts them into a common internal schema.
-3. Profiles and validates the data.
-4. Maps observations to H3 spatial cells.
-5. Aggregates observations by H3 cell and date.
-6. Harmonizes MODIS and VIIRS measurements.
-7. Produces a unified relative Burn Index.
-8. Detects statistically unusual fire activity.
-9. Exposes processed information through an API.
+1.  Ingests NASA FIRMS MODIS and VIIRS data.
+2.  Converts them into a common internal schema.
+3.  Profiles and validates the data.
+4.  Maps observations to H3 spatial cells.
+5.  Aggregates observations by H3 cell and date.
+6.  Harmonizes MODIS and VIIRS measurements.
+7.  Produces a unified relative Burn Index.
+8.  Detects statistically unusual fire activity.
+9.  Exposes processed information through an API.
 10. Provides the foundation for interactive frontend visualization.
 
 ---
@@ -134,9 +144,9 @@ The system:
 - Automated data-quality validation
 - H3 spatial aggregation
 - Sensor-specific metric preservation
-- MODIS–VIIRS harmonization
+- MODIS--VIIRS harmonization
 - Relative fire-activity scoring
-- 0–100 Burn Index
+- 0--100 Burn Index
 - Robust statistical anomaly detection
 - Daily anomaly analysis
 - Parquet-based analytical storage
@@ -259,7 +269,8 @@ Next.js
 
 ### Purpose
 
-The ingestion stage converts raw NASA FIRMS TXT files into a standardized internal dataset.
+The ingestion stage converts raw NASA FIRMS TXT files into a
+standardized internal dataset.
 
 ### Implementation
 
@@ -269,7 +280,8 @@ app/services/fire_ingestion.py
 
 ### Input
 
-Raw NASA FIRMS files containing MODIS and VIIRS active-fire observations.
+Raw NASA FIRMS files containing MODIS and VIIRS active-fire
+observations.
 
 ### Output
 
@@ -301,7 +313,8 @@ version
 source_file
 ```
 
-Sensor-specific measurements are mapped into common fields while preserving their original meaning.
+Sensor-specific measurements are mapped into common fields while
+preserving their original meaning.
 
 ### Current Dataset
 
@@ -318,7 +331,8 @@ Invalid observations: 0
 
 ## Purpose
 
-Before spatial aggregation, the standardized dataset is profiled to understand its quality and statistical characteristics.
+Before spatial aggregation, the standardized dataset is profiled to
+understand its quality and statistical characteristics.
 
 ### Implementation
 
@@ -445,13 +459,15 @@ The H3 aggregation successfully conserved:
 
 ---
 
-# 4. MODIS–VIIRS Harmonization
+# 4. MODIS--VIIRS Harmonization
 
 ## Purpose
 
 MODIS and VIIRS measurements are not directly equivalent.
 
-The harmonization layer converts sensor-specific measurements into relative, unitless indicators while preserving the original sensor information.
+The harmonization layer converts sensor-specific measurements into
+relative, unitless indicators while preserving the original sensor
+information.
 
 ### Implementation
 
@@ -534,7 +550,8 @@ VIIRS index
 mean of available sensor indices
 ```
 
-The sensor indices are averaged rather than added to avoid automatically doubling the score when both sensors are present.
+The sensor indices are averaged rather than added to avoid automatically
+doubling the score when both sensors are present.
 
 ### Important Interpretation
 
@@ -553,7 +570,8 @@ They are not:
 
 ## Purpose
 
-The Burn Index combines the harmonized activity and FRP signals into a single relative fire-activity score.
+The Burn Index combines the harmonized activity and FRP signals into a
+single relative fire-activity score.
 
 ### Implementation
 
@@ -605,7 +623,8 @@ Burn Index =
 )
 ```
 
-If one component is unavailable, the available component receives the effective full weight.
+If one component is unavailable, the available component receives the
+effective full weight.
 
 ## Output Scale
 
@@ -642,7 +661,9 @@ It is not:
 
 ## Purpose
 
-The anomaly layer identifies H3 cell/date observations whose Burn Index is unusually high or low relative to other detected-fire observations on the same date.
+The anomaly layer identifies H3 cell/date observations whose Burn Index
+is unusually high or low relative to other detected-fire observations on
+the same date.
 
 ### Implementation
 
@@ -681,7 +702,8 @@ and:
 6,458 H3 cells appear on only one date
 ```
 
-Therefore, a reliable per-H3 historical baseline cannot currently be constructed.
+Therefore, a reliable per-H3 historical baseline cannot currently be
+constructed.
 
 The anomaly system therefore uses a daily robust baseline.
 
@@ -821,7 +843,8 @@ Percentile:
 
 # Scientific Methodology
 
-TerraIgnis intentionally separates the analytical process into multiple stages:
+TerraIgnis intentionally separates the analytical process into multiple
+stages:
 
 ```text
 Raw observation
@@ -837,13 +860,15 @@ Burn Index
 Anomaly detection
 ```
 
-This prevents raw MODIS and VIIRS measurements from being directly mixed without normalization.
+This prevents raw MODIS and VIIRS measurements from being directly mixed
+without normalization.
 
 ---
 
 ## Sensor Harmonization Principle
 
-The system does not assume that observations from different sensors are directly interchangeable.
+The system does not assume that observations from different sensors are
+directly interchangeable.
 
 Instead:
 
@@ -861,7 +886,8 @@ sensor-specific normalization
 VIIRS index
 ```
 
-The resulting indices can then be combined while retaining sensor provenance.
+The resulting indices can then be combined while retaining sensor
+provenance.
 
 ---
 
@@ -882,7 +908,8 @@ with a transparent weighting:
 40% FRP
 ```
 
-This weighting is a project design choice rather than a scientifically calibrated universal weighting.
+This weighting is a project design choice rather than a scientifically
+calibrated universal weighting.
 
 ---
 
@@ -890,7 +917,8 @@ This weighting is a project design choice rather than a scientifically calibrate
 
 The anomaly system asks:
 
-> Is this detected-fire H3 cell/date unusually high or low compared with other detected-fire observations on the same date?
+> Is this detected-fire H3 cell/date unusually high or low compared with
+> other detected-fire observations on the same date?
 
 It does not claim:
 
@@ -900,13 +928,23 @@ It does not claim:
 
 # Dataset Summary
 
-| Dataset                      |   Rows | Purpose                         |
-| ---------------------------- | -----: | ------------------------------- |
-| `standardized_fires.parquet` | 35,315 | Standardized FIRMS observations |
-| `h3_fire_daily.parquet`      | 23,244 | H3 cell/date aggregation        |
-| `harmonized_fire.parquet`    | 23,244 | MODIS–VIIRS harmonization       |
-| `burn_index.parquet`         | 23,244 | Relative fire-activity index    |
-| `anomalies.parquet`          | 23,244 | Statistical anomaly analysis    |
+---
+
+Dataset Rows Purpose
+
+---
+
+`standardized_fires.parquet` 35,315 Standardized FIRMS observations
+
+`h3_fire_daily.parquet` 23,244 H3 cell/date aggregation
+
+`harmonized_fire.parquet` 23,244 MODIS--VIIRS harmonization
+
+`burn_index.parquet` 23,244 Relative fire-activity index
+
+`anomalies.parquet` 23,244 Statistical anomaly analysis
+
+---
 
 ---
 
@@ -958,7 +996,8 @@ The analytical datasets use:
 Apache Parquet
 ```
 
-Parquet is suitable for this project because the workload is primarily analytical.
+Parquet is suitable for this project because the workload is primarily
+analytical.
 
 Advantages include:
 
@@ -999,7 +1038,8 @@ terraIgnis/
 │   │   │   ├── fires.py
 │   │   │   ├── calendar.py
 │   │   │   ├── anomaly.py
-│   │   │   └── regions.py
+│   │   │   ├── regions.py
+│   │   │   └── stats.py
 │   │   │
 │   │   ├── core/
 │   │   │   ├── __init__.py
@@ -1012,7 +1052,9 @@ terraIgnis/
 │   │   ├── schemas/
 │   │   │   ├── fire.py
 │   │   │   ├── calendar.py
-│   │   │   └── anomaly.py
+│   │   │   ├── anomaly.py
+│   │   │   ├── regions.py
+│   │   │   └── stats.py
 │   │   │
 │   │   ├── services/
 │   │   │   ├── fire_ingestion.py
@@ -1035,7 +1077,12 @@ terraIgnis/
 │   │   ├── test_spatial.py
 │   │   ├── test_harmonization.py
 │   │   ├── test_burn_index.py
-│   │   └── test_anomaly.py
+│   │   ├── test_anomaly.py
+│   │   ├── test_fires_api.py
+│   │   ├── test_calendar_api.py
+│   │   ├── test_anomaly_api.py
+│   │   ├── test_stats_api.py
+│   │   └── test_regions_api.py
 │   │
 │   ├── data/
 │   │   ├── raw/
@@ -1049,6 +1096,7 @@ terraIgnis/
 │   │       ├── burn_index.parquet
 │   │       └── anomalies.parquet
 │   │
+│   ├── terraIgnis.postman_collection.json
 │   ├── .env
 │   ├── .gitignore
 │   ├── requirements.txt
@@ -1126,7 +1174,8 @@ Example:
 APP_ENV=development
 ```
 
-Do not commit secrets, API keys, credentials, or private configuration values.
+Do not commit secrets, API keys, credentials, or private configuration
+values.
 
 ---
 
@@ -1134,7 +1183,7 @@ Do not commit secrets, API keys, credentials, or private configuration values.
 
 Run the stages in order.
 
-## Step 1 — Ingestion
+## Step 1 --- Ingestion
 
 ```bash
 .venv/bin/python scripts/ingest.py
@@ -1148,7 +1197,7 @@ data/processed/standardized_fires.parquet
 
 ---
 
-## Step 2 — Profiling
+## Step 2 --- Profiling
 
 ```bash
 .venv/bin/python scripts/profile_fires.py
@@ -1162,7 +1211,7 @@ data/processed/fire_profile.json
 
 ---
 
-## Step 3 — H3 Aggregation
+## Step 3 --- H3 Aggregation
 
 ```bash
 .venv/bin/python scripts/build_h3_grid.py
@@ -1176,7 +1225,7 @@ data/processed/h3_fire_daily.parquet
 
 ---
 
-## Step 4 — Harmonization
+## Step 4 --- Harmonization
 
 ```bash
 .venv/bin/python scripts/build_harmonized_fire.py
@@ -1190,7 +1239,7 @@ data/processed/harmonized_fire.parquet
 
 ---
 
-## Step 5 — Burn Index
+## Step 5 --- Burn Index
 
 ```bash
 .venv/bin/python scripts/build_burn_index.py
@@ -1204,7 +1253,7 @@ data/processed/burn_index.parquet
 
 ---
 
-## Step 6 — Anomaly Detection
+## Step 6 --- Anomaly Detection
 
 ```bash
 .venv/bin/python scripts/build_anomalies.py
@@ -1240,9 +1289,41 @@ Each stage consumes the output of the previous stage.
 
 ---
 
+# Running the FastAPI Server
+
+From the `backend/` directory:
+
+```bash
+.venv/bin/uvicorn app.main:app --reload
+```
+
+The development API will be available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Health check:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+FastAPI interactive documentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+OpenAPI schema:
+
+```text
+http://127.0.0.1:8000/openapi.json
+```
+
 # Running Tests
 
-Run all backend tests:
+Run the complete backend test suite:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
@@ -1251,26 +1332,22 @@ Run all backend tests:
 Current result:
 
 ```text
-57 backend tests passed
+131 backend tests passed
 ```
 
-Individual test modules can be executed separately:
+The test suite covers:
 
-```bash
-.venv/bin/python -m unittest tests.test_spatial -v
-```
-
-```bash
-.venv/bin/python -m unittest tests.test_harmonization -v
-```
-
-```bash
-.venv/bin/python -m unittest tests.test_burn_index -v
-```
-
-```bash
-.venv/bin/python -m unittest tests.test_anomaly -v
-```
+- FIRMS ingestion
+- H3 spatial aggregation
+- MODIS--VIIRS harmonization
+- Burn Index
+- anomaly detection
+- `/api/fires`
+- `/api/calendar`
+- `/api/anomalies`
+- `/api/anomalies/{h3_cell}`
+- `/api/stats`
+- `/api/regions/{h3_cell}`
 
 ---
 
@@ -1454,11 +1531,100 @@ All checks passed.
 
 ---
 
+# Data Schema
+
+TerraIgnis keeps the analytical layers separated by purpose.
+
+## Standardized FIRMS Observations
+
+`standardized_fires.parquet` contains one record per standardized
+satellite fire detection.
+
+Key fields include:
+
+```text
+record_id
+sensor
+satellite
+latitude
+longitude
+acq_date
+acq_time
+brightness
+brightness_longwave
+scan
+track
+confidence_raw
+confidence_numeric
+frp
+daynight
+version
+source_file
+```
+
+## H3 Daily Aggregation
+
+`h3_fire_daily.parquet` contains one record per observed:
+
+```text
+h3_cell + acq_date
+```
+
+The dataset preserves MODIS and VIIRS detection and FRP metrics
+separately.
+
+## Harmonized Fire Data
+
+`harmonized_fire.parquet` contains H3/date-level sensor metrics, sensor
+presence, normalized sensor indicators, and harmonized activity/FRP
+indices.
+
+## Burn Index
+
+`burn_index.parquet` contains the unified relative fire-activity score
+and its component values.
+
+Important fields include:
+
+```text
+h3_cell
+acq_date
+harmonized_activity_index
+activity_component
+frp_component
+activity_weight
+frp_weight
+burn_index
+```
+
+## Anomaly Data
+
+`anomalies.parquet` contains:
+
+```text
+h3_cell
+acq_date
+burn_index
+daily_median
+daily_mad
+daily_mean
+daily_std
+robust_z_score
+anomaly_percentile
+anomaly_level
+```
+
+## API Response Model
+
+The FastAPI layer exposes these analytical datasets as typed JSON
+responses through Pydantic schemas.
+
 # API Architecture
 
-The next application layer is FastAPI.
+The analytical API layer is implemented with FastAPI.
 
-The API will sit between the processed Parquet datasets and the Next.js frontend.
+The API sits between the processed Parquet datasets and the Next.js
+frontend:
 
 ```text
 Processed Parquet
@@ -1473,7 +1639,594 @@ Processed Parquet
     Next.js
 ```
 
-The API should query processed analytical datasets instead of recalculating the entire pipeline for every request.
+The API queries processed analytical datasets instead of recalculating
+the entire pipeline for every request.
+
+## API Data Flow
+
+```text
+NASA FIRMS
+    ↓
+Analytical Pipeline
+    ↓
+Parquet Datasets
+    ↓
+DuckDB
+    ↓
+FastAPI
+    ↓
+JSON API Responses
+    ↓
+Next.js Frontend
+```
+
+The API layer is read-only with respect to the analytical Parquet
+datasets.
+
+---
+
+# API Endpoints
+
+The current backend exposes the following endpoints.
+
+## Health
+
+### `GET /health`
+
+Returns the API health status.
+
+Example:
+
+```text
+GET http://127.0.0.1:8000/health
+```
+
+---
+
+## Fires
+
+### `GET /api/fires`
+
+Returns paginated H3 cell/date fire-activity records.
+
+Supported query parameters:
+
+```text
+date
+start_date
+end_date
+h3_cell
+min_burn_index
+max_burn_index
+sensor
+limit
+offset
+```
+
+Example:
+
+```text
+GET /api/fires?date=2026-09-02&limit=100
+```
+
+Sensor values supported by the current dataset/API include:
+
+```text
+MODIS
+VIIRS
+BOTH
+```
+
+`BOTH` represents H3 cell/date observations where both MODIS and VIIRS
+are present.
+
+---
+
+## Calendar
+
+### `GET /api/calendar`
+
+Returns daily fire-activity summaries for the observed dataset.
+
+Supported query parameters:
+
+```text
+date
+start_date
+end_date
+anomaly_level
+limit
+offset
+```
+
+Returned information includes daily metrics such as:
+
+```text
+date
+fire_count
+mean_burn_index
+max_burn_index
+anomaly counts
+```
+
+Example:
+
+```text
+GET /api/calendar?start_date=2026-09-01&end_date=2026-09-26
+```
+
+---
+
+## Anomalies
+
+### `GET /api/anomalies`
+
+Returns paginated anomaly records.
+
+Supported query parameters:
+
+```text
+date
+start_date
+end_date
+anomaly_level
+h3_cell
+min_robust_z
+max_robust_z
+min_burn_index
+max_burn_index
+limit
+offset
+```
+
+Supported anomaly levels:
+
+```text
+normal
+low
+high
+extreme_low
+extreme_high
+```
+
+Example:
+
+```text
+GET /api/anomalies?anomaly_level=extreme_high&limit=100
+```
+
+### `GET /api/anomalies/{h3_cell}`
+
+Returns the observed anomaly history for a specific H3 resolution-7
+cell.
+
+Optional query parameters:
+
+```text
+start_date
+end_date
+```
+
+Example:
+
+```text
+GET /api/anomalies/8743aa964ffffff
+```
+
+A valid H3 cell with no observations returns an empty/not-found response
+according to the API behavior. Missing dates are not fabricated.
+
+---
+
+## Statistics
+
+### `GET /api/stats`
+
+Returns a structured project-level analytical summary.
+
+The response contains:
+
+```text
+coverage
+sensors
+burn_index
+anomalies
+```
+
+Example:
+
+```text
+GET /api/stats
+```
+
+Current statistics include:
+
+- total raw observations
+- total H3 cell/date observations
+- unique H3 cells
+- observed dates
+- temporal coverage
+- H3 resolution
+- MODIS observations
+- VIIRS observations
+- MODIS-only cell/date rows
+- VIIRS-only cell/date rows
+- both-sensor cell/date rows
+- Burn Index minimum
+- Burn Index maximum
+- Burn Index mean
+- Burn Index median
+- Burn Index P95
+- anomaly-level counts
+
+---
+
+## Regions
+
+### `GET /api/regions/{h3_cell}`
+
+TerraIgnis currently has no administrative-boundary dataset.
+
+Therefore, the API uses an observed H3 resolution-7 cell as the spatial
+"region" abstraction.
+
+The endpoint returns a summary including metrics such as:
+
+```text
+h3_cell
+observed_cell_dates
+first_observed_date
+last_observed_date
+total_fire_detections
+mean_burn_index
+max_burn_index
+min_burn_index
+anomaly_count
+extreme_anomaly_count
+modis_fire_detections
+viirs_fire_detections
+```
+
+Example:
+
+```text
+GET /api/regions/87436c709ffffff
+```
+
+Optional query parameters:
+
+```text
+start_date
+end_date
+```
+
+Example:
+
+```text
+GET /api/regions/87436c709ffffff?start_date=2026-08-01&end_date=2026-09-26
+```
+
+Important semantics:
+
+- `observed_cell_dates` counts observed H3 cell/date rows.
+- `total_fire_detections` represents summed satellite fire detections.
+- MODIS and VIIRS detection totals are kept separate.
+- Missing dates are not fabricated.
+- Valid H3 cells must be resolution 7.
+- Invalid H3 identifiers or wrong-resolution H3 cells return HTTP 422.
+- A valid H3 cell with no matching observations returns HTTP 404.
+- Reversed date ranges return HTTP 422.
+
+---
+
+## API Response and Query Principles
+
+The API:
+
+- queries processed Parquet datasets
+- uses DuckDB for analytical queries
+- validates query parameters
+- uses Pydantic response schemas
+- returns predictable JSON structures
+- supports date filtering
+- supports H3 filtering
+- exposes anomaly information
+- preserves sensor provenance where useful
+- avoids recalculating the analytical pipeline per request
+- does not mutate analytical datasets
+- uses pagination where appropriate
+
+The API does not fabricate missing H3/date observations as zero-fire
+records.
+
+---
+
+# Postman Collection
+
+A complete Postman collection is included in the repository:
+
+```text
+backend/terraIgnis.postman_collection.json
+```
+
+The collection can be imported directly into Postman and contains
+ready-to-use requests for the TerraIgnis API.
+
+The collection includes:
+
+```text
+TerraIgnis API
+├── Health
+│   └── Health Check
+│
+├── Fires
+│   ├── Get Fires
+│   ├── Get Fires By Date
+│   ├── Get Fires By Date Range
+│   ├── Get Fires By H3 Cell
+│   ├── Get Fires By Burn Index
+│   ├── Get Fires By Sensor
+│   └── Get Fires With Pagination
+│
+├── Calendar
+│   ├── Get Calendar
+│   ├── Get Calendar By Date
+│   ├── Get Calendar By Date Range
+│   └── Get Calendar High Anomalies
+│
+├── Anomalies
+│   ├── Get Anomalies
+│   ├── Get High Anomalies
+│   ├── Get Extreme Anomalies
+│   ├── Get Anomalies By Date
+│   ├── Get Anomalies By H3 Cell
+│   ├── Get Anomalies By Robust Z Score
+│   ├── Get Anomaly History
+│   └── Get Anomaly History By Date Range
+│
+├── Statistics
+│   └── Get Statistics
+│
+└── Regions
+    ├── Get Region Summary
+    └── Get Region Summary By Date Range
+```
+
+### Importing the Collection
+
+1.  Start the FastAPI server.
+2.  Open Postman.
+3.  Select **Import**.
+4.  Choose:
+
+```text
+backend/terraIgnis.postman_collection.json
+```
+
+The collection uses these variables:
+
+```text
+base_url
+h3_cell
+date
+start_date
+end_date
+```
+
+Default development base URL:
+
+```text
+http://127.0.0.1:8000
+```
+
+Example H3 cell:
+
+```text
+87436c709ffffff
+```
+
+Example date:
+
+```text
+2026-09-02
+```
+
+The collection is intended to provide a convenient way to manually
+inspect and validate all current API endpoints before frontend
+integration.
+
+# Data Quality & Validation
+
+The pipeline performs validation after each major processing stage.
+
+## Ingestion
+
+```text
+Total observations: 35,315
+Invalid observations: 0
+```
+
+---
+
+## H3 Aggregation
+
+Validation checks include:
+
+- row representation
+- sensor count conservation
+- FRP conservation
+- null H3 cells
+- null dates
+- duplicate cell/date keys
+- negative values
+
+All checks passed.
+
+---
+
+## Harmonization
+
+Validation checks include:
+
+- row conservation
+- MODIS detection conservation
+- VIIRS detection conservation
+- FRP conservation
+- duplicate cell/date keys
+- null keys
+- negative normalized values
+- out-of-range indices
+
+All checks passed.
+
+---
+
+## Burn Index
+
+Validation checks include:
+
+- row conservation
+- MODIS/VIIRS representation
+- duplicate keys
+- null scores
+- negative scores
+- scores above 100
+- formula consistency
+- sensor-presence consistency
+
+All checks passed.
+
+---
+
+## Anomaly Detection
+
+Validation checks include:
+
+- input/output row conservation
+- duplicate H3/date keys
+- null required fields
+- percentile range
+- infinite scores
+- division by zero
+- daily baseline consistency
+- fabricated cells
+- fabricated keys
+- fabricated zero-fire rows
+
+All checks passed.
+
+---
+
+# Data Schema
+
+TerraIgnis keeps the analytical layers separated by purpose.
+
+## Standardized FIRMS Observations
+
+`standardized_fires.parquet` contains one record per standardized
+satellite fire detection.
+
+Key fields include:
+
+```text
+record_id
+sensor
+satellite
+latitude
+longitude
+acq_date
+acq_time
+brightness
+brightness_longwave
+scan
+track
+confidence_raw
+confidence_numeric
+frp
+daynight
+version
+source_file
+```
+
+## H3 Daily Aggregation
+
+`h3_fire_daily.parquet` contains one record per observed:
+
+```text
+h3_cell + acq_date
+```
+
+The dataset preserves MODIS and VIIRS detection and FRP metrics
+separately.
+
+## Harmonized Fire Data
+
+`harmonized_fire.parquet` contains H3/date-level sensor metrics, sensor
+presence, normalized sensor indicators, and harmonized activity/FRP
+indices.
+
+## Burn Index
+
+`burn_index.parquet` contains the unified relative fire-activity score
+and its component values.
+
+Important fields include:
+
+```text
+h3_cell
+acq_date
+harmonized_activity_index
+activity_component
+frp_component
+activity_weight
+frp_weight
+burn_index
+```
+
+## Anomaly Data
+
+`anomalies.parquet` contains:
+
+```text
+h3_cell
+acq_date
+burn_index
+daily_median
+daily_mad
+daily_mean
+daily_std
+robust_z_score
+anomaly_percentile
+anomaly_level
+```
+
+## API Response Model
+
+The FastAPI layer exposes these analytical datasets as typed JSON
+responses through Pydantic schemas.
+
+# API Architecture
+
+The next application layer is FastAPI.
+
+The API will sit between the processed Parquet datasets and the Next.js
+frontend.
+
+```text
+Processed Parquet
+       │
+       ▼
+    DuckDB
+       │
+       ▼
+    FastAPI
+       │
+       ▼
+    Next.js
+```
+
+The API should query processed analytical datasets instead of
+recalculating the entire pipeline for every request.
 
 ---
 
@@ -1560,7 +2313,8 @@ GET /api/anomalies/{h3_cell}
 GET /api/stats
 ```
 
-These endpoints are part of the planned FastAPI layer and may evolve based on frontend requirements.
+These endpoints are part of the planned FastAPI layer and may evolve
+based on frontend requirements.
 
 ---
 
@@ -1595,7 +2349,8 @@ The current dataset covers:
 
 This is approximately two months.
 
-Therefore, the current system does not provide a long-term climatological baseline.
+Therefore, the current system does not provide a long-term
+climatological baseline.
 
 ---
 
@@ -1609,7 +2364,8 @@ H3 cell × date
 
 grid.
 
-Only cell/date combinations with at least one detected fire are represented.
+Only cell/date combinations with at least one detected fire are
+represented.
 
 Therefore:
 
@@ -1637,7 +2393,8 @@ Additionally:
 
 appear on only one date.
 
-Therefore, reliable long-term per-cell anomaly baselines cannot currently be constructed.
+Therefore, reliable long-term per-cell anomaly baselines cannot
+currently be constructed.
 
 ---
 
@@ -1645,7 +2402,8 @@ Therefore, reliable long-term per-cell anomaly baselines cannot currently be con
 
 MODIS and VIIRS have different sensor characteristics.
 
-The harmonization methodology creates relative normalized indicators but does not establish perfect physical equivalence.
+The harmonization methodology creates relative normalized indicators but
+does not establish perfect physical equivalence.
 
 ---
 
@@ -1665,7 +2423,8 @@ It is not:
 
 ## Anomaly Limitations
 
-The anomaly system identifies unusual observations among detected-fire H3 cells for a date.
+The anomaly system identifies unusual observations among detected-fire
+H3 cells for a date.
 
 A low anomaly does not mean:
 
@@ -1679,7 +2438,8 @@ or:
 below-normal regional activity
 ```
 
-Similarly, a high anomaly does not by itself constitute a definitive wildfire alert.
+Similarly, a high anomaly does not by itself constitute a definitive
+wildfire alert.
 
 ---
 
@@ -1719,6 +2479,11 @@ feat: add MODIS VIIRS harmonization
 feat: add burn index calculation
 feat: add fire anomaly detection
 feat: add FastAPI fire endpoints
+feat: add FastAPI calendar endpoints
+feat: add FastAPI anomaly endpoints
+feat: add FastAPI statistics endpoints
+feat: add H3 region summary endpoints
+docs: add Postman API collection
 ```
 
 Other prefixes:
@@ -1743,7 +2508,8 @@ Each major processing stage has:
 - unit tests
 - deterministic output
 
-The analytical pipeline can be reproduced by executing the processing stages in order.
+The analytical pipeline can be reproduced by executing the processing
+stages in order.
 
 ```bash
 .venv/bin/python scripts/ingest.py
@@ -1763,29 +2529,12 @@ The analytical pipeline can be reproduced by executing the processing stages in 
 
 # Future Work
 
-## FastAPI
-
-The immediate next backend milestone is the FastAPI layer.
-
-Planned work:
-
-- FastAPI application
-- DuckDB query layer
-- Pydantic schemas
-- fire endpoints
-- calendar endpoints
-- anomaly endpoints
-- region statistics
-- H3 queries
-- date filtering
-- spatial filtering
-- API documentation
-
----
-
 ## Frontend Integration
 
-The Next.js frontend will use the API to provide:
+The backend API layer is now complete. The next major application stage
+is the Next.js frontend.
+
+The frontend will use the API to provide:
 
 - interactive wildfire maps
 - H3 cell visualization
@@ -1793,8 +2542,12 @@ The Next.js frontend will use the API to provide:
 - anomaly visualization
 - temporal fire calendars
 - fire statistics
-- regional summaries
+- H3 spatial summaries
 - sensor information
+- API-driven filtering
+
+The frontend should consume the existing API rather than reimplementing
+analytical calculations.
 
 ---
 
@@ -1808,26 +2561,31 @@ With a larger historical dataset, TerraIgnis could support:
 - temporal trend analysis
 - historical fire-event tracking
 - improved sensor calibration
-- stronger MODIS–VIIRS cross-comparison
+- stronger MODIS--VIIRS cross-comparison
 - regional fire-risk analysis
-
----
 
 # Current Project Status
 
-| Component                 | Status        |
-| ------------------------- | ------------- |
-| FIRMS ingestion           | ✅ Complete   |
-| Data profiling            | ✅ Complete   |
-| H3 spatial aggregation    | ✅ Complete   |
-| MODIS–VIIRS harmonization | ✅ Complete   |
-| Burn Index                | ✅ Complete   |
-| Anomaly detection         | ✅ Complete   |
-| Backend tests             | ✅ 57 passing |
-| FastAPI                   | 🚧 Next       |
-| Frontend integration      | ⏳ Planned    |
+Component Status
 
 ---
+
+FIRMS ingestion ✅ Complete
+Data profiling ✅ Complete
+H3 spatial aggregation ✅ Complete
+MODIS--VIIRS harmonization ✅ Complete
+Burn Index ✅ Complete
+Anomaly detection ✅ Complete
+FastAPI foundation ✅ Complete
+`/api/fires` ✅ Complete
+`/api/calendar` ✅ Complete
+`/api/anomalies` ✅ Complete
+`/api/anomalies/{h3_cell}` ✅ Complete
+`/api/stats` ✅ Complete
+`/api/regions/{h3_cell}` ✅ Complete
+Postman collection ✅ Added
+Backend tests ✅ 131 passing
+Frontend integration ⏳ Next
 
 # Pipeline Summary
 
@@ -1914,7 +2672,9 @@ The current TerraIgnis analytical pipeline is:
 
 # Conclusion
 
-TerraIgnis provides a structured pipeline for transforming NASA FIRMS active-fire observations into a common spatial and analytical representation.
+TerraIgnis provides a structured pipeline for transforming NASA FIRMS
+active-fire observations into a common spatial and analytical
+representation.
 
 The system currently supports:
 
@@ -1958,13 +2718,15 @@ burn_index.parquet
 anomalies.parquet
 ```
 
-All major analytical stages have been validated through automated tests, with the current backend test suite containing:
+All major analytical stages and API endpoints have been validated
+through automated tests, with the current backend test suite containing:
 
 ```text
-57 passing tests
+131 passing tests
 ```
 
-The next major stage is to expose these analytical results through FastAPI and integrate them with the TerraIgnis frontend.
+The FastAPI backend is now complete. The next major stage is to
+integrate the API with the TerraIgnis Next.js frontend.
 
 ---
 
@@ -1979,5 +2741,3 @@ MIT License
 ```
 
 or the license selected by the TerraIgnis team.
-
-**This is the single complete README**—you don't need to combine it with the previous version. It includes the current state through **anomaly detection** and leaves **FastAPI as the next development stage**.
