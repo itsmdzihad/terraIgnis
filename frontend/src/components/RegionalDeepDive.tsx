@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { REGIONAL_SITES, DIURNAL_PROFILE, LAND_COVER_CORRELATION } from '../mockData';
-import { MapPin, Sliders, Activity, Sunset, Layers, BarChart3, ChevronDown, Flame, AlertTriangle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import TerraIgnisMap from './TerraIgnisMap';
 
 export default function RegionalDeepDive() {
@@ -58,28 +58,23 @@ export default function RegionalDeepDive() {
   return (
     <div className="flex flex-col h-full bg-slate-950 p-6 gap-6 overflow-hidden">
       
-      {/* 1. HEADER & DROPDOWN REGION SELECTOR */}
+      {/* 1. HEADER & REGION SELECTOR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
         <div>
-          <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
-            Spatio-Temporal Coregistration
-          </span>
-          <h2 className="text-sm font-bold text-white uppercase tracking-tight flex items-center gap-2 mt-0.5">
-            <Flame className="w-4 h-4 text-orange-500" />
-            Regional Deep Dive Analytics
-          </h2>
+          <h2 className="text-sm font-semibold text-white">Regional Deep Dive</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Spatio-temporal coregistration analysis</p>
         </div>
 
-        {/* Droplist Selection */}
+        {/* Region Selector */}
         <div className="relative min-w-[240px]">
           <select
             value={activeSiteId}
             onChange={(e) => setActiveSiteId(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 pr-10 text-xs font-mono text-white focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none cursor-pointer"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none cursor-pointer"
           >
             {REGIONAL_SITES.map((site) => (
               <option key={site.id} value={site.id}>
-                {site.name} ({site.id.toUpperCase()})
+                {site.name}
               </option>
             ))}
           </select>
@@ -97,10 +92,8 @@ export default function RegionalDeepDive() {
           
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <div>
-              <span className="text-[9px] font-mono text-cyan-400 block font-semibold uppercase">
-                Target Calibration Area
-              </span>
-              <h3 className="text-xs font-bold text-white mt-0.5">
+              <p className="text-xs text-slate-400">Target Region</p>
+              <h3 className="text-sm font-semibold text-white mt-0.5">
                 {activeSite.name}
               </h3>
             </div>
@@ -143,11 +136,9 @@ export default function RegionalDeepDive() {
             {/* 1. Sensor Inconsistency Graph */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
               <div>
-                <span className="text-[9px] font-mono text-red-500 block font-semibold uppercase">
-                  Sensor Inconsistency Graph (Raw Counts)
-                </span>
-                <h4 className="text-xs font-bold text-white mt-0.5">
-                  Raw MODIS vs Raw VIIRS Over Time
+                <p className="text-xs text-slate-400">Sensor Inconsistency</p>
+                <h4 className="text-sm font-semibold text-white mt-0.5">
+                  Raw MODIS vs Raw VIIRS
                 </h4>
               </div>
 
@@ -177,21 +168,21 @@ export default function RegionalDeepDive() {
                     strokeWidth="1.5"
                   />
                 </svg>
-                <div className="flex justify-between text-[7px] font-mono text-slate-600 mt-1">
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                   <span>2012</span>
                   <span>2019</span>
                   <span>2026</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-[8px] font-mono text-slate-500 mt-2">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-0.5 bg-yellow-400" />
-                  <span>MODIS Raw</span>
+              <div className="flex items-center gap-3 text-xs text-slate-500 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-0.5 bg-yellow-400 block" />
+                  <span>MODIS</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-0.5 bg-red-500" />
-                  <span>VIIRS Raw</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-0.5 bg-red-500 block" />
+                  <span>VIIRS</span>
                 </div>
               </div>
             </div>
@@ -199,11 +190,9 @@ export default function RegionalDeepDive() {
             {/* 2. Harmonized Activity Graph */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
               <div>
-                <span className="text-[9px] font-mono text-emerald-400 block font-semibold uppercase">
-                  Harmonized Activity Graph (Corrected)
-                </span>
-                <h4 className="text-xs font-bold text-white mt-0.5">
-                  Unified Trend Curve (TerraIgnis)
+                <p className="text-xs text-slate-400">Harmonized Activity</p>
+                <h4 className="text-sm font-semibold text-white mt-0.5">
+                  Unified Trend (TerraIgnis)
                 </h4>
               </div>
 
@@ -221,25 +210,23 @@ export default function RegionalDeepDive() {
                     strokeWidth="2"
                   />
                 </svg>
-                <div className="flex justify-between text-[7px] font-mono text-slate-600 mt-1">
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                   <span>2012</span>
                   <span>2019</span>
                   <span>2026</span>
                 </div>
               </div>
 
-              <div className="text-[8px] font-mono text-slate-500 mt-2">
-                ✓ Rescaled and synchronized using bi-directional scaling factor.
+              <div className="text-xs text-slate-500 mt-2">
+                Rescaled using bi-directional scaling factor.
               </div>
             </div>
 
             {/* 3. Diurnal Cycle Analysis */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
               <div>
-                <span className="text-[9px] font-mono text-cyan-400 block font-semibold uppercase">
-                  Diurnal Cycle Analysis
-                </span>
-                <h4 className="text-xs font-bold text-white mt-0.5">
+                <p className="text-xs text-slate-400">Diurnal Cycle</p>
+                <h4 className="text-sm font-semibold text-white mt-0.5">
                   Overpass Schedule & Radiative Curve
                 </h4>
               </div>
@@ -268,35 +255,33 @@ export default function RegionalDeepDive() {
                     strokeWidth="1.5"
                   />
                 </svg>
-                <div className="flex justify-between text-[7px] font-mono text-slate-600 mt-1">
-                  <span>06:00 AM</span>
-                  <span>12:00 PM</span>
-                  <span>18:00 PM</span>
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>06:00</span>
+                  <span>12:00</span>
+                  <span>18:00</span>
                 </div>
               </div>
 
-              <div className="text-[8px] font-mono text-slate-500 mt-2">
-                Peak morning (Terra) & afternoon (Aqua/VIIRS) cycles integrated.
+              <div className="text-xs text-slate-500 mt-2">
+                Peak morning (Terra) and afternoon (Aqua/VIIRS) cycles integrated.
               </div>
             </div>
 
             {/* 4. Land Cover Correlation */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
               <div>
-                <span className="text-[9px] font-mono text-yellow-500 block font-semibold uppercase">
-                  Land Cover Correlation
-                </span>
-                <h4 className="text-xs font-bold text-white mt-0.5">
-                  Occurrences Mapped by Forestry Class
+                <p className="text-xs text-slate-400">Land Cover Correlation</p>
+                <h4 className="text-sm font-semibold text-white mt-0.5">
+                  Occurrences by Forestry Class
                 </h4>
               </div>
 
               <div className="space-y-2 mt-3">
                 {LAND_COVER_CORRELATION.slice(0, 4).map((item, idx) => (
-                  <div key={idx} className="space-y-0.5 text-[10px] font-mono">
-                    <div className="flex justify-between text-slate-400">
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-xs text-slate-400">
                       <span className="truncate max-w-[120px]">{item.class}</span>
-                      <span className="text-white font-semibold">{item.harmonizedPercentage}%</span>
+                      <span className="text-white font-medium">{item.harmonizedPercentage}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
                       <div
@@ -308,7 +293,7 @@ export default function RegionalDeepDive() {
                 ))}
               </div>
 
-              <div className="text-[7px] font-mono text-slate-600 mt-2">
+              <div className="text-xs text-slate-500 mt-3">
                 Source: ESA land-cover map coregistrations.
               </div>
             </div>
