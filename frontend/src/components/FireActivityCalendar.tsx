@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { generateDailyBurnData, DailyBurnPoint } from '../mockData';
-import { Calendar, Download, FileText, AlertOctagon, Sparkles } from 'lucide-react';
+import { Calendar, Download, FileText } from 'lucide-react';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -132,18 +132,16 @@ export default function FireActivityCalendar() {
       {/* 1. YEAR SELECTOR HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
         <div>
-          <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
-            Multi-Decade Temporal Matrix
-          </span>
-          <h2 className="text-sm font-bold text-white uppercase tracking-tight flex items-center gap-2 mt-0.5">
-            <Calendar className="w-4 h-4 text-orange-500 animate-pulse" />
-            Annual Activity Calendar
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-orange-500" />
+            Activity Calendar
           </h2>
+          <p className="text-xs text-slate-400 mt-0.5">Multi-decade temporal matrix</p>
         </div>
 
         {/* Selection Slider */}
         <div className="flex items-center gap-4 min-w-[280px]">
-          <span className="text-[10px] font-mono text-slate-400">Scrub Year:</span>
+          <span className="text-xs text-slate-400 shrink-0">Year</span>
           <input
             type="range"
             min="2000"
@@ -153,9 +151,9 @@ export default function FireActivityCalendar() {
               setSelectedYear(Number(e.target.value));
               setHoveredDay(null);
             }}
-            className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+            className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-green-500"
           />
-          <span className="text-sm font-bold font-mono text-white bg-slate-950 border border-slate-800 px-2.5 py-1 rounded">
+          <span className="text-sm font-semibold text-white bg-slate-950 border border-slate-800 px-2.5 py-1 rounded font-mono">
             {selectedYear}
           </span>
         </div>
@@ -166,24 +164,24 @@ export default function FireActivityCalendar() {
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-              Harmonized Burn Intensity Grid (365 Days)
+            <h3 className="text-sm font-semibold text-white">
+              Harmonized Burn Intensity — {selectedYear}
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Each block represents one calendar day. Hover for detailed spectrographic metrics.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Each cell represents one calendar day. Hover for metrics.
             </p>
           </div>
 
           {/* Grid Legend */}
-          <div className="flex items-center gap-1 text-[9px] font-mono text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <span>Low</span>
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-slate-900 border border-slate-800" />
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-red-950/70" />
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-orange-600/60" />
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-orange-500" />
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-yellow-400" />
-            <span className="w-[15px] h-[15px] rounded-[3px] bg-purple-500" />
-            <span>Severe</span>
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-slate-900 border border-slate-800 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-950 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-900 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-700 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-500 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-400 block" />
+            <span>High</span>
           </div>
         </div>
 
@@ -228,11 +226,11 @@ export default function FireActivityCalendar() {
                       const val = dayPoint.value;
                       let colorStyle = 'bg-slate-900 border border-slate-800/40 hover:ring-1 hover:ring-white z-10';
                       
-                      if (val > 0.8) colorStyle = 'bg-purple-500 hover:ring-1 hover:ring-purple-300 z-10';
-                      else if (val > 0.6) colorStyle = 'bg-yellow-400 hover:ring-1 hover:ring-yellow-200 z-10';
-                      else if (val > 0.4) colorStyle = 'bg-orange-500 hover:ring-1 hover:ring-orange-300 z-10';
-                      else if (val > 0.25) colorStyle = 'bg-orange-600/70 hover:ring-1 hover:ring-orange-500 z-10';
-                      else if (val > 0.1) colorStyle = 'bg-red-950/70 hover:ring-1 hover:ring-red-400 z-10';
+                      if (val > 0.8) colorStyle = 'bg-green-400 hover:ring-1 hover:ring-green-200 z-10';
+                      else if (val > 0.6) colorStyle = 'bg-green-500 hover:ring-1 hover:ring-green-300 z-10';
+                      else if (val > 0.4) colorStyle = 'bg-green-700 hover:ring-1 hover:ring-green-500 z-10';
+                      else if (val > 0.25) colorStyle = 'bg-green-900 hover:ring-1 hover:ring-green-700 z-10';
+                      else if (val > 0.1) colorStyle = 'bg-green-950 hover:ring-1 hover:ring-green-800 z-10';
                       
                       return (
                         <div
@@ -250,32 +248,32 @@ export default function FireActivityCalendar() {
           </div>
         </div>
 
-        {/* Live Hover Tooltip Panel */}
-        <div className="min-h-[56px] bg-slate-950/60 rounded border border-slate-800 p-3 flex items-center justify-between font-mono text-[11px]">
+        {/* Hover Tooltip Panel */}
+        <div className="min-h-[56px] bg-slate-950/60 rounded-lg border border-slate-800 p-3 flex items-center justify-between text-xs">
           {hoveredDay ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div>
-                <span className="text-slate-500 block text-[9px]">DATE</span>
-                <span className="text-white font-bold">{hoveredDay.date}</span>
+                <span className="text-slate-500 block text-[10px] mb-0.5">Date</span>
+                <span className="text-white font-semibold">{hoveredDay.date}</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px]">ACTIVE HOTSPOTS</span>
-                <span className="text-yellow-400 font-bold">{hoveredDay.hotspotsCount} Daily</span>
+                <span className="text-slate-500 block text-[10px] mb-0.5">Active Hotspots</span>
+                <span className="text-green-300 font-semibold">{hoveredDay.hotspotsCount} daily</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px]">FRP RADIATIVE POWER</span>
-                <span className="text-orange-500 font-bold">{hoveredDay.frp.toLocaleString()} MW</span>
+                <span className="text-slate-500 block text-[10px] mb-0.5">FRP Radiative Power</span>
+                <span className="text-green-400 font-semibold">{hoveredDay.frp.toLocaleString()} MW</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px]">ANOMALY STATUS</span>
-                <span className={`font-extrabold ${
-                  hoveredDay.status === 'Extreme Anomaly' ? 'text-purple-400' : hoveredDay.status === 'High' ? 'text-red-400' : 'text-emerald-400'
+                <span className="text-slate-500 block text-[10px] mb-0.5">Anomaly Status</span>
+                <span className={`font-semibold ${
+                  hoveredDay.status === 'Extreme Anomaly' ? 'text-green-500' : hoveredDay.status === 'High' ? 'text-green-400' : 'text-green-300'
                 }`}>{hoveredDay.status}</span>
               </div>
             </div>
           ) : (
-            <div className="text-slate-500 italic text-[10px] text-center w-full">
-              ✓ Hover over any daily grid cell in the matrix above to retrieve instant spectrographic telemetry.
+            <div className="text-slate-500 text-xs text-center w-full">
+              Hover over a cell to see daily telemetry.
             </div>
           )}
         </div>
@@ -287,11 +285,8 @@ export default function FireActivityCalendar() {
         
         {/* Outliers summary card */}
         <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-3">
-          <div className="flex items-center gap-2 border-b border-slate-850 pb-2">
-            <AlertOctagon className="w-4 h-4 text-orange-500 animate-pulse" />
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-              Statistical Z-Score Outlier Report
-            </h4>
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+            <h4 className="text-sm font-semibold text-white">Z-Score Outlier Report</h4>
           </div>
 
           {outliers.length > 0 ? (
@@ -299,24 +294,24 @@ export default function FireActivityCalendar() {
               {outliers.map((dayPoint, idx) => (
                 <div key={idx} className="p-3 bg-slate-950/70 border border-slate-800 rounded flex flex-col justify-between hover:border-slate-700 transition-colors">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs font-bold text-white font-mono">{dayPoint.date}</span>
-                    <span className="text-[9px] font-mono font-bold text-purple-400 uppercase bg-purple-950/60 border border-purple-500/20 px-1.5 py-0.2 rounded">
+                    <span className="text-sm font-medium text-white">{dayPoint.date}</span>
+                    <span className="text-[10px] font-medium text-green-400 bg-green-950/60 border border-green-500/20 px-1.5 py-0.5 rounded">
                       Z: +{dayPoint.zScore}
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-2 text-[10px] font-mono text-slate-400 mt-2 gap-y-1">
-                    <span>FRP Intensity:</span>
-                    <span className="text-orange-400 font-bold text-right">{dayPoint.frp} MW</span>
-                    <span>Confidence:</span>
+                  <div className="grid grid-cols-2 text-xs text-slate-400 mt-2 gap-y-1">
+                    <span>FRP Intensity</span>
+                    <span className="text-green-400 font-medium text-right">{dayPoint.frp} MW</span>
+                    <span>Confidence</span>
                     <span className="text-white text-right">98.4% Harmonized</span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-slate-500 font-mono text-[10px] text-center py-6">
-              Nominal year sequence. No high-Z outliers registered for year {selectedYear}.
+            <div className="text-slate-500 text-xs text-center py-6">
+              No high-Z outliers for {selectedYear}.
             </div>
           )}
         </div>
@@ -324,35 +319,32 @@ export default function FireActivityCalendar() {
         {/* Data export controllers */}
         <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between gap-4">
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              Scientific Archive Exports
-            </h4>
-            <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-              Export NASA calibrated GeoJSON point shapes or daily statistical sheets to preserve baseline readings.
+            <h4 className="text-sm font-semibold text-white">Archive Exports</h4>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Export GeoJSON or daily statistical CSV sheets.
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
             <button
               onClick={handleExportGeoJSON}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded text-xs font-mono border border-slate-800 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded-lg text-xs border border-slate-800 transition-colors"
             >
-              <FileText className="w-3.5 h-3.5 text-cyan-500" />
+              <FileText className="w-3.5 h-3.5 text-green-500" />
               Export Harmonized Data (GeoJSON)
             </button>
 
             <button
               onClick={handleExportCSV}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded text-xs font-mono border border-slate-800 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded-lg text-xs border border-slate-800 transition-colors"
             >
-              <Download className="w-3.5 h-3.5 text-orange-500" />
+              <Download className="w-3.5 h-3.5 text-green-500" />
               Export Telemetry Tables (CSV)
             </button>
           </div>
 
           {exportStatus && (
-            <div className="bg-slate-950/80 p-2 border border-slate-850 rounded text-[9px] font-mono text-emerald-400 flex items-center gap-1.5 animate-pulse">
+            <div className="bg-slate-950/80 p-2 border border-slate-800 rounded-lg text-xs text-emerald-400 flex items-center gap-1.5">
               <span>●</span>
               <span className="truncate">{exportStatus}</span>
             </div>

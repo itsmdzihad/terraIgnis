@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Flame, ShieldAlert, Zap, Globe, HeartPulse, Sparkles, Radio, HelpCircle, Layers } from 'lucide-react';
+import { Play, Pause, RotateCcw, Flame, Radio } from 'lucide-react';
 import { GLOBAL_ANNUAL_SERIES, SATELLITE_METADATA } from '../mockData';
 import TerraIgnisMap from './TerraIgnisMap';
 
@@ -65,85 +65,53 @@ export default function GlobalFirePulse() {
       
       {/* 1. TOP KPI BANNER */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        
+
         {/* KPI 1: Unified Global Area Burned */}
-        <div className="bg-slate-900 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Globe className="w-12 h-12 text-orange-500" />
-          </div>
-          <div className="text-[10px] tracking-widest font-mono text-slate-400 uppercase">
-            Unified Global Area Burned
-          </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-bold font-mono tracking-tight text-white tabular-nums">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+          <span className="text-xs text-slate-400">Area Burned</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold text-white tabular-nums">
               {displayedBurnedArea.toLocaleString('en-US', { minimumFractionDigits: 1 })}
             </span>
-            <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">sq km</span>
+            <span className="text-xs text-slate-500">sq km</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1.5 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-            <span>Telemetry calibrated via MODIS/VIIRS grid scale</span>
-          </div>
+          <span className="text-xs text-slate-500">MODIS / VIIRS calibrated</span>
         </div>
 
         {/* KPI 2: FRP Total */}
-        <div className="bg-slate-900 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Flame className="w-12 h-12 text-red-500" />
-          </div>
-          <div className="text-[10px] tracking-widest font-mono text-slate-400 uppercase">
-            FRP Total
-          </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-bold font-mono tracking-tight text-orange-500 tabular-nums">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+          <span className="text-xs text-slate-400">FRP Total</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold text-orange-400 tabular-nums">
               {displayedFrp.toLocaleString()}
             </span>
-            <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">MW</span>
+            <span className="text-xs text-slate-500">MW</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1.5 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span>Cumulative thermal radiative output</span>
-          </div>
+          <span className="text-xs text-slate-500">Cumulative thermal output</span>
         </div>
 
         {/* KPI 3: Satellite Continuity Index */}
-        <div className="bg-slate-900 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Radio className="w-12 h-12 text-cyan-500" />
-          </div>
-          <div className="text-[10px] tracking-widest font-mono text-slate-400 uppercase">
-            Satellite Continuity Index
-          </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-bold font-mono tracking-tight text-cyan-400 tabular-nums">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+          <span className="text-xs text-slate-400">Satellite Continuity</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold text-sky-400 tabular-nums">
               {displayedContinuity.toFixed(1)}%
             </span>
-            <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">Coverage</span>
+            <span className="text-xs text-slate-500">coverage</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1.5 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span>Terra/Aqua/SNPP/JPSS constellation sync</span>
-          </div>
+          <span className="text-xs text-slate-500">Terra · Aqua · SNPP · JPSS</span>
         </div>
 
         {/* KPI 4: Harmonization Index */}
-        <div className="bg-slate-900 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <HeartPulse className="w-12 h-12 text-emerald-500" />
-          </div>
-          <div className="text-[10px] tracking-widest font-mono text-slate-400 uppercase">
-            Harmonization Index
-          </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-bold font-mono tracking-tight text-emerald-400 tabular-nums">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+          <span className="text-xs text-slate-400">Harmonization Index</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold text-emerald-400 tabular-nums">
               {displayedHarmonization.toFixed(2)}
             </span>
-            <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">Ratio</span>
+            <span className="text-xs text-slate-500">ratio</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1.5 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Spatio-temporal coregistration fit</span>
-          </div>
+          <span className="text-xs text-slate-500">Spatio-temporal coregistration</span>
         </div>
 
       </div>
@@ -280,15 +248,12 @@ export default function GlobalFirePulse() {
         </div>
 
         {/* SIDEBAR CALIBRATION CONTROLS (Right 4 Cols) */}
-        <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800/80 rounded-lg p-4 flex flex-col gap-4">
-          
+        <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-4">
+
           <div className="border-b border-slate-800 pb-3">
-            <h3 className="text-xs uppercase tracking-wider text-slate-400 font-mono flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-orange-500" />
-              Integration Matrix
-            </h3>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Select sensors contributing to the live harmonized projection.
+            <h3 className="text-sm font-semibold text-white">Integration Matrix</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Sensors contributing to the live harmonized projection.
             </p>
           </div>
 
@@ -296,58 +261,55 @@ export default function GlobalFirePulse() {
           <div className="space-y-3 flex-1 overflow-y-auto pr-1">
             
             {/* MODIS */}
-            <div className="p-3 bg-slate-950/60 rounded border border-slate-800/80 hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-yellow-400">Aqua & Terra MODIS</span>
-                <span className="text-[9px] font-mono text-emerald-400">ACTIVE SINCE 2000</span>
+            <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-sm font-medium text-white">Aqua & Terra MODIS</span>
+                <span className="text-[10px] text-emerald-400">Since 2000</span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                {SATELLITE_METADATA.MODIS.strengths} Pass frequency operates twice daily.
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {SATELLITE_METADATA.MODIS.strengths} Passes twice daily.
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-1 text-[8px] font-mono text-slate-500">
-                <span>Altitude: {SATELLITE_METADATA.MODIS.altitude}</span>
-                <span>Res: {SATELLITE_METADATA.MODIS.resolution}</span>
+              <div className="mt-2 flex gap-3 text-xs text-slate-500">
+                <span>{SATELLITE_METADATA.MODIS.altitude}</span>
+                <span>{SATELLITE_METADATA.MODIS.resolution}</span>
               </div>
             </div>
 
             {/* VIIRS */}
-            <div className="p-3 bg-slate-950/60 rounded border border-slate-800/80 hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-red-400">Suomi NPP & JPSS VIIRS</span>
-                <span className="text-[9px] font-mono text-emerald-400">ACTIVE SINCE 2011</span>
+            <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-sm font-medium text-white">Suomi NPP & JPSS VIIRS</span>
+                <span className="text-[10px] text-emerald-400">Since 2011</span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                {SATELLITE_METADATA.VIIRS.strengths} Perfect for high spatial resolution tasks.
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {SATELLITE_METADATA.VIIRS.strengths} High spatial resolution.
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-1 text-[8px] font-mono text-slate-500">
-                <span>Altitude: {SATELLITE_METADATA.VIIRS.altitude}</span>
-                <span>Res: {SATELLITE_METADATA.VIIRS.resolution}</span>
+              <div className="mt-2 flex gap-3 text-xs text-slate-500">
+                <span>{SATELLITE_METADATA.VIIRS.altitude}</span>
+                <span>{SATELLITE_METADATA.VIIRS.resolution}</span>
               </div>
             </div>
 
             {/* TerraIgnis Harmonization Method */}
-            <div className="p-3 bg-orange-950/10 rounded border border-orange-950/40">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                <span className="text-xs font-bold text-orange-400">TerraIgnis Harmonizer</span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            <div className="p-3 bg-orange-950/10 rounded-lg border border-orange-900/30">
+              <span className="text-sm font-medium text-orange-400 block mb-1.5">TerraIgnis Harmonizer</span>
+              <p className="text-xs text-slate-400 leading-relaxed">
                 {SATELLITE_METADATA.HARMONIZATION.methodology}
               </p>
             </div>
 
           </div>
 
-          {/* REAL TIME CONSOLE FEED */}
-          <div className="bg-slate-950 border border-slate-800 rounded p-2.5 font-mono text-[9px] text-slate-500 space-y-1">
-            <div className="text-slate-400 font-bold uppercase tracking-wider flex items-center justify-between">
-              <span>Telemetry Core Stream</span>
-              <span className="text-emerald-500 animate-pulse">● FEED ONLINE</span>
+          {/* TELEMETRY CONSOLE */}
+          <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-500 space-y-1">
+            <div className="flex items-center justify-between text-slate-300 mb-1">
+              <span className="text-xs font-medium">Telemetry Stream</span>
+              <span className="text-emerald-500 text-[10px]">● Online</span>
             </div>
-            <div className="h-[1px] bg-slate-900 my-1" />
-            <div className="truncate">T+{selectedYear - 2000} YRS | SCAN STATUS: 200 SUCCESS</div>
-            <div className="truncate">LATENCY: 42ms | CORE ALGO: Coregistration v2.6</div>
-            <div className="truncate">SENSORS: Aqua, Terra, SNPP, JPSS-1</div>
+            <div className="h-[1px] bg-slate-800 mb-2" />
+            <div className="truncate text-[10px]">T+{selectedYear - 2000} YRS · SCAN: 200 OK</div>
+            <div className="truncate text-[10px]">LATENCY: 42ms · ALGO: Coregistration v2.6</div>
+            <div className="truncate text-[10px]">SENSORS: Aqua, Terra, SNPP, JPSS-1</div>
           </div>
 
         </div>
