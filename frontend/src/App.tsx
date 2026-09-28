@@ -3,12 +3,14 @@ import Navbar from './Navbar';
 import GlobalFirePulse from './components/GlobalFirePulse';
 import RegionalDeepDive from './components/RegionalDeepDive';
 import FireActivityCalendar from './components/FireActivityCalendar';
+import { DashboardProvider } from './context/DashboardContext';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('global');
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-white select-none">
+    <DashboardProvider>
+      <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-white select-none">
       {/* Top Navbar Contract */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
@@ -18,6 +20,7 @@ export default function App() {
         {activeTab === 'regional' && <RegionalDeepDive />}
         {activeTab === 'calendar' && <FireActivityCalendar />}
       </main>
-    </div>
+      </div>
+    </DashboardProvider>
   );
 }

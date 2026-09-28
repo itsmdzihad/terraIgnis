@@ -5,6 +5,7 @@ import { useCalendar } from '../hooks/useCalendar';
 import { useAnomalies } from '../hooks/useAnomalies';
 import type { AnomalyLevel } from '../types/anomaly';
 import type { CalendarDay } from '../types/calendar';
+import { useDashboard } from '../context/DashboardContext';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PAGE_SIZE = 366;
@@ -38,13 +39,14 @@ function burnIndexColor(value: number | null): string {
 }
 
 export default function FireActivityCalendar() {
-  const [selectedYear, setSelectedYear] = useState(2026);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const { selectedDate, selectedStartDate, selectedEndDate, setSelectedDate, setSelectedYear } = useDashboard();
+  const selectedYear = Number(selectedStartDate.slice(0, 4));
 
   const { data, loading, error, refetch } = useCalendar({
-    start_date: `${selectedYear}-01-01`,
-    end_date: `${selectedYear}-12-31`,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
     limit: PAGE_SIZE,
     offset: 0,
   });
@@ -55,8 +57,8 @@ export default function FireActivityCalendar() {
     error: anomaliesError,
     refetch: refetchAnomalies,
   } = useAnomalies({
-    start_date: `${selectedYear}-01-01`,
-    end_date: `${selectedYear}-12-31`,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
   });
 
   const observationsByDate = useMemo(
@@ -287,10 +289,12 @@ export default function FireActivityCalendar() {
                             key={rowIndex}
                             type="button"
                             aria-label={label}
-                            title={label}
+                            aria-pressed={selectedDate === cell.date}
+                            title={`${label}${selectedDate === cell.date ? ' · selected for map' : ''}`}
+                            onClick={() => setSelectedDate(cell.date)}
                             onMouseEnter={() => setHoveredDate(cell.date)}
                             onFocus={() => setHoveredDate(cell.date)}
-                            className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white ${color}`}
+                            className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white ${selectedDate === cell.date ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-slate-950' : ''} ${color}`}
                           />
                         );
                       })}
