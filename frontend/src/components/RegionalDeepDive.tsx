@@ -82,7 +82,6 @@ export default function RegionalDeepDive() {
   const mapFireData = useMemo(() => mapRecords.map((record) => ({
     h3Index: record.h3_cell,
     burnIndex: record.burn_index,
-    intensity: record.total_fire_count,
   })), [mapRecords]);
 
   const selectCell = useCallback((h3Cell: string) => setSelectedH3Cell(h3Cell || null), []);
