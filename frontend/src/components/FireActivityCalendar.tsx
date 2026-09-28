@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Calendar, Download, FileText } from 'lucide-react';
-import { generateDailyBurnData } from '../mockData';
+import { Calendar } from 'lucide-react';
 import { useCalendar } from '../hooks/useCalendar';
 import { useAnomalies } from '../hooks/useAnomalies';
 import type { AnomalyLevel } from '../types/anomaly';
@@ -40,7 +39,6 @@ function burnIndexColor(value: number | null): string {
 
 export default function FireActivityCalendar() {
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [exportStatus, setExportStatus] = useState<string | null>(null);
   const { selectedDate, selectedStartDate, selectedEndDate, setSelectedDate, setSelectedYear } = useDashboard();
   const selectedYear = Number(selectedStartDate.slice(0, 4));
 
@@ -103,8 +101,6 @@ export default function FireActivityCalendar() {
     });
   }, [calendarWeeks]);
 
-  // Archive exports remain on their existing mock source; the outlier report uses only API records.
-  const archiveMockData = useMemo(() => generateDailyBurnData(selectedYear), [selectedYear]);
   const strongestAnomalies = useMemo(() => {
     if (!anomalyData) return [];
     return [...anomalyData]
@@ -121,66 +117,6 @@ export default function FireActivityCalendar() {
     ? `${data.data[0].date} — ${data.data[data.data.length - 1].date} · ${data.total} observed dates`
     : null;
 
-  const handleExportGeoJSON = () => {
-    setExportStatus('Compiling GeoJSON point vectors...');
-    setTimeout(() => {
-      const geoJson = {
-        type: 'FeatureCollection',
-        metadata: {
-          generated: new Date().toISOString(),
-          mission: 'TerraIgnis ACTIVE FIRE CORE',
-          year: selectedYear,
-        },
-        features: archiveMockData.filter((day) => day.value > 0.6).map((day) => ({
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [
-              -60.0 + Math.sin(day.dayOfYear) * 10,
-              -6.5 + Math.cos(day.dayOfYear) * 5,
-            ],
-          },
-          properties: {
-            date: day.date,
-            intensity: day.value,
-            frp_mw: day.frp,
-            hotspots: day.hotspotsCount,
-            status: day.status,
-          },
-        })),
-      };
-
-      const blob = new Blob([JSON.stringify(geoJson, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `terraignis_anomalies_${selectedYear}.geojson`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setExportStatus(`Successfully exported ${geoJson.features.length} high-intensity coordinates to GeoJSON.`);
-    }, 1200);
-  };
-
-  const handleExportCSV = () => {
-    setExportStatus('Formatting telemetry CSV tables...');
-    setTimeout(() => {
-      let csvContent = 'Date,Day_of_Year,Harmonized_Burn_Index,Hotspots_Count,FRP_MW,Anomaly_Status,Z_Score\n';
-      archiveMockData.forEach((day) => {
-        csvContent += `${day.date},${day.dayOfYear},${day.value},${day.hotspotsCount},${day.frp},${day.status},${day.zScore}\n`;
-      });
-
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `terraignis_activity_daily_${selectedYear}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setExportStatus('CSV exported successfully. Saved as daily telemetry sheet.');
-    }, 1000);
-  };
 
   return (
     <div className="flex flex-col w-full min-h-full bg-slate-950 p-4 sm:p-6 gap-5 overflow-y-auto">
@@ -394,21 +330,9 @@ export default function FireActivityCalendar() {
         <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between gap-4">
           <div>
             <h4 className="text-sm font-semibold text-white">Archive Exports</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Export preview uses temporary mock telemetry.</p>
+            <p className="text-xs text-slate-400 mt-0.5">The current backend does not provide an export endpoint.</p>
           </div>
-          <div className="flex flex-col gap-2">
-            <button onClick={handleExportGeoJSON} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded-lg text-xs border border-slate-800 transition-colors">
-              <FileText className="w-3.5 h-3.5 text-green-500" /> Export Harmonized Data (GeoJSON)
-            </button>
-            <button onClick={handleExportCSV} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-300 rounded-lg text-xs border border-slate-800 transition-colors">
-              <Download className="w-3.5 h-3.5 text-green-500" /> Export Telemetry Tables (CSV)
-            </button>
-          </div>
-          {exportStatus && (
-            <div className="bg-slate-950/80 p-2 border border-slate-800 rounded-lg text-xs text-emerald-400 flex items-center gap-1.5">
-              <span>●</span><span className="truncate">{exportStatus}</span>
-            </div>
-          )}
+          <p className="text-xs text-slate-500">Exports will be available when the backend supports downloadable fire and anomaly records.</p>
         </div>
       </div>
     </div>

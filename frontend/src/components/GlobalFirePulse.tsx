@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { GLOBAL_ANNUAL_SERIES, SATELLITE_METADATA } from "../mockData";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
 import type { FireSensor } from "../types/fire";
@@ -68,6 +67,8 @@ export default function GlobalFirePulse() {
 
   const { data, loading, error, refetch } = useFires({
     date: selectedDate || undefined,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
     sensor: selectedSensor || undefined,
     min_burn_index: minBurnIndex ?? undefined,
     max_burn_index: maxBurnIndex ?? undefined,
@@ -75,13 +76,7 @@ export default function GlobalFirePulse() {
     offset,
   });
   const records = data?.data ?? [];
-  const meanBurnIndex = records.length
-    ? records.reduce((sum, record) => sum + record.burn_index, 0) / records.length
-    : null;
-  const frpValues = records.flatMap((record) => record.total_frp === null ? [] : [record.total_frp]);
-  const loadedFrp = frpValues.reduce((sum, value) => sum + value, 0);
-
-  const yearsList = useMemo(() => GLOBAL_ANNUAL_SERIES.map((d) => d.year), []);
+  const yearsList = useMemo(() => Array.from({ length: 27 }, (_, index) => 2000 + index), []);
   const h3Cells = useMemo(() => [...new Set(records.map((record) => record.h3_cell))], [records]);
   const {
     data: anomalyRecords,
@@ -118,6 +113,7 @@ export default function GlobalFirePulse() {
       timer = setInterval(() => {
         const currentIndex = yearsList.indexOf(selectedYear);
         setSelectedYear(currentIndex === yearsList.length - 1 ? yearsList[0] : yearsList[currentIndex + 1]);
+        setOffset(0);
       }, 1800);
     }
     return () => clearInterval(timer);
@@ -361,16 +357,17 @@ export default function GlobalFirePulse() {
                 value={selectedYear}
                 onChange={(e) => {
                   setSelectedYear(Number(e.target.value));
+                  setOffset(0);
                   setIsPlaying(false);
                 }}
                 className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
               />
               <div className="flex justify-between text-[8px] font-mono text-slate-600">
-                <span>2000 (MODIS Baseline)</span>
+                <span>2000</span>
                 <span className="text-orange-500/80 font-bold">
-                  TEMPORARY MOCK · Year: {selectedYear}
+                  YEAR FILTER · {selectedYear}
                 </span>
-                <span>2026 (Synthesized Future Peak)</span>
+                <span>2026</span>
               </div>
             </div>
           </div>
@@ -398,12 +395,8 @@ export default function GlobalFirePulse() {
                 <span className="text-[9px] font-mono text-slate-500">REFERENCE</span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                {SATELLITE_METADATA.MODIS.strengths} Passes twice daily.
+                MODIS observations are included in the backend sensor counts. Pass-time and platform metadata are not available from this API.
               </p>
-              <div className="mt-2 flex gap-3 text-xs text-slate-500">
-                <span>{SATELLITE_METADATA.MODIS.altitude}</span>
-                <span>{SATELLITE_METADATA.MODIS.resolution}</span>
-              </div>
             </div>
 
             {/* VIIRS */}
@@ -415,21 +408,17 @@ export default function GlobalFirePulse() {
                 <span className="text-[9px] font-mono text-slate-500">REFERENCE</span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                {SATELLITE_METADATA.VIIRS.strengths} High spatial resolution.
+                VIIRS observations are included in the backend sensor counts. Pass-time and platform metadata are not available from this API.
               </p>
-              <div className="mt-2 flex gap-3 text-xs text-slate-500">
-                <span>{SATELLITE_METADATA.VIIRS.altitude}</span>
-                <span>{SATELLITE_METADATA.VIIRS.resolution}</span>
-              </div>
             </div>
 
             {/* TerraIgnis Harmonization Method */}
             <div className="p-3 bg-orange-950/10 rounded-lg border border-orange-900/30">
               <span className="text-sm font-medium text-orange-400 block mb-1.5">
-                Harmonization · reference
+                Harmonization · unavailable
               </span>
               <p className="text-xs text-slate-400 leading-relaxed">
-                {SATELLITE_METADATA.HARMONIZATION.methodology}
+                The API provides a relative Burn Index, but does not expose a harmonization methodology or annual sensor trend series.
               </p>
             </div>
           </div>

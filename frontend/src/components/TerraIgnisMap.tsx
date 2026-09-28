@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Map from 'react-map-gl/mapbox';
 import DeckGL from '@deck.gl/react';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
-import { ScatterplotLayer, PathLayer } from '@deck.gl/layers';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { cellToLatLng } from 'h3-js';
 
@@ -10,12 +9,8 @@ import { cellToLatLng } from 'h3-js';
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhaHJpYXJ4cHJveGltYSIsImEiOiJjbXVpcjdxeGUwMmllMzFvZjZkb3JrejlwIn0.u8XtSDGNGUtVb6V7XEu1BA';
 
 export interface FirePoint {
-  lat?: number;
-  lng?: number;
-  intensity?: number;
-  frp?: number;
-  h3Index?: string;
-  burnIndex?: number;
+  h3Index: string;
+  burnIndex: number;
 }
 
 interface TerraIgnisMapProps {
@@ -89,14 +84,7 @@ export default function TerraIgnisMap({
     setViewState({ longitude, latitude, zoom, pitch: 0, bearing: 0 });
   }, [longitude, latitude, zoom, isRegional, selectedH3Cell]);
 
-  // Split datasets based on presence of H3 index
-  const h3Data = useMemo(() => {
-    return fireData.filter((d): d is FirePoint & { h3Index: string } => Boolean(d.h3Index));
-  }, [fireData]);
-
-  const coordinateData = useMemo(() => {
-    return fireData.filter((d): d is FirePoint & { lat: number; lng: number } => !d.h3Index && d.lat !== undefined && d.lng !== undefined);
-  }, [fireData]);
+  const h3Data = fireData;
 
   // Construct Deck.gl Layers list dynamically
   const layers = useMemo(() => {
@@ -119,16 +107,16 @@ export default function TerraIgnisMap({
           getHexagon: (d: FirePoint & { h3Index: string }) => d.h3Index,
           getFillColor: (d: FirePoint) => {
             if (d.h3Index === selectedH3Cell) return [6, 182, 212, 230];
-            const rawBurnIndex = d.burnIndex ?? 0;
-            const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
+            const rawBurnIndex = d.burnIndex;
+            const val = rawBurnIndex / 100;
             return [...getColor(val), 210];
           },
           getLineColor: (d: FirePoint) => d.h3Index === selectedH3Cell ? [103, 232, 249, 255] : [15, 23, 42, 160],
           lineWidthMinPixels: 1,
           getLineWidth: (d: FirePoint) => d.h3Index === selectedH3Cell ? 4 : 1,
           getElevation: (d: FirePoint) => {
-            const rawBurnIndex = d.burnIndex ?? 0;
-            const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
+            const rawBurnIndex = d.burnIndex;
+            const val = rawBurnIndex / 100;
             return val * 1200;
           },
           opacity: isRegional ? 0.95 : 0.7,
@@ -160,80 +148,8 @@ export default function TerraIgnisMap({
       }));
     }
 
-    // Layer 2: Glowing Scatterplot Layer representing continuous coordinate hotspots
-    if (coordinateData.length > 0) {
-      list.push(
-        new ScatterplotLayer({
-          id: 'fire-embers',
-          data: coordinateData,
-          pickable: true,
-          opacity: isRegional ? 0.95 : 0.8,
-          stroked: true,
-          filled: true,
-          radiusScale: isRegional ? 4 : 8,
-          radiusMinPixels: 2,
-          radiusMaxPixels: 12,
-          lineWidthMinPixels: 1,
-          getPosition: (d: FirePoint) => [d.lng ?? 0, d.lat ?? 0],
-          getRadius: (d: FirePoint) => {
-            const size = d.intensity || d.frp || 100;
-            return Math.max(100, size * 2);
-          },
-          getFillColor: (d: FirePoint) => {
-            const intensity = d.intensity || d.frp || 100;
-            const val = Math.min(1.0, intensity / 1500);
-            return [...getColor(val), 210];
-          },
-          getLineColor: [255, 255, 255, 140],
-          updateTriggers: {
-            opacity: [isRegional],
-            radiusScale: [isRegional]
-          }
-        })
-      );
-    }
-
-    // Layer 3: Dynamic neon bounding box around regional hotspot clusters
-    if (isRegional && coordinateData.length > 0) {
-      let minLat = Infinity, maxLat = -Infinity;
-      let minLng = Infinity, maxLng = -Infinity;
-
-      coordinateData.forEach(p => {
-        if (p.lat !== undefined && p.lng !== undefined) {
-          if (p.lat < minLat) minLat = p.lat;
-          if (p.lat > maxLat) maxLat = p.lat;
-          if (p.lng < minLng) minLng = p.lng;
-          if (p.lng > maxLng) maxLng = p.lng;
-        }
-      });
-
-      if (minLat !== Infinity) {
-        const padding = 1.0;
-        const bounds: [number, number][] = [
-          [minLng - padding, minLat - padding],
-          [maxLng + padding, minLat - padding],
-          [maxLng + padding, maxLat + padding],
-          [minLng - padding, maxLat + padding],
-          [minLng - padding, minLat - padding]
-        ];
-
-        list.push(
-          new PathLayer({
-            id: 'regional-bounding-outline',
-            data: [{ path: bounds }],
-            getPath: (d: { path: [number, number][] }) => d.path,
-            getColor: [239, 68, 68, 220], // neon red outline
-            getWidth: 4,
-            widthScale: 1,
-            widthMinPixels: 2.5,
-            pickable: false
-          })
-        );
-      }
-    }
-
     return list;
-  }, [h3Data, coordinateData, isRegional, selectedH3Cell, onH3CellClick]);
+  }, [h3Data, isRegional, selectedH3Cell, onH3CellClick]);
 
   return (
     <div className="relative w-full h-full min-h-[350px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">
@@ -264,11 +180,6 @@ export default function TerraIgnisMap({
           {h3Data.length > 0 && (
             <div className="text-[7.5px] text-cyan-400/80 mt-1 uppercase font-semibold">
               Grid Style: Active H3 Hexagons
-            </div>
-          )}
-          {coordinateData.length > 0 && (
-            <div className="text-[7.5px] text-orange-400/80 uppercase font-semibold">
-              Points: Synchronized Embers
             </div>
           )}
         </div>
