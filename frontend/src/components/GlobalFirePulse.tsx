@@ -4,7 +4,9 @@ import { GLOBAL_ANNUAL_SERIES, SATELLITE_METADATA } from "../mockData";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
 import type { FireSensor } from "../types/fire";
+import { useDashboard } from "../context/DashboardContext";
 import { useAnomalies } from "../hooks/useAnomalies";
+import { useStats } from "../hooks/useStats";
 
 function Metric({ label, value, detail, color }: { label: string; value: string; detail: string; color: string }) {
   return (
@@ -16,23 +18,59 @@ function Metric({ label, value, detail, color }: { label: string; value: string;
   );
 }
 
+function formatCount(value: number | null | undefined): string {
+  return value == null ? "—" : value.toLocaleString("en-US");
+}
+
+function formatBurnIndex(value: number | null | undefined): string {
+  return value == null ? "—" : value.toFixed(2);
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "Unavailable";
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function StatRow({ label, value, color = "text-slate-200" }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-[10px] font-mono">
+      <span className="text-slate-500">{label}</span>
+      <span className={`text-right tabular-nums ${color}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function GlobalFirePulse() {
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [date, setDate] = useState("");
-  const [sensor, setSensor] = useState<FireSensor | "">("");
-  const [minBurnIndex, setMinBurnIndex] = useState("");
-  const [maxBurnIndex, setMaxBurnIndex] = useState("");
-  const [h3Cell, setH3Cell] = useState("");
   const [offset, setOffset] = useState(0);
+  const {
+    selectedDate,
+    selectedStartDate,
+    selectedEndDate,
+    selectedH3Cell,
+    selectedSensor,
+    minBurnIndex,
+    maxBurnIndex,
+    setSelectedDate,
+    setSelectedH3Cell,
+    setSelectedSensor,
+    setBurnIndexRange,
+    setSelectedYear,
+    clearFilters,
+  } = useDashboard();
+  const selectedYear = Number(selectedStartDate.slice(0, 4));
   const pageSize = 500;
 
   const { data, loading, error, refetch } = useFires({
-    date: date || undefined,
-    sensor: sensor || undefined,
-    min_burn_index: minBurnIndex ? Number(minBurnIndex) : undefined,
-    max_burn_index: maxBurnIndex ? Number(maxBurnIndex) : undefined,
-    h3_cell: h3Cell.trim() || undefined,
+    date: selectedDate || undefined,
+    sensor: selectedSensor || undefined,
+    min_burn_index: minBurnIndex ?? undefined,
+    max_burn_index: maxBurnIndex ?? undefined,
     limit: pageSize,
     offset,
   });
@@ -43,16 +81,23 @@ export default function GlobalFirePulse() {
   const frpValues = records.flatMap((record) => record.total_frp === null ? [] : [record.total_frp]);
   const loadedFrp = frpValues.reduce((sum, value) => sum + value, 0);
 
-  const yearsList = GLOBAL_ANNUAL_SERIES.map((d) => d.year);
+  const yearsList = useMemo(() => GLOBAL_ANNUAL_SERIES.map((d) => d.year), []);
+  const h3Cells = useMemo(() => [...new Set(records.map((record) => record.h3_cell))], [records]);
   const {
     data: anomalyRecords,
     loading: anomaliesLoading,
     error: anomaliesError,
     refetch: refetchAnomalies,
   } = useAnomalies({
-    start_date: `${selectedYear}-01-01`,
-    end_date: `${selectedYear}-12-31`,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
   });
+  const {
+    data: stats,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useStats();
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthlyAnomalyCounts = useMemo(() => {
     const counts: (number | null)[] = Array(12).fill(null);
@@ -71,17 +116,12 @@ export default function GlobalFirePulse() {
     let timer: ReturnType<typeof setInterval> | undefined;
     if (isPlaying) {
       timer = setInterval(() => {
-        setSelectedYear((prev) => {
-          const currentIndex = yearsList.indexOf(prev);
-          if (currentIndex === yearsList.length - 1) {
-            return yearsList[0];
-          }
-          return yearsList[currentIndex + 1];
-        });
+        const currentIndex = yearsList.indexOf(selectedYear);
+        setSelectedYear(currentIndex === yearsList.length - 1 ? yearsList[0] : yearsList[currentIndex + 1]);
       }, 1800);
     }
     return () => clearInterval(timer);
-  }, [isPlaying, yearsList]);
+  }, [isPlaying, yearsList, selectedYear, setSelectedYear]);
 
   return (
     <div className="flex flex-col h-full bg-slate-950 p-4 lg:p-5 gap-4 overflow-y-auto">
@@ -91,33 +131,40 @@ export default function GlobalFirePulse() {
             <h2 className="text-sm font-semibold text-white">Fire telemetry</h2>
             <p className="text-[10px] font-mono text-slate-500">GET /api/fires · H3 resolution 7</p>
           </div>
-          <span className={`inline-flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider ${error ? "text-red-400" : loading ? "text-amber-300" : "text-emerald-400"}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${error ? "bg-red-400" : loading ? "bg-amber-300 animate-pulse" : "bg-emerald-400"}`} />
-            {error ? "BACKEND UNAVAILABLE" : loading ? "CONNECTING TO BACKEND" : "REAL BACKEND DATA"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider ${error ? "text-red-400" : loading ? "text-amber-300" : "text-emerald-400"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${error ? "bg-red-400" : loading ? "bg-amber-300 animate-pulse" : "bg-emerald-400"}`} />
+              {error ? "BACKEND UNAVAILABLE" : loading ? "CONNECTING TO BACKEND" : "REAL BACKEND DATA"}
+            </span>
+            <button type="button" onClick={() => { clearFilters(); setOffset(0); setIsPlaying(false); }} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-300 hover:border-orange-500">RESET FILTERS</button>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
           <label className="text-[9px] font-mono text-slate-500 uppercase">
             Date
-            <input type="date" value={date} onChange={(event) => { setDate(event.target.value); setOffset(0); }} className="mt-1 block w-full min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 [color-scheme:dark]" />
+            <input type="date" value={selectedDate ?? ""} onChange={(event) => { setSelectedDate(event.target.value || null); setOffset(0); }} className="mt-1 block w-full min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 [color-scheme:dark]" />
           </label>
           <label className="text-[9px] font-mono text-slate-500 uppercase">
             Sensor
-            <select value={sensor} onChange={(event) => { setSensor(event.target.value as FireSensor | ""); setOffset(0); }} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200">
+            <select value={selectedSensor ?? ""} onChange={(event) => { setSelectedSensor((event.target.value || null) as FireSensor | null); setOffset(0); }} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200">
               <option value="">All sensors</option><option value="MODIS">MODIS</option><option value="VIIRS">VIIRS</option><option value="BOTH">Both sensors</option>
             </select>
           </label>
           <label className="text-[9px] font-mono text-slate-500 uppercase">
             Min Burn Index
-            <input type="number" min="0" max="100" value={minBurnIndex} onChange={(event) => { setMinBurnIndex(event.target.value); setOffset(0); }} placeholder="0" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
+            <input type="number" min="0" max="100" value={minBurnIndex ?? ""} onChange={(event) => { setBurnIndexRange(event.target.value === "" ? null : Number(event.target.value), maxBurnIndex); setOffset(0); }} placeholder="0" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
           </label>
           <label className="text-[9px] font-mono text-slate-500 uppercase">
             Max Burn Index
-            <input type="number" min="0" max="100" value={maxBurnIndex} onChange={(event) => { setMaxBurnIndex(event.target.value); setOffset(0); }} placeholder="100" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
+            <input type="number" min="0" max="100" value={maxBurnIndex ?? ""} onChange={(event) => { setBurnIndexRange(minBurnIndex, event.target.value === "" ? null : Number(event.target.value)); setOffset(0); }} placeholder="100" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
           </label>
           <label className="text-[9px] font-mono text-slate-500 uppercase col-span-2 md:col-span-1">
-            H3 cell · res 7
-            <input value={h3Cell} onChange={(event) => { setH3Cell(event.target.value); setOffset(0); }} placeholder="Optional cell ID" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
+            Selected H3 cell
+            <select value={selectedH3Cell ?? ""} onChange={(event) => setSelectedH3Cell(event.target.value || null)} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs font-mono text-slate-200">
+              <option value="">No cell selected</option>
+              {selectedH3Cell && !h3Cells.includes(selectedH3Cell) && <option value={selectedH3Cell}>{selectedH3Cell}</option>}
+              {h3Cells.map((cell) => <option key={cell} value={cell}>{cell}</option>)}
+            </select>
           </label>
           <div className="flex items-end justify-between gap-2">
             <span className="text-[9px] font-mono text-slate-500 pb-2">Page {Math.floor(offset / pageSize) + 1}</span>
@@ -129,12 +176,53 @@ export default function GlobalFirePulse() {
         </div>
       </section>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
-        <Metric label="Matching fire records" value={data ? data.total.toLocaleString() : "—"} detail="Across selected filters" color="text-white" />
-        <Metric label="Loaded H3 observations" value={data ? data.count.toLocaleString() : "—"} detail={data ? `Page size ${data.limit}` : "Awaiting response"} color="text-orange-400" />
-        <Metric label="Mean Burn Index" value={meanBurnIndex === null ? "—" : meanBurnIndex.toFixed(1)} detail="Loaded observations · 0–100" color="text-amber-300" />
-        <Metric label="FRP in loaded records" value={data && frpValues.length > 0 ? loadedFrp.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"} detail="MW · null values omitted" color="text-sky-300" />
-      </div>
+      <section className="shrink-0" aria-label="Project statistics">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">System Statistics · GET /api/stats</span>
+          <div className="flex items-center gap-2">
+            {statsLoading ? (
+              <span role="status" className="text-[9px] font-mono text-amber-300">LOADING...</span>
+            ) : statsError ? (
+              <>
+                <span role="alert" className="text-[9px] font-mono text-red-400">CONNECTION ERROR · Unable to retrieve project statistics</span>
+                <button onClick={refetchStats} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
+              </>
+            ) : stats ? (
+              <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> LIVE DATA
+              </span>
+            ) : (
+              <span className="text-[9px] font-mono text-slate-400">NO STATISTICS DATA</span>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <Metric
+            label="Raw Fire Observations"
+            value={formatCount(stats?.coverage.total_raw_observations)}
+            detail="Standardized MODIS + VIIRS detections"
+            color="text-white"
+          />
+          <Metric
+            label="H3 Cell/Date Observations"
+            value={formatCount(stats?.coverage.total_h3_cell_dates)}
+            detail={stats?.coverage.h3_resolution == null ? "Observed resolution-7 records" : `Observed H3 resolution-${stats.coverage.h3_resolution} records`}
+            color="text-orange-400"
+          />
+          <Metric
+            label="Mean Burn Index"
+            value={formatBurnIndex(stats?.burn_index.mean)}
+            detail="Mean relative fire-activity score · 0–100"
+            color="text-amber-300"
+          />
+          <Metric
+            label="Anomalous Observations"
+            value={formatCount(stats?.anomalies.total_anomalous)}
+            detail="Non-normal anomaly records"
+            color="text-red-300"
+          />
+        </div>
+      </section>
 
       {/* 2. BOTTOM MAIN SECTION */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[620px] lg:min-h-0">
@@ -162,6 +250,8 @@ export default function GlobalFirePulse() {
                   burnIndex: record.burn_index,
                 }))}
                 isRegional={false}
+                selectedH3Cell={selectedH3Cell}
+                onH3CellClick={setSelectedH3Cell}
               />
             </div>
             {(loading || error || (!loading && data?.count === 0)) && (
@@ -298,7 +388,7 @@ export default function GlobalFirePulse() {
           </div>
 
           {/* SATELLITE SUMMARY INFO */}
-          <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+          <div className="space-y-3">
             {/* MODIS */}
             <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
               <div className="flex justify-between items-center mb-1.5">
@@ -344,22 +434,66 @@ export default function GlobalFirePulse() {
             </div>
           </div>
 
-          {/* TELEMETRY CONSOLE */}
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-500 space-y-1">
-            <div className="flex items-center justify-between text-slate-300 mb-1">
-              <span className="text-xs font-medium">TEMPORARY MOCK · Telemetry</span>
-              <span className="text-slate-500 text-[9px]">SYNTHETIC</span>
-            </div>
-            <div className="h-[1px] bg-slate-800 mb-2" />
-            <div className="truncate text-[10px]">
-              Simulated year range · not API status
-            </div>
-            <div className="truncate text-[10px]">
-              Synthetic latency / algorithm telemetry
-            </div>
-            <div className="truncate text-[10px]">
-              Reference sensors: Aqua, Terra, SNPP, JPSS
-            </div>
+          <div className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
+            {statsLoading ? (
+              <div role="status" className="bg-slate-950 border border-slate-800 rounded-md p-3 text-center">
+                <span className="block text-[9px] font-mono text-amber-300">SYSTEM STATISTICS</span>
+                <span className="block mt-1 text-[10px] font-mono text-slate-400">LOADING...</span>
+              </div>
+            ) : statsError ? (
+              <div role="alert" className="bg-slate-950 border border-red-900/60 rounded-md p-3 text-center">
+                <span className="block text-[9px] font-mono text-red-400">SYSTEM STATISTICS · CONNECTION ERROR</span>
+                <span className="block mt-1 text-[10px] text-slate-300">Unable to retrieve project statistics.</span>
+                <button onClick={refetchStats} className="mt-2 border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
+              </div>
+            ) : stats ? (
+              <>
+                <section className="bg-slate-950/80 border border-slate-800 rounded-md p-3 space-y-2">
+                  <h4 className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Dataset Coverage</h4>
+                  <StatRow label="PERIOD" value={`${formatDate(stats.coverage.start_date)} — ${formatDate(stats.coverage.end_date)}`} />
+                  <StatRow label="OBSERVED DATES" value={formatCount(stats.coverage.observed_dates)} />
+                  <StatRow label="UNIQUE H3 CELLS" value={formatCount(stats.coverage.unique_h3_cells)} />
+                  <StatRow label="H3 RESOLUTION" value={stats.coverage.h3_resolution == null ? "Unavailable" : String(stats.coverage.h3_resolution)} />
+                </section>
+
+                <section className="bg-slate-950/80 border border-slate-800 rounded-md p-3 space-y-2">
+                  <h4 className="text-[9px] font-mono uppercase tracking-widest text-sky-300">Sensor Observations</h4>
+                  <StatRow label="MODIS RAW OBSERVATIONS" value={formatCount(stats.sensors.modis_observations)} />
+                  <StatRow label="VIIRS RAW OBSERVATIONS" value={formatCount(stats.sensors.viirs_observations)} />
+                  <div className="h-px bg-slate-800" />
+                  <StatRow label="MODIS-ONLY CELL/DATES" value={formatCount(stats.sensors.modis_only_cell_dates)} />
+                  <StatRow label="VIIRS-ONLY CELL/DATES" value={formatCount(stats.sensors.viirs_only_cell_dates)} />
+                  <StatRow label="BOTH-SENSOR CELL/DATES" value={formatCount(stats.sensors.both_sensor_cell_dates)} />
+                </section>
+
+                <section className="bg-slate-950/80 border border-slate-800 rounded-md p-3 space-y-2">
+                  <h4 className="text-[9px] font-mono uppercase tracking-widest text-orange-300">Burn Index · Relative Score</h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <StatRow label="MIN" value={formatBurnIndex(stats.burn_index.minimum)} />
+                    <StatRow label="MAX" value={formatBurnIndex(stats.burn_index.maximum)} />
+                    <StatRow label="MEAN" value={formatBurnIndex(stats.burn_index.mean)} color="text-orange-300" />
+                    <StatRow label="MEDIAN" value={formatBurnIndex(stats.burn_index.median)} />
+                    <StatRow label="P95" value={formatBurnIndex(stats.burn_index.p95)} />
+                  </div>
+                </section>
+
+                <section className="bg-slate-950/80 border border-slate-800 rounded-md p-3 space-y-2">
+                  <h4 className="text-[9px] font-mono uppercase tracking-widest text-red-300">Anomaly Distribution</h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <StatRow label="NORMAL" value={formatCount(stats.anomalies.normal)} />
+                    <StatRow label="LOW" value={formatCount(stats.anomalies.low)} />
+                    <StatRow label="HIGH" value={formatCount(stats.anomalies.high)} />
+                    <StatRow label="EXTREME LOW" value={formatCount(stats.anomalies.extreme_low)} />
+                    <StatRow label="EXTREME HIGH" value={formatCount(stats.anomalies.extreme_high)} />
+                    <StatRow label="TOTAL ANOMALOUS" value={formatCount(stats.anomalies.total_anomalous)} color="text-red-300" />
+                  </div>
+                </section>
+              </>
+            ) : (
+              <div className="bg-slate-950 border border-slate-800 rounded-md p-3 text-center text-[10px] font-mono text-slate-400">
+                NO STATISTICS DATA
+              </div>
+            )}
           </div>
         </div>
       </div>

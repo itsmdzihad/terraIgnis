@@ -4,6 +4,7 @@ import DeckGL from '@deck.gl/react';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import { ScatterplotLayer, PathLayer } from '@deck.gl/layers';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { cellToLatLng } from 'h3-js';
 
 // Public Mapbox Access Token as configured
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhaHJpYXJ4cHJveGltYSIsImEiOiJjbXVpcjdxeGUwMmllMzFvZjZkb3JrejlwIn0.u8XtSDGNGUtVb6V7XEu1BA';
@@ -23,6 +24,8 @@ interface TerraIgnisMapProps {
   zoom?: number;
   fireData: FirePoint[];
   isRegional?: boolean;
+  selectedH3Cell?: string | null;
+  onH3CellClick?: (h3Cell: string) => void;
 }
 
 // Interpole neon fire color scale: slate blue -> deep crimson -> vibrant orange -> glowing yellow
@@ -58,7 +61,9 @@ export default function TerraIgnisMap({
   latitude = 20,
   zoom = 1.5,
   fireData = [],
-  isRegional = false
+  isRegional = false,
+  selectedH3Cell = null,
+  onH3CellClick
 }: TerraIgnisMapProps) {
   
   // Manage map viewport state dynamically so it can be controlled by tabs & user panned
@@ -66,20 +71,23 @@ export default function TerraIgnisMap({
     longitude,
     latitude,
     zoom,
-    pitch: isRegional ? 30 : 0,
+    pitch: 0,
     bearing: 0
   });
 
-  // Keep viewState updated when props change
+  // Follow a shared H3 selection, then return to the current overview when it is cleared.
   useEffect(() => {
-    setViewState({
-      longitude,
-      latitude,
-      zoom,
-      pitch: isRegional ? 35 : 0,
-      bearing: 0
-    });
-  }, [longitude, latitude, zoom, isRegional]);
+    if (selectedH3Cell) {
+      try {
+        const [selectedLatitude, selectedLongitude] = cellToLatLng(selectedH3Cell);
+        setViewState({ longitude: selectedLongitude, latitude: selectedLatitude, zoom: Math.max(zoom, 9), pitch: 0, bearing: 0 });
+        return;
+      } catch {
+        // Keep the supplied overview if a cell identifier is invalid.
+      }
+    }
+    setViewState({ longitude, latitude, zoom, pitch: 0, bearing: 0 });
+  }, [longitude, latitude, zoom, isRegional, selectedH3Cell]);
 
   // Split datasets based on presence of H3 index
   const h3Data = useMemo(() => {
@@ -101,28 +109,55 @@ export default function TerraIgnisMap({
           id: 'h3-fire-hexagons',
           data: h3Data,
           pickable: true,
+          onClick: (info) => {
+            const h3Cell = (info.object as { h3Index?: string } | undefined)?.h3Index;
+            if (h3Cell) onH3CellClick?.(h3Cell);
+          },
           wireframe: false,
           filled: true,
-          extruded: true,
+          extruded: !isRegional,
           getHexagon: (d: FirePoint & { h3Index: string }) => d.h3Index,
           getFillColor: (d: FirePoint) => {
+            if (d.h3Index === selectedH3Cell) return [6, 182, 212, 230];
             const rawBurnIndex = d.burnIndex ?? 0;
             const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
-            return getColor(val);
+            return [...getColor(val), 210];
           },
+          getLineColor: (d: FirePoint) => d.h3Index === selectedH3Cell ? [103, 232, 249, 255] : [15, 23, 42, 160],
+          lineWidthMinPixels: 1,
+          getLineWidth: (d: FirePoint) => d.h3Index === selectedH3Cell ? 4 : 1,
           getElevation: (d: FirePoint) => {
             const rawBurnIndex = d.burnIndex ?? 0;
             const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
             return val * 1200;
           },
           opacity: isRegional ? 0.95 : 0.7,
-          elevationScale: isRegional ? 180 : 1,
+          elevationScale: 1,
           updateTriggers: {
-            getFillColor: [isRegional],
-            getElevation: [isRegional]
+            getFillColor: [isRegional, selectedH3Cell],
+            getElevation: [isRegional, selectedH3Cell],
+            getLineColor: [selectedH3Cell],
+            getLineWidth: [selectedH3Cell]
           }
         })
       );
+    }
+
+    // Keep the shared selection visible if date/sensor filters remove it from the current Fire API page.
+    if (selectedH3Cell && !h3Data.some((record) => record.h3Index === selectedH3Cell)) {
+      list.push(new H3HexagonLayer({
+        id: 'selected-h3-cell',
+        data: [{ h3Index: selectedH3Cell }],
+        pickable: false,
+        filled: true,
+        stroked: true,
+        extruded: false,
+        getHexagon: (record: { h3Index: string }) => record.h3Index,
+        getFillColor: [6, 182, 212, 45],
+        getLineColor: [103, 232, 249, 255],
+        getLineWidth: 4,
+        lineWidthMinPixels: 3,
+      }));
     }
 
     // Layer 2: Glowing Scatterplot Layer representing continuous coordinate hotspots
@@ -198,7 +233,7 @@ export default function TerraIgnisMap({
     }
 
     return list;
-  }, [h3Data, coordinateData, isRegional]);
+  }, [h3Data, coordinateData, isRegional, selectedH3Cell, onH3CellClick]);
 
   return (
     <div className="relative w-full h-full min-h-[350px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">

@@ -12,6 +12,11 @@ export function getAnomalies(params: AnomalyQuery = {}, signal?: AbortSignal): P
   return apiGet<AnomaliesResponse>('/api/anomalies', query, signal);
 }
 
+export function getCellAnomalyHistory(h3Cell: string, signal?: AbortSignal): Promise<AnomaliesResponse> {
+  const query = new URLSearchParams({ limit: String(MAX_PAGE_SIZE) });
+  return apiGet<AnomaliesResponse>(`/api/anomalies/${encodeURIComponent(h3Cell)}`, query, signal);
+}
+
 async function getAllForLevel(
   params: Omit<AnomalyQuery, 'anomaly_level' | 'limit' | 'offset'>,
   anomalyLevel: AnomalyLevel,
