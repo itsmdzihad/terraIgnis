@@ -83,16 +83,16 @@ export default function TerraIgnisMap({
 
   // Split datasets based on presence of H3 index
   const h3Data = useMemo(() => {
-    return fireData.filter(d => !!d.h3Index);
+    return fireData.filter((d): d is FirePoint & { h3Index: string } => Boolean(d.h3Index));
   }, [fireData]);
 
   const coordinateData = useMemo(() => {
-    return fireData.filter(d => !d.h3Index && d.lat !== undefined && d.lng !== undefined);
+    return fireData.filter((d): d is FirePoint & { lat: number; lng: number } => !d.h3Index && d.lat !== undefined && d.lng !== undefined);
   }, [fireData]);
 
   // Construct Deck.gl Layers list dynamically
   const layers = useMemo(() => {
-    const list: any[] = [];
+    const list = [];
 
     // Layer 1: H3 Hexagon Layer representing gridded global burn anomalies
     if (h3Data.length > 0) {
@@ -104,17 +104,19 @@ export default function TerraIgnisMap({
           wireframe: false,
           filled: true,
           extruded: true,
-          getHexagon: (d: any) => d.h3Index,
-          getFillColor: (d: any) => {
-            const val = d.burnIndex !== undefined ? d.burnIndex : (d.intensity ? d.intensity / 1000 : 0.5);
+          getHexagon: (d: FirePoint & { h3Index: string }) => d.h3Index,
+          getFillColor: (d: FirePoint) => {
+            const rawBurnIndex = d.burnIndex ?? 0;
+            const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
             return getColor(val);
           },
-          getElevation: (d: any) => {
-            const val = d.burnIndex !== undefined ? d.burnIndex : (d.intensity ? d.intensity / 1000 : 0.5);
+          getElevation: (d: FirePoint) => {
+            const rawBurnIndex = d.burnIndex ?? 0;
+            const val = rawBurnIndex > 1 ? rawBurnIndex / 100 : rawBurnIndex;
             return val * 1200;
           },
           opacity: isRegional ? 0.95 : 0.7,
-          elevationScale: isRegional ? 180 : 60,
+          elevationScale: isRegional ? 180 : 1,
           updateTriggers: {
             getFillColor: [isRegional],
             getElevation: [isRegional]
@@ -137,12 +139,12 @@ export default function TerraIgnisMap({
           radiusMinPixels: 2,
           radiusMaxPixels: 12,
           lineWidthMinPixels: 1,
-          getPosition: (d: any) => [d.lng, d.lat],
-          getRadius: (d: any) => {
+          getPosition: (d: FirePoint) => [d.lng ?? 0, d.lat ?? 0],
+          getRadius: (d: FirePoint) => {
             const size = d.intensity || d.frp || 100;
             return Math.max(100, size * 2);
           },
-          getFillColor: (d: any) => {
+          getFillColor: (d: FirePoint) => {
             const intensity = d.intensity || d.frp || 100;
             const val = Math.min(1.0, intensity / 1500);
             return [...getColor(val), 210];
@@ -172,7 +174,7 @@ export default function TerraIgnisMap({
 
       if (minLat !== Infinity) {
         const padding = 1.0;
-        const bounds = [
+        const bounds: [number, number][] = [
           [minLng - padding, minLat - padding],
           [maxLng + padding, minLat - padding],
           [maxLng + padding, maxLat + padding],
@@ -184,7 +186,7 @@ export default function TerraIgnisMap({
           new PathLayer({
             id: 'regional-bounding-outline',
             data: [{ path: bounds }],
-            getPath: (d: any) => d.path,
+            getPath: (d: { path: [number, number][] }) => d.path,
             getColor: [239, 68, 68, 220], // neon red outline
             getWidth: 4,
             widthScale: 1,
@@ -204,7 +206,7 @@ export default function TerraIgnisMap({
       {/* DeckGL Stage with Nested Mapbox Base Style */}
       <DeckGL
         viewState={viewState}
-        onViewStateChange={(e: any) => setViewState(e.viewState as any)}
+        onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
         controller={true}
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? 'pointer' : 'grab')}
@@ -217,12 +219,12 @@ export default function TerraIgnisMap({
       </DeckGL>
 
       {/* Floating Scientific Legend Scale */}
-      <div className="absolute bottom-4 right-4 bg-slate-950/90 border border-slate-800/80 rounded p-2.5 backdrop-blur-md text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-        <span className="font-bold text-white block mb-1">HARMONIZED HOTSPOT SCALE</span>
+      <div className="absolute bottom-4 left-4 bg-slate-950/90 border border-slate-800/80 rounded p-2.5 backdrop-blur-md text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
+        <span className="font-bold text-white block mb-1">BURN INDEX · 0–100</span>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            <span className="w-16 h-2 rounded bg-gradient-to-r from-slate-600 via-red-800 to-orange-500" />
-            <span className="text-[8px] text-slate-500">Low &rarr; Extreme</span>
+            <span className="w-16 h-2 rounded bg-gradient-to-r from-slate-600 via-orange-700 to-orange-300" />
+            <span className="text-[8px] text-slate-500">Low · Medium · High · Extreme</span>
           </div>
           {h3Data.length > 0 && (
             <div className="text-[7.5px] text-cyan-400/80 mt-1 uppercase font-semibold">
