@@ -1,11 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Calendar, Download, FileText } from 'lucide-react';
-import { generateDailyBurnData, type DailyBurnPoint } from '../mockData';
+import { generateDailyBurnData } from '../mockData';
 import { useCalendar } from '../hooks/useCalendar';
+import { useAnomalies } from '../hooks/useAnomalies';
+import type { AnomalyLevel } from '../types/anomaly';
 import type { CalendarDay } from '../types/calendar';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PAGE_SIZE = 366;
+
+const anomalyLevelStyle: Record<AnomalyLevel, string> = {
+  normal: 'text-emerald-300 border-emerald-800/70 bg-emerald-950/40',
+  low: 'text-amber-300 border-amber-800/70 bg-amber-950/40',
+  high: 'text-orange-300 border-orange-800/70 bg-orange-950/40',
+  extreme_low: 'text-cyan-300 border-cyan-800/70 bg-cyan-950/40',
+  extreme_high: 'text-red-300 border-red-800/70 bg-red-950/40',
+};
 
 interface CalendarCell {
   date: string;
@@ -37,6 +47,16 @@ export default function FireActivityCalendar() {
     end_date: `${selectedYear}-12-31`,
     limit: PAGE_SIZE,
     offset: 0,
+  });
+
+  const {
+    data: anomalyData,
+    loading: anomaliesLoading,
+    error: anomaliesError,
+    refetch: refetchAnomalies,
+  } = useAnomalies({
+    start_date: `${selectedYear}-01-01`,
+    end_date: `${selectedYear}-12-31`,
   });
 
   const observationsByDate = useMemo(
@@ -81,12 +101,18 @@ export default function FireActivityCalendar() {
     });
   }, [calendarWeeks]);
 
-  // Step 3 owns anomaly records. Keep this existing demo source isolated from the real calendar response.
-  const mockDailyData = useMemo(() => generateDailyBurnData(selectedYear), [selectedYear]);
-  const outliers = useMemo(
-    () => mockDailyData.filter((day) => day.zScore > 2.5).slice(0, 4),
-    [mockDailyData],
-  );
+  // Archive exports remain on their existing mock source; the outlier report uses only API records.
+  const archiveMockData = useMemo(() => generateDailyBurnData(selectedYear), [selectedYear]);
+  const strongestAnomalies = useMemo(() => {
+    if (!anomalyData) return [];
+    return [...anomalyData]
+      .sort((left, right) => {
+        const leftScore = left.robust_z_score === null ? -1 : Math.abs(left.robust_z_score);
+        const rightScore = right.robust_z_score === null ? -1 : Math.abs(right.robust_z_score);
+        return rightScore - leftScore;
+      })
+      .slice(0, 4);
+  }, [anomalyData]);
 
   const hoveredObservation = hoveredDate ? observationsByDate.get(hoveredDate) : undefined;
   const observedDateRange = data?.data.length
@@ -103,7 +129,7 @@ export default function FireActivityCalendar() {
           mission: 'TerraIgnis ACTIVE FIRE CORE',
           year: selectedYear,
         },
-        features: mockDailyData.filter((day) => day.value > 0.6).map((day) => ({
+        features: archiveMockData.filter((day) => day.value > 0.6).map((day) => ({
           type: 'Feature',
           geometry: {
             type: 'Point',
@@ -138,7 +164,7 @@ export default function FireActivityCalendar() {
     setExportStatus('Formatting telemetry CSV tables...');
     setTimeout(() => {
       let csvContent = 'Date,Day_of_Year,Harmonized_Burn_Index,Hotspots_Count,FRP_MW,Anomaly_Status,Z_Score\n';
-      mockDailyData.forEach((day) => {
+      archiveMockData.forEach((day) => {
         csvContent += `${day.date},${day.dayOfYear},${day.value},${day.hotspotsCount},${day.frp},${day.status},${day.zScore}\n`;
       });
 
@@ -298,27 +324,66 @@ export default function FireActivityCalendar() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
             <h4 className="text-sm font-semibold text-white">Z-Score Outlier Report</h4>
-            <span className="text-[9px] font-mono text-amber-400">TEMPORARY MOCK DATA · STEP 3</span>
+            {!anomaliesLoading && !anomaliesError && anomalyData && (
+              <span className="text-[9px] font-mono text-emerald-400">
+                REAL BACKEND DATA · {anomalyData.length.toLocaleString()} outliers
+              </span>
+            )}
           </div>
-          {outliers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {outliers.map((dayPoint: DailyBurnPoint, index) => (
-                <div key={index} className="p-3 bg-slate-950/70 border border-slate-800 rounded flex flex-col justify-between hover:border-slate-700 transition-colors">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm font-medium text-white">{dayPoint.date}</span>
-                    <span className="text-[10px] font-medium text-green-400 bg-green-950/60 border border-green-500/20 px-1.5 py-0.5 rounded">Z: +{dayPoint.zScore}</span>
-                  </div>
-                  <div className="grid grid-cols-2 text-xs text-slate-400 mt-2 gap-y-1">
-                    <span>FRP Intensity</span><span className="text-green-400 font-medium text-right">{dayPoint.frp} MW</span>
-                    <span>Confidence</span><span className="text-white text-right">98.4% Harmonized</span>
-                  </div>
-                </div>
-              ))}
+
+          {anomaliesLoading ? (
+            <div role="status" className="text-center py-8">
+              <span className="block text-[9px] font-mono tracking-widest text-orange-400">ANOMALY TELEMETRY</span>
+              <span className="block mt-1 text-xs font-mono text-slate-300">LOADING...</span>
+            </div>
+          ) : anomaliesError ? (
+            <div role="alert" className="text-center py-8">
+              <span className="block text-[9px] font-mono tracking-widest text-red-400">ANOMALY TELEMETRY · CONNECTION ERROR</span>
+              <span className="block mt-1 text-xs text-slate-300">Unable to retrieve anomaly observations.</span>
+              <button onClick={refetchAnomalies} className="mt-3 border border-slate-700 px-3 py-1 text-[10px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
+            </div>
+          ) : anomalyData && anomalyData.length === 0 ? (
+            <div className="text-center py-8">
+              <span className="block text-[9px] font-mono tracking-widest text-slate-300">NO ANOMALIES</span>
+              <span className="block mt-1 text-xs text-slate-400">No anomaly observations are available for this period.</span>
             </div>
           ) : (
-            <div className="text-slate-500 text-xs text-center py-6">No high-Z mock outliers for {selectedYear}.</div>
+            <>
+              <p className="text-[10px] text-slate-500">
+                Showing the 4 strongest by absolute robust Z-score from the complete outlier set.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {strongestAnomalies.map((anomaly) => (
+                  <article key={`${anomaly.acq_date}-${anomaly.h3_cell}`} className="p-3 bg-slate-950/70 border border-slate-800 rounded hover:border-slate-700 transition-colors">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-sm font-medium text-white">{anomaly.acq_date}</span>
+                      <span className={`text-[9px] font-mono uppercase tracking-wider border px-1.5 py-0.5 rounded ${anomalyLevelStyle[anomaly.anomaly_level]}`}>
+                        {anomaly.anomaly_level.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3">
+                      <Telemetry label="Burn Index" value={anomaly.burn_index.toFixed(2)} emphasis="text-orange-300" />
+                      <Telemetry
+                        label="Robust Z"
+                        value={anomaly.robust_z_score === null ? 'Unavailable' : `${anomaly.robust_z_score > 0 ? '+' : ''}${anomaly.robust_z_score.toFixed(2)}`}
+                        emphasis="text-white"
+                      />
+                      <Telemetry
+                        label="Percentile"
+                        value={anomaly.anomaly_percentile === null ? 'Unavailable' : `${(anomaly.anomaly_percentile * 100).toFixed(0)}%`}
+                        emphasis="text-cyan-300"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-slate-500 block text-[10px] mb-0.5">H3 CELL</span>
+                        <span className="font-mono text-[10px] text-slate-300 break-all">{anomaly.h3_cell}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
