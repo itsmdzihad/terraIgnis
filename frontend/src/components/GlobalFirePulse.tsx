@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
 import { GLOBAL_ANNUAL_SERIES, SATELLITE_METADATA } from "../mockData";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
 import type { FireSensor } from "../types/fire";
+import { useAnomalies } from "../hooks/useAnomalies";
 
 function Metric({ label, value, detail, color }: { label: string; value: string; detail: string; color: string }) {
   return (
@@ -43,31 +44,27 @@ export default function GlobalFirePulse() {
   const loadedFrp = frpValues.reduce((sum, value) => sum + value, 0);
 
   const yearsList = GLOBAL_ANNUAL_SERIES.map((d) => d.year);
-  const selectedYearData =
-    GLOBAL_ANNUAL_SERIES.find((d) => d.year === selectedYear) ||
-    GLOBAL_ANNUAL_SERIES[GLOBAL_ANNUAL_SERIES.length - 1];
-
-
-  const getMonthlyCurve = (yearFactor: number) => {
-    return [
-      22 * yearFactor,
-      24 * yearFactor,
-      18 * yearFactor,
-      12 * yearFactor,
-      15 * yearFactor,
-      32 * yearFactor,
-      68 * yearFactor,
-      110 * yearFactor,
-      145 * yearFactor,
-      98 * yearFactor,
-      42 * yearFactor,
-      25 * yearFactor,
-    ];
-  };
-
-  const medianCurve = [18, 20, 15, 10, 12, 25, 52, 85, 110, 75, 32, 20];
-  const yearIntensityFactor = 0.5 + (selectedYearData.anomalyIndex + 1) * 0.8;
-  const currentYearCurve = getMonthlyCurve(yearIntensityFactor);
+  const {
+    data: anomalyRecords,
+    loading: anomaliesLoading,
+    error: anomaliesError,
+    refetch: refetchAnomalies,
+  } = useAnomalies({
+    start_date: `${selectedYear}-01-01`,
+    end_date: `${selectedYear}-12-31`,
+  });
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthlyAnomalyCounts = useMemo(() => {
+    const counts: (number | null)[] = Array(12).fill(null);
+    for (const record of anomalyRecords ?? []) {
+      const monthIndex = Number(record.acq_date.slice(5, 7)) - 1;
+      if (monthIndex >= 0 && monthIndex < 12) {
+        counts[monthIndex] = (counts[monthIndex] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [anomalyRecords]);
+  const maxMonthlyAnomalies = Math.max(1, ...monthlyAnomalyCounts.map((count) => count ?? 0));
 
   // Auto-play interval
   useEffect(() => {
@@ -189,59 +186,51 @@ export default function GlobalFirePulse() {
               </div>
             )}
 
-            {/* FLOATING CARD: FIRE ANOMALY TRACKER (Overlaid on Map bottom-right) */}
+            {/* API-backed monthly outlier summary */}
             <div className="absolute bottom-4 right-4 bg-slate-950/90 border border-slate-800/80 rounded p-3 backdrop-blur-md w-60 shadow-xl pointer-events-auto">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] font-mono text-orange-500 font-extrabold uppercase tracking-wider flex items-center gap-1">
-                  TEMPORARY MOCK · Monthly fire profile
+                <span className="text-[9px] font-mono text-orange-500 font-extrabold uppercase tracking-wider">
+                  H3 outliers by month
                 </span>
-                <span className="text-[8px] text-slate-400 font-mono">
-                  {selectedYear} vs Median
-                </span>
+                {!anomaliesLoading && !anomaliesError && anomalyRecords && (
+                  <span className="text-[8px] text-slate-400 font-mono">{anomalyRecords.length} records</span>
+                )}
               </div>
-
-              {/* Sparkline visualization */}
-              <div className="h-10 relative">
-                <svg
-                  viewBox="0 0 200 50"
-                  preserveAspectRatio="none"
-                  className="w-full h-full"
-                >
-                  {/* Median Line (Gray dash) */}
-                  <path
-                    d={medianCurve
-                      .map((val, idx) => {
-                        const x = (idx / 11) * 200;
-                        const y = 45 - (val / 160) * 40;
-                        return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
-                      })
-                      .join(" ")}
-                    fill="none"
-                    stroke="#475569"
-                    strokeWidth="1"
-                    strokeDasharray="2,2"
-                  />
-
-                  {/* Selected Year Line (Neon Orange) */}
-                  <path
-                    d={currentYearCurve
-                      .map((val, idx) => {
-                        const x = (idx / 11) * 200;
-                        const y = 45 - (val / 160) * 40;
-                        return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
-                      })
-                      .join(" ")}
-                    fill="none"
-                    stroke="#f97316"
-                    strokeWidth="1.5"
-                  />
+              {anomaliesLoading ? (
+                <div role="status" className="h-10 flex flex-col items-center justify-center">
+                  <span className="text-[8px] font-mono text-orange-400">ANOMALY TELEMETRY</span>
+                  <span className="text-[8px] font-mono text-slate-400">LOADING...</span>
+                </div>
+              ) : anomaliesError ? (
+                <div role="alert" className="text-center">
+                  <span className="block text-[8px] font-mono text-red-400">CONNECTION ERROR</span>
+                  <button onClick={refetchAnomalies} className="mt-1 border border-slate-700 px-2 py-0.5 text-[8px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
+                </div>
+              ) : anomalyRecords?.length ? (
+                <svg viewBox="0 0 200 46" className="w-full h-10" role="img" aria-label="Monthly H3 outlier record counts">
+                  {monthlyAnomalyCounts.map((count, index) => count === null ? null : (
+                    <rect
+                      key={monthNames[index]}
+                      x={index * 16 + 4}
+                      y={42 - (count / maxMonthlyAnomalies) * 38}
+                      width="9"
+                      height={(count / maxMonthlyAnomalies) * 38}
+                      rx="1"
+                      fill="#f97316"
+                    >
+                      <title>{monthNames[index]}: {count} anomaly records</title>
+                    </rect>
+                  ))}
                 </svg>
-              </div>
-
+              ) : (
+                <div className="h-10 flex items-center justify-center text-center text-[8px] font-mono text-slate-400">
+                  NO ANOMALIES FOR {selectedYear}
+                </div>
+              )}
               <div className="flex justify-between text-[7px] font-mono text-slate-500 mt-1">
-                <span>Jan</span>
-                <span>Jun</span>
-                <span>Dec</span>
+                <span>JAN</span>
+                <span>JUN</span>
+                <span>DEC</span>
               </div>
             </div>
           </div>
