@@ -1,4 +1,5 @@
-import { Activity, CalendarDays, Globe2, MapPinned, Moon, Sun } from 'lucide-react';
+import { CalendarDays, Globe2, MapPinned, Moon, Sun } from 'lucide-react';
+import TerraIgnisLogo from './components/TerraIgnisLogo';
 
 interface NavbarProps {
   activeTab: string;
@@ -17,10 +18,7 @@ export default function Navbar({ activeTab, setActiveTab, theme, onThemeToggle }
   return (
     <header className="site-header">
       <a href="/" className="site-brand" aria-label="TerraIgnis home">
-        <span className="site-brand-mark"><Activity size={18} strokeWidth={2.4} /></span>
-        <span className="site-brand-name">terra<span>ignis</span></span>
-        <span className="site-brand-divider" />
-        <span className="site-brand-caption">Fire activity monitor</span>
+        <TerraIgnisLogo theme={theme} className="site-logo" />
       </a>
 
       <nav className="site-nav" aria-label="Primary navigation">
