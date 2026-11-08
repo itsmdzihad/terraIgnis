@@ -29,12 +29,12 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function burnIndexColor(value: number | null): string {
-  if (value === null) return 'bg-slate-700 border border-cyan-700/40';
-  if (value <= 25) return 'bg-green-950 border border-green-900/50';
-  if (value <= 50) return 'bg-green-900 border border-green-800/50';
-  if (value <= 75) return 'bg-green-700 border border-green-600/50';
-  return 'bg-green-400 border border-green-300/50';
+function burnIndexColor(value: number): string {
+  if (value <= 25) return '#00204c';
+  if (value <= 50) return '#414c6b';
+  if (value <= 75) return '#7b7b78';
+  if (value <= 90) return '#c5a852';
+  return '#fee838';
 }
 
 export default function FireActivityCalendar() {
@@ -159,11 +159,11 @@ export default function FireActivityCalendar() {
             <span>No observation</span>
             <span className="w-[13px] h-[13px] rounded-[3px] bg-slate-950 border border-slate-700 block" />
             <span>Low</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-950 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#00204c' }} />
             <span>Medium</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-700 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#7b7b78' }} />
             <span>High</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] bg-green-400 block" />
+            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#fee838' }} />
           </div>
         </div>
 
@@ -213,9 +213,9 @@ export default function FireActivityCalendar() {
                       {week.map((cell, rowIndex) => {
                         if (!cell) return <div key={rowIndex} className="w-[15px] h-[15px]" />;
                         const observation = cell.observation;
-                        const color = observation
-                          ? burnIndexColor(observation.mean_burn_index)
-                          : 'bg-slate-950 border border-slate-800/80';
+                        const color = observation?.mean_burn_index == null
+                          ? undefined
+                          : burnIndexColor(observation.mean_burn_index);
                         const label = observation
                           ? `${cell.date}: ${observation.fire_count} observed records, mean Burn Index ${observation.mean_burn_index ?? 'unavailable'}`
                           : `${cell.date}: no observed fire activity data`;
@@ -230,7 +230,8 @@ export default function FireActivityCalendar() {
                             onClick={() => setSelectedDate(cell.date)}
                             onMouseEnter={() => setHoveredDate(cell.date)}
                             onFocus={() => setHoveredDate(cell.date)}
-                            className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white ${selectedDate === cell.date ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-slate-950' : ''} ${color}`}
+                            className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white border ${selectedDate === cell.date ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-slate-950' : ''} ${color ? 'border-white/20' : 'bg-slate-950 border-slate-800/80'}`}
+                            style={color ? { backgroundColor: color } : undefined}
                           />
                         );
                       })}
