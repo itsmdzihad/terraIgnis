@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import React, { useState, useMemo } from "react";
 import { latLngToCell } from "h3-js";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
@@ -10,7 +9,7 @@ import { useStats } from "../hooks/useStats";
 
 function Metric({ label, value, detail, color }: { label: string; value: string; detail: string; color: string }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-md px-3 py-2.5 flex flex-col gap-1">
+    <div className="metric-card bg-slate-900 border border-slate-800 rounded-md px-3 py-2.5 flex flex-col gap-1">
       <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">{label}</span>
       <span className={`text-xl font-semibold tabular-nums ${color}`}>{value}</span>
       <span className="text-[10px] text-slate-500">{detail}</span>
@@ -46,7 +45,6 @@ function StatRow({ label, value, color = "text-slate-200" }: { label: string; va
 }
 
 export default function GlobalFirePulse() {
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [offset, setOffset] = useState(0);
   const [latitudeInput, setLatitudeInput] = useState("");
   const [longitudeInput, setLongitudeInput] = useState("");
@@ -63,7 +61,6 @@ export default function GlobalFirePulse() {
     setSelectedH3Cell,
     setSelectedSensor,
     setBurnIndexRange,
-    setSelectedYear,
     clearFilters,
   } = useDashboard();
   const selectedYear = Number(selectedStartDate.slice(0, 4));
@@ -80,7 +77,6 @@ export default function GlobalFirePulse() {
     offset,
   });
   const records = data?.data ?? [];
-  const yearsList = useMemo(() => Array.from({ length: 27 }, (_, index) => 2000 + index), []);
   const h3Cells = useMemo(() => [...new Set(records.map((record) => record.h3_cell))], [records]);
   const {
     data: anomalyRecords,
@@ -127,33 +123,20 @@ export default function GlobalFirePulse() {
     setSelectedH3Cell(latLngToCell(latitude, longitude, 7));
   };
 
-  // Auto-play interval
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-    if (isPlaying) {
-      timer = setInterval(() => {
-        const currentIndex = yearsList.indexOf(selectedYear);
-        setSelectedYear(currentIndex === yearsList.length - 1 ? yearsList[0] : yearsList[currentIndex + 1]);
-        setOffset(0);
-      }, 1800);
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying, yearsList, selectedYear, setSelectedYear]);
-
   return (
-    <div className="flex flex-col h-full bg-slate-950 p-4 lg:p-5 gap-4 overflow-y-auto">
-      <section aria-label="Fire API filters" className="shrink-0 border border-slate-800 bg-slate-900/70 rounded-md p-3">
+    <div className="global-view flex flex-col h-full bg-slate-950 p-4 lg:p-5 gap-4 overflow-y-auto">
+      <section aria-label="Fire API filters" className="filter-panel shrink-0 border border-slate-800 bg-slate-900/70 rounded-md p-3">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
-            <h2 className="text-sm font-semibold text-white">Fire telemetry</h2>
-            <p className="text-[10px] font-mono text-slate-500">GET /api/fires · H3 resolution 7</p>
+            <h2 className="text-sm font-semibold text-white">Fire activity map</h2>
+            <p className="text-[10px] font-mono text-slate-500">Active detections grouped into H3 cells</p>
           </div>
           <div className="flex items-center gap-3">
             <span className={`inline-flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider ${error ? "text-red-400" : loading ? "text-amber-300" : "text-emerald-400"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${error ? "bg-red-400" : loading ? "bg-amber-300 animate-pulse" : "bg-emerald-400"}`} />
-              {error ? "BACKEND UNAVAILABLE" : loading ? "CONNECTING TO BACKEND" : "REAL BACKEND DATA"}
+              {error ? "DATA UNAVAILABLE" : loading ? "LOADING OBSERVATIONS" : "DATA READY"}
             </span>
-            <button type="button" onClick={() => { clearFilters(); setOffset(0); setIsPlaying(false); }} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-300 hover:border-orange-500">RESET FILTERS</button>
+            <button type="button" onClick={() => { clearFilters(); setOffset(0); }} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-300 hover:border-orange-500">Clear filters</button>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
@@ -205,9 +188,9 @@ export default function GlobalFirePulse() {
         </div>
       </section>
 
-      <section className="shrink-0" aria-label="Project statistics">
+      <section className="summary-block shrink-0" aria-label="Project statistics">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">System Statistics · GET /api/stats</span>
+          <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Coverage at a glance</span>
           <div className="flex items-center gap-2">
             {statsLoading ? (
               <span role="status" className="text-[9px] font-mono text-amber-300">LOADING...</span>
@@ -217,8 +200,8 @@ export default function GlobalFirePulse() {
                 <button onClick={refetchStats} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
               </>
             ) : stats ? (
-              <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> LIVE DATA
+                <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> AVAILABLE
               </span>
             ) : (
               <span className="text-[9px] font-mono text-slate-400">NO STATISTICS DATA</span>
@@ -260,10 +243,10 @@ export default function GlobalFirePulse() {
           {/* Map Title / Legend Overlay (Top Left) */}
           <div className="absolute top-4 left-4 z-10 bg-slate-950/90 border border-slate-800 rounded p-2.5 backdrop-blur-md max-w-xs pointer-events-none">
             <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
-              Active Hazard Monitor
+              OBSERVED FIRE ACTIVITY
             </span>
             <span className="text-xs font-bold text-white block mt-0.5">
-              Filtered H3 fire observations
+              {data?.total == null ? "Satellite detections by H3 cell" : `${formatCount(data.total)} matching cell-date records`}
             </span>
           </div>
 
@@ -309,7 +292,7 @@ export default function GlobalFirePulse() {
             <div className="absolute bottom-4 right-4 bg-slate-950/90 border border-slate-800/80 rounded p-3 backdrop-blur-md w-60 shadow-xl pointer-events-auto">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[9px] font-mono text-orange-500 font-extrabold uppercase tracking-wider">
-                  H3 outliers by month
+                  Anomaly records by month
                 </span>
                 {!anomaliesLoading && !anomaliesError && anomalyRecords && (
                   <span className="text-[8px] text-slate-400 font-mono">{anomalyRecords.length} records</span>
@@ -326,7 +309,7 @@ export default function GlobalFirePulse() {
                   <button onClick={refetchAnomalies} className="mt-1 border border-slate-700 px-2 py-0.5 text-[8px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
                 </div>
               ) : anomalyRecords?.length ? (
-                <svg viewBox="0 0 200 46" className="w-full h-10" role="img" aria-label="Monthly H3 outlier record counts">
+                <svg viewBox="0 0 200 46" className="w-full h-10" role="img" aria-label="Monthly anomaly record counts">
                   {monthlyAnomalyCounts.map((count, index) => count === null ? null : (
                     <rect
                       key={monthNames[index]}
@@ -354,108 +337,18 @@ export default function GlobalFirePulse() {
             </div>
           </div>
 
-          {/* TIMELINE SLIDER (At the bottom of the map) */}
-          <div className="bg-slate-950 border-t border-slate-800/60 p-4 flex items-center gap-4">
-            {/* Playback Controls */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="p-2 bg-orange-600 hover:bg-orange-500 text-white rounded transition-colors"
-                title={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? (
-                  <Pause className="w-3.5 h-3.5" />
-                ) : (
-                  <Play className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedYear(2026);
-                  setIsPlaying(false);
-                }}
-                className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded border border-slate-800"
-                title="Reset"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Interactive Timeline Track */}
-            <div className="flex-1 flex flex-col gap-1">
-              <input
-                type="range"
-                min="2000"
-                max="2026"
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(Number(e.target.value));
-                  setOffset(0);
-                  setIsPlaying(false);
-                }}
-                className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-              />
-              <div className="flex justify-between text-[8px] font-mono text-slate-600">
-                <span>2000</span>
-                <span className="text-orange-500/80 font-bold">
-                  YEAR FILTER · {selectedYear}
-                </span>
-                <span>2026</span>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* SIDEBAR CALIBRATION CONTROLS (Right 4 Cols) */}
+        {/* DATASET CONTEXT */}
         <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-4">
           <div className="border-b border-slate-800 pb-3">
             <h3 className="text-sm font-semibold text-white">
-              Integration Matrix
+              Dataset context
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Reference metadata · observed records above come from GET /api/fires.
+              Coverage, sensor mix and anomaly levels for the processed observations.
             </p>
           </div>
-
-          {/* SATELLITE SUMMARY INFO */}
-          <div className="space-y-3">
-            {/* MODIS */}
-            <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-sm font-medium text-white">
-                  Aqua & Terra MODIS
-                </span>
-                <span className="text-[9px] font-mono text-slate-500">REFERENCE</span>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                MODIS observations are included in the backend sensor counts. Pass-time and platform metadata are not available from this API.
-              </p>
-            </div>
-
-            {/* VIIRS */}
-            <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-sm font-medium text-white">
-                  Suomi NPP & JPSS VIIRS
-                </span>
-                <span className="text-[9px] font-mono text-slate-500">REFERENCE</span>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                VIIRS observations are included in the backend sensor counts. Pass-time and platform metadata are not available from this API.
-              </p>
-            </div>
-
-            {/* TerraIgnis Harmonization Method */}
-            <div className="p-3 bg-orange-950/10 rounded-lg border border-orange-900/30">
-              <span className="text-sm font-medium text-orange-400 block mb-1.5">
-                Harmonization · unavailable
-              </span>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                The API provides a relative Burn Index, but does not expose a harmonization methodology or annual sensor trend series.
-              </p>
-            </div>
-          </div>
-
           <div className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
             {statsLoading ? (
               <div role="status" className="bg-slate-950 border border-slate-800 rounded-md p-3 text-center">
