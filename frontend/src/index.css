@@ -105,6 +105,8 @@ button:disabled { cursor: not-allowed; }
 }
 
 .site-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; }
+.site-logo { display: block; height: 38px; width: auto; max-width: 100%; flex-shrink: 0; transition: opacity .15s ease, transform .15s ease; }
+.site-logo:hover { opacity: .92; }
 .site-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; color: #a64f2d; background: #f5e9df; border-radius: 10px; }
 .site-brand-name { font-size: 18px; font-weight: 750; letter-spacing: -.055em; color: #28352d; }
 .site-brand-name span { color: #a64f2d; }
@@ -172,6 +174,7 @@ main { min-height: 0; }
 @media (max-width: 560px) {
   .site-header { grid-template-columns: 1fr; }
   .site-brand { grid-column: 1; }
+  .site-logo { height: 32px; }
   .site-brand-divider, .site-brand-caption { display: none; }
   .site-header-actions { position: absolute; right: 14px; top: 10px; }
   .site-header-note { display: none; }
@@ -236,6 +239,9 @@ main { min-height: 0; }
 .app-shell[data-theme="dark"] [class~="hover:bg-slate-800"]:hover,
 .app-shell[data-theme="dark"] [class~="hover:bg-slate-800/50"]:hover { background-color: #253129 !important; }
 .app-shell[data-theme="dark"] .site-header { background: #18221c; border-color: #303d34; }
+.app-shell[data-theme="dark"] .site-logo .logo-terra-text { fill: #EDF5F8; }
+.app-shell[data-theme="dark"] .site-logo .logo-subtitle { fill: #91AFBF; }
+.app-shell[data-theme="dark"] .site-logo .logo-hex { fill: #E6F7FA; }
 .app-shell[data-theme="dark"] .site-brand-mark { background: #34261f; color: #e29a70; }
 .app-shell[data-theme="dark"] .site-brand-name { color: #eeeDE4; }
 .app-shell[data-theme="dark"] .site-brand-name span { color: #e29a70; }
