@@ -23,32 +23,17 @@ interface TerraIgnisMapProps {
   onH3CellClick?: (h3Cell: string) => void;
 }
 
-// Interpole neon fire color scale: slate blue -> deep crimson -> vibrant orange -> glowing yellow
+// Perceptually ordered blue-to-yellow ramp chosen to remain distinguishable
+// for common color-vision deficiencies.
 function getColor(value: number): [number, number, number] {
-  // Clamp value between 0 and 1
   const v = Math.min(1.0, Math.max(0.0, value));
-  if (v < 0.25) {
-    const t = v / 0.25;
-    return [
-      Math.round(71 + t * (153 - 71)),
-      Math.round(85 + t * (27 - 85)),
-      Math.round(105 + t * (27 - 105))
-    ];
-  } else if (v < 0.6) {
-    const t = (v - 0.25) / 0.35;
-    return [
-      Math.round(153 + t * (249 - 153)),
-      Math.round(27 + t * (115 - 27)),
-      Math.round(27 + t * (22 - 27))
-    ];
-  } else {
-    const t = (v - 0.6) / 0.4;
-    return [
-      Math.round(249 + t * (253 - 249)),
-      Math.round(115 + t * (224 - 115)),
-      Math.round(22 + t * (71 - 22))
-    ];
-  }
+  const stops: [number, number, number][] = [[0, 32, 76], [123, 123, 120], [254, 232, 56]];
+  const scaled = v * (stops.length - 1);
+  const index = Math.min(stops.length - 2, Math.floor(scaled));
+  const t = scaled - index;
+  return stops[index].map((channel, channelIndex) =>
+    Math.round(channel + t * (stops[index + 1][channelIndex] - channel)),
+  ) as [number, number, number];
 }
 
 export default function TerraIgnisMap({
@@ -174,8 +159,8 @@ export default function TerraIgnisMap({
         <span className="font-bold text-white block mb-1">BURN INDEX · 0–100</span>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            <span className="w-16 h-2 rounded bg-gradient-to-r from-slate-600 via-orange-700 to-orange-300" />
-            <span className="text-[8px] text-slate-500">Low · Medium · High · Extreme</span>
+            <span className="w-16 h-2 rounded" style={{ background: 'linear-gradient(to right, #00204c, #7b7b78, #fee838)' }} />
+            <span className="text-[8px] text-slate-400">Low · Medium · High</span>
           </div>
           {h3Data.length > 0 && (
             <div className="text-[7.5px] text-cyan-400/80 mt-1 uppercase font-semibold">

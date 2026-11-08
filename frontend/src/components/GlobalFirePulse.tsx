@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import { latLngToCell } from "h3-js";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
 import type { FireSensor } from "../types/fire";
@@ -47,6 +48,9 @@ function StatRow({ label, value, color = "text-slate-200" }: { label: string; va
 export default function GlobalFirePulse() {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [offset, setOffset] = useState(0);
+  const [latitudeInput, setLatitudeInput] = useState("");
+  const [longitudeInput, setLongitudeInput] = useState("");
+  const [coordinateError, setCoordinateError] = useState<string | null>(null);
   const {
     selectedDate,
     selectedStartDate,
@@ -106,6 +110,23 @@ export default function GlobalFirePulse() {
   }, [anomalyRecords]);
   const maxMonthlyAnomalies = Math.max(1, ...monthlyAnomalyCounts.map((count) => count ?? 0));
 
+  const handleCoordinateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const latitude = Number(latitudeInput);
+    const longitude = Number(longitudeInput);
+    if (latitudeInput.trim() === "" || longitudeInput.trim() === "" || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setCoordinateError("Enter both latitude and longitude as numbers.");
+      return;
+    }
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      setCoordinateError("Latitude must be −90 to 90 and longitude −180 to 180.");
+      return;
+    }
+
+    setCoordinateError(null);
+    setSelectedH3Cell(latLngToCell(latitude, longitude, 7));
+  };
+
   // Auto-play interval
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -162,6 +183,18 @@ export default function GlobalFirePulse() {
               {h3Cells.map((cell) => <option key={cell} value={cell}>{cell}</option>)}
             </select>
           </label>
+          <form onSubmit={handleCoordinateSubmit} className="col-span-2 md:col-span-3 xl:col-span-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+            <label className="text-[9px] font-mono text-slate-500 uppercase">
+              Latitude
+              <input aria-label="Latitude" type="number" min="-90" max="90" step="any" value={latitudeInput} onChange={(event) => setLatitudeInput(event.target.value)} placeholder="e.g. 28.6" className="mt-1 block w-full min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
+            </label>
+            <label className="text-[9px] font-mono text-slate-500 uppercase">
+              Longitude
+              <input aria-label="Longitude" type="number" min="-180" max="180" step="any" value={longitudeInput} onChange={(event) => setLongitudeInput(event.target.value)} placeholder="e.g. 85.1" className="mt-1 block w-full min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600" />
+            </label>
+            <button type="submit" className="border border-slate-700 rounded px-3 py-1.5 text-[10px] font-mono text-slate-200 hover:border-orange-500">GO TO CELL</button>
+            {coordinateError && <span role="alert" className="col-span-3 text-[10px] text-red-300">{coordinateError}</span>}
+          </form>
           <div className="flex items-end justify-between gap-2">
             <span className="text-[9px] font-mono text-slate-500 pb-2">Page {Math.floor(offset / pageSize) + 1}</span>
             <div className="flex gap-1">
