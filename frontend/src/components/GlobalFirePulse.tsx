@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { latLngToCell } from "h3-js";
+import { cellToLatLng, latLngToCell } from "h3-js";
 import TerraIgnisMap from "./TerraIgnisMap";
 import { useFires } from "../hooks/useFires";
 import type { FireSensor } from "../types/fire";
@@ -9,7 +9,7 @@ import { useStats } from "../hooks/useStats";
 
 function Metric({ label, value, detail, color }: { label: string; value: string; detail: string; color: string }) {
   return (
-    <div className="metric-card bg-slate-900 border border-slate-800 rounded-md px-3 py-2.5 flex flex-col gap-1">
+    <div className="metric-card border border-slate-800 rounded-md px-3 py-2.5 flex flex-col gap-1">
       <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">{label}</span>
       <span className={`text-xl font-semibold tabular-nums ${color}`}>{value}</span>
       <span className="text-[10px] text-slate-500">{detail}</span>
@@ -64,7 +64,7 @@ export default function GlobalFirePulse() {
     clearFilters,
   } = useDashboard();
   const selectedYear = Number(selectedStartDate.slice(0, 4));
-  const pageSize = 500;
+  const pageSize = 5000;
 
   const { data, loading, error, refetch } = useFires({
     date: selectedDate || undefined,
@@ -77,6 +77,37 @@ export default function GlobalFirePulse() {
     offset,
   });
   const records = data?.data ?? [];
+  const mapFireData = useMemo(() => loading ? [] : records.map((record) => ({
+    h3Index: record.h3_cell,
+    burnIndex: record.burn_index,
+  })), [loading, records]);
+  const mapOverview = useMemo(() => {
+    const cells = [...new Set(mapFireData.map((record) => record.h3Index))];
+    if (cells.length === 0) return { latitude: 20, longitude: 0, zoom: 1.2 };
+
+    const centers = cells.map((cell) => cellToLatLng(cell));
+    const latitude = centers.reduce((sum, center) => sum + center[0], 0) / centers.length;
+    const longitude = Math.atan2(
+      centers.reduce((sum, center) => sum + Math.sin(center[1] * Math.PI / 180), 0),
+      centers.reduce((sum, center) => sum + Math.cos(center[1] * Math.PI / 180), 0),
+    ) * 180 / Math.PI;
+    const longitudeOffsets = centers.map((center) => ((center[1] - longitude + 540) % 360) - 180);
+    const longitudeSpan = Math.max(...longitudeOffsets) - Math.min(...longitudeOffsets);
+    const toMercatorY = (value: number) => {
+      const lat = Math.max(-85, Math.min(85, value)) * Math.PI / 180;
+      return (1 - Math.asinh(Math.tan(lat)) / Math.PI) / 2;
+    };
+    const yValues = centers.map(([lat]) => toMercatorY(lat));
+    const latitudeSpan = Math.max(...yValues) - Math.min(...yValues);
+    const longitudeZoom = Math.log2((900 * 360) / (256 * Math.max(longitudeSpan, 0.1)));
+    const latitudeZoom = Math.log2(480 / (256 * Math.max(latitudeSpan, 0.001)));
+
+    return {
+      latitude,
+      longitude,
+      zoom: Math.max(1.2, Math.min(7.5, Math.min(longitudeZoom, latitudeZoom) - 0.45)),
+    };
+  }, [mapFireData]);
   const h3Cells = useMemo(() => [...new Set(records.map((record) => record.h3_cell))], [records]);
   const {
     data: anomalyRecords,
@@ -246,7 +277,7 @@ export default function GlobalFirePulse() {
               OBSERVED FIRE ACTIVITY
             </span>
             <span className="text-xs font-bold text-white block mt-0.5">
-              {data?.total == null ? "Satellite detections by H3 cell" : `${formatCount(data.total)} matching cell-date records`}
+              {data?.total == null ? "Satellite detections by H3 cell" : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
             </span>
           </div>
 
@@ -254,13 +285,10 @@ export default function GlobalFirePulse() {
           <div className="flex-1 flex items-center justify-center relative select-none h-full">
             <div className="w-full h-full text-slate-950">
               <TerraIgnisMap
-                latitude={20}
-                longitude={0}
-                zoom={1.2}
-                fireData={loading ? [] : records.map((record) => ({
-                  h3Index: record.h3_cell,
-                  burnIndex: record.burn_index,
-                }))}
+                latitude={mapOverview.latitude}
+                longitude={mapOverview.longitude}
+                zoom={mapOverview.zoom}
+                fireData={mapFireData}
                 isRegional={false}
                 selectedH3Cell={selectedH3Cell}
                 onH3CellClick={setSelectedH3Cell}

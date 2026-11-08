@@ -139,7 +139,7 @@ main { min-height: 0; }
 .summary-block > div:first-child > span:first-child { color: #77796f !important; font-family: inherit !important; font-size: 11px !important; font-weight: 650; letter-spacing: .05em !important; }
 .summary-block > div:last-child > div > span:first-child { font-family: inherit !important; font-weight: 600; }
 .summary-block > div:last-child > div > span:nth-child(2) { font-variant-numeric: tabular-nums; }
-.metric-card { transition: background-color .18s ease, border-color .18s ease; }
+.metric-card { background-color: var(--surface); transition: background-color .18s ease, border-color .18s ease; }
 .global-view > div:last-child > div:first-child { border-radius: 13px !important; overflow: hidden; }
 .global-view > div:last-child > div:first-child > div:last-child { background: #fffefa !important; border-color: #dedacf !important; }
 .global-view svg { font-family: inherit; }
@@ -158,7 +158,7 @@ main { min-height: 0; }
 .calendar-detail { scroll-margin-block: 16px; }
 .calendar-view section > div:last-child { border-color: #e6e2d8 !important; }
 .calendar-view input[type="range"] { accent-color: #596f4e !important; }
-.app-shell main section[aria-label="Project statistics"] > div:last-child > div { min-height: 98px; padding: 14px 16px; border-color: #dedacf !important; border-radius: 11px !important; background: #fffefa !important; }
+.app-shell main section[aria-label="Project statistics"] > div:last-child > div { min-height: 98px; padding: 14px 16px; border-color: var(--line) !important; border-radius: 11px !important; background: var(--surface) !important; }
 .app-shell main section[aria-label="Project statistics"] > div:last-child > div > span:first-child { font-size: 10px; letter-spacing: .04em; }
 .app-shell main section[aria-label="Project statistics"] > div:last-child > div > span:nth-child(2) { font-size: 26px; letter-spacing: -.04em; }
 .app-shell main section[aria-label="Project statistics"] > div:last-child > div > span:last-child { font-size: 11px; }
@@ -256,7 +256,7 @@ main { min-height: 0; }
 .app-shell[data-theme="dark"] .regional-view > main > section:first-child,
 .app-shell[data-theme="dark"] .calendar-view > div:first-child,
 .app-shell[data-theme="dark"] .global-view > div:last-child > div:first-child > div:last-child {
-  background-color: #18221c !important;
-  border-color: #303d34 !important;
+  background-color: var(--surface) !important;
+  border-color: var(--line) !important;
 }
 .app-shell[data-theme="dark"] .calendar-view { scrollbar-color: #526156 transparent; }
