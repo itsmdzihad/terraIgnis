@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import Map from 'react-map-gl/mapbox';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import MapboxMap, { Layer, Source } from 'react-map-gl/mapbox';
 import DeckGL from '@deck.gl/react';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -7,6 +7,8 @@ import { cellToLatLng } from 'h3-js';
 
 // Public Mapbox Access Token as configured
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhaHJpYXJ4cHJveGltYSIsImEiOiJjbXVpcjdxeGUwMmllMzFvZjZkb3JrejlwIn0.u8XtSDGNGUtVb6V7XEu1BA';
+const SATELLITE_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
+const FALLBACK_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
 export interface FirePoint {
   h3Index: string;
@@ -45,6 +47,8 @@ export default function TerraIgnisMap({
   selectedH3Cell = null,
   onH3CellClick
 }: TerraIgnisMapProps) {
+  const [mapStyle, setMapStyle] = useState(SATELLITE_STYLE);
+  const [satelliteUnavailable, setSatelliteUnavailable] = useState(false);
   
   // Manage map viewport state dynamically so it can be controlled by tabs & user panned
   const [viewState, setViewState] = useState({
@@ -54,6 +58,11 @@ export default function TerraIgnisMap({
     pitch: 0,
     bearing: 0
   });
+
+  const handleMapError = useCallback(() => {
+    setMapStyle((currentStyle) => currentStyle === SATELLITE_STYLE ? FALLBACK_STYLE : currentStyle);
+    setSatelliteUnavailable(true);
+  }, []);
 
   // Follow a shared H3 selection, then return to the current overview when it is cleared.
   useEffect(() => {
@@ -69,14 +78,38 @@ export default function TerraIgnisMap({
     setViewState({ longitude, latitude, zoom, pitch: 0, bearing: 0 });
   }, [longitude, latitude, zoom, isRegional, selectedH3Cell]);
 
-  const h3Data = fireData;
+  // The API returns one record per H3 cell and date. Collapse repeated dates
+  // to one visible map marker while retaining the strongest observed score.
+  const h3Data = useMemo(() => {
+    const cells = new Map<string, FirePoint>();
+    for (const record of fireData) {
+      const current = cells.get(record.h3Index);
+      if (!current || record.burnIndex > current.burnIndex) cells.set(record.h3Index, record);
+    }
+    return [...cells.values()];
+  }, [fireData]);
+
+  const pointFeatures = useMemo(() => ({
+    type: 'FeatureCollection' as const,
+    features: h3Data.map((record) => {
+      const [lat, lng] = cellToLatLng(record.h3Index);
+      return {
+        type: 'Feature' as const,
+        properties: record,
+        geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+      };
+    }),
+  }), [h3Data]);
+
+  const globeView = viewState.zoom <= 1.5;
 
   // Construct Deck.gl Layers list dynamically
   const layers = useMemo(() => {
     const list = [];
 
-    // Layer 1: H3 Hexagon Layer representing gridded global burn anomalies
-    if (h3Data.length > 0) {
+    // Show cell boundaries only when zoomed in; at overview scale they hide
+    // the imagery and make individual observed cells hard to find.
+    if (h3Data.length > 0 && !globeView && viewState.zoom >= 6) {
       list.push(
         new H3HexagonLayer({
           id: 'h3-fire-hexagons',
@@ -88,27 +121,20 @@ export default function TerraIgnisMap({
           },
           wireframe: false,
           filled: true,
-          extruded: !isRegional,
+          extruded: false,
           getHexagon: (d: FirePoint & { h3Index: string }) => d.h3Index,
           getFillColor: (d: FirePoint) => {
-            if (d.h3Index === selectedH3Cell) return [6, 182, 212, 230];
+            if (d.h3Index === selectedH3Cell) return [0, 205, 220, 100];
             const rawBurnIndex = d.burnIndex;
             const val = rawBurnIndex / 100;
-            return [...getColor(val), 210];
+            return [...getColor(val), 70];
           },
-          getLineColor: (d: FirePoint) => d.h3Index === selectedH3Cell ? [103, 232, 249, 255] : [15, 23, 42, 160],
+          getLineColor: (d: FirePoint) => d.h3Index === selectedH3Cell ? [100, 245, 255, 255] : [255, 255, 255, 120],
           lineWidthMinPixels: 1,
-          getLineWidth: (d: FirePoint) => d.h3Index === selectedH3Cell ? 4 : 1,
-          getElevation: (d: FirePoint) => {
-            const rawBurnIndex = d.burnIndex;
-            const val = rawBurnIndex / 100;
-            return val * 1200;
-          },
-          opacity: isRegional ? 0.95 : 0.7,
-          elevationScale: 1,
+          getLineWidth: (d: FirePoint) => d.h3Index === selectedH3Cell ? 2 : 1,
+          opacity: 0.8,
           updateTriggers: {
-            getFillColor: [isRegional, selectedH3Cell],
-            getElevation: [isRegional, selectedH3Cell],
+            getFillColor: [selectedH3Cell],
             getLineColor: [selectedH3Cell],
             getLineWidth: [selectedH3Cell]
           }
@@ -117,7 +143,7 @@ export default function TerraIgnisMap({
     }
 
     // Keep the shared selection visible if date/sensor filters remove it from the current Fire API page.
-    if (selectedH3Cell && !h3Data.some((record) => record.h3Index === selectedH3Cell)) {
+    if (!globeView && viewState.zoom >= 4 && selectedH3Cell && !h3Data.some((record) => record.h3Index === selectedH3Cell)) {
       list.push(new H3HexagonLayer({
         id: 'selected-h3-cell',
         data: [{ h3Index: selectedH3Cell }],
@@ -134,7 +160,7 @@ export default function TerraIgnisMap({
     }
 
     return list;
-  }, [h3Data, isRegional, selectedH3Cell, onH3CellClick]);
+  }, [globeView, h3Data, selectedH3Cell, onH3CellClick, viewState.zoom]);
 
   return (
     <div className="relative w-full h-full min-h-[350px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">
@@ -147,11 +173,31 @@ export default function TerraIgnisMap({
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? 'pointer' : 'grab')}
       >
-        <Map
+        <MapboxMap
           mapboxAccessToken={MAPBOX_TOKEN}
-          mapStyle="mapbox://styles/mapbox/dark-v11"
-          reuseMaps
-        />
+          mapStyle={mapStyle}
+          projection={{ name: globeView ? 'globe' : 'mercator' }}
+          onError={handleMapError}
+          interactiveLayerIds={h3Data.length > 0 ? ['fire-cell-points'] : []}
+          onClick={(event) => {
+            const h3Cell = event.features?.[0]?.properties?.h3Index;
+            if (typeof h3Cell === 'string') onH3CellClick?.(h3Cell);
+          }}
+        >
+          <Source id="fire-cell-source" type="geojson" data={pointFeatures}>
+            <Layer
+              id="fire-cell-points"
+              type="circle"
+              paint={{
+                'circle-radius': 4,
+                'circle-color': ['case', ['==', ['get', 'h3Index'], selectedH3Cell ?? ''], '#00cddc', '#ff2226'],
+                'circle-stroke-color': '#fffaf0',
+                'circle-stroke-width': 1,
+                'circle-opacity': 0.96,
+              }}
+            />
+          </Source>
+        </MapboxMap>
       </DeckGL>
 
       {/* Floating Scientific Legend Scale */}
@@ -164,8 +210,11 @@ export default function TerraIgnisMap({
           </div>
           {h3Data.length > 0 && (
             <div className="text-[7.5px] text-cyan-400/80 mt-1 uppercase font-semibold">
-              Grid Style: Active H3 Hexagons
+              Red markers: observed H3 cells
             </div>
+          )}
+          {satelliteUnavailable && (
+            <div className="text-[8px] text-amber-300 mt-1">Satellite tiles unavailable · showing street map</div>
           )}
         </div>
       </div>

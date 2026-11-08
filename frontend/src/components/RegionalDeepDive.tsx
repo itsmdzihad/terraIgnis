@@ -147,7 +147,7 @@ export default function RegionalDeepDive() {
             <p className="text-[9px] font-mono tracking-widest text-emerald-400">SELECTED H3 CELL · RESOLUTION 7</p>
             <p className="mt-1 text-xs font-mono text-white break-all">{regionData.h3_cell}</p>
           </div>
-          <span className="text-[9px] font-mono text-slate-500">GET /api/regions/{'{h3_cell}'}</span>
+          <span className="text-[9px] font-mono text-slate-500">CELL SUMMARY</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4">
           <Metric label="OBSERVED CELL/DATES" value={formatCount(regionData.observed_cell_dates)} />
@@ -199,7 +199,7 @@ export default function RegionalDeepDive() {
             <p className="text-xs text-slate-400">ANOMALY HISTORY</p>
             <h3 className="text-sm font-semibold text-white mt-0.5">Observed Burn Index by cell/date</h3>
           </div>
-          <span className="text-[9px] font-mono text-slate-500">GET /api/anomalies/{'{h3_cell}'}</span>
+          <span className="text-[9px] font-mono text-slate-500">CELL HISTORY</span>
         </div>
         {history.loading ? (
           <p role="status" className="mt-4 text-[10px] font-mono text-amber-300">LOADING ANOMALY HISTORY...</p>
@@ -243,15 +243,15 @@ export default function RegionalDeepDive() {
   ) : null;
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 p-4 lg:p-6 gap-4 lg:gap-6 overflow-hidden">
+    <div className="regional-view flex flex-col h-full bg-slate-950 p-4 lg:p-6 gap-4 lg:gap-6 overflow-hidden">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
         <div>
-          <h2 className="text-sm font-semibold text-white">Regional Deep Dive</h2>
-          <p className="text-xs text-cyan-300 mt-0.5 font-mono">H3 CELL ANALYSIS · resolution 7</p>
+          <h2 className="text-sm font-semibold text-white">Cell explorer</h2>
+          <p className="text-xs text-cyan-300 mt-0.5 font-mono">Inspect observed fire activity by H3 cell</p>
           <p className="text-[10px] text-slate-500 mt-1">Selected: <span className="font-mono text-slate-300">{selectedH3Cell ?? 'None'}</span></p>
         </div>
         <div className="flex flex-col sm:items-end gap-1">
-          <label htmlFor="h3-cell-select" className="text-[9px] font-mono tracking-widest text-slate-500">SELECT FROM LOADED FIRE OBSERVATIONS</label>
+          <label htmlFor="h3-cell-select" className="text-[9px] font-mono tracking-widest text-slate-500">Choose an observed cell</label>
           <div className="relative min-w-[260px]">
             <select
               id="h3-cell-select"
@@ -294,19 +294,9 @@ export default function RegionalDeepDive() {
 
         <section className="xl:col-span-7 overflow-y-auto pr-1 min-h-0">
           {regionContent}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <article className="bg-slate-900/30 border border-slate-800/80 rounded-lg p-4">
-              <p className="text-[9px] font-mono tracking-widest text-cyan-300">REFERENCE DATA · NOT CELL-SPECIFIC</p>
-              <h3 className="mt-1 text-sm font-semibold text-white">Diurnal Cycle</h3>
-              <p className="mt-2 text-xs text-slate-400">Overpass schedule and radiative curves are unavailable from the selected-cell APIs.</p>
-            </article>
-            <article className="bg-slate-900/30 border border-slate-800/80 rounded-lg p-4">
-              <p className="text-[9px] font-mono tracking-widest text-cyan-300">REFERENCE DATA · NOT CELL-SPECIFIC</p>
-              <h3 className="mt-1 text-sm font-semibold text-white">Land Cover</h3>
-              <p className="mt-2 text-xs text-slate-400">No land-cover measurements are provided by the H3 summary endpoint.</p>
-            </article>
-          </div>
-          <p className="mt-4 mb-2 text-[9px] font-mono text-slate-600">Annual historical sensor series and harmonized trends are unavailable from the current cell summary API.</p>
+          <p className="mt-4 mb-2 text-xs leading-relaxed text-slate-500">
+            Burn Index is a relative activity score. Cell history shows observed dates only; gaps do not imply zero activity.
+          </p>
         </section>
       </main>
     </div>

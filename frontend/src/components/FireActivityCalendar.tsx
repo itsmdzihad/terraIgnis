@@ -112,14 +112,15 @@ export default function FireActivityCalendar() {
       .slice(0, 4);
   }, [anomalyData]);
 
-  const hoveredObservation = hoveredDate ? observationsByDate.get(hoveredDate) : undefined;
+  const detailDate = hoveredDate ?? selectedDate;
+  const detailObservation = detailDate ? observationsByDate.get(detailDate) : undefined;
   const observedDateRange = data?.data.length
     ? `${data.data[0].date} — ${data.data[data.data.length - 1].date} · ${data.total} observed dates`
     : null;
 
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-950 p-4 sm:p-6 gap-5 overflow-y-auto">
+    <div className="calendar-view flex flex-col w-full h-full min-h-0 bg-slate-950 p-4 sm:p-6 gap-5 overflow-y-auto overscroll-contain">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
         <div>
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -152,8 +153,8 @@ export default function FireActivityCalendar() {
       <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 sm:p-5 flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-white">Harmonized Burn Intensity — {selectedYear}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Daily mean Burn Index · dates without a record are unavailable</p>
+            <h3 className="text-sm font-semibold text-white">Daily fire activity · {selectedYear}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Mean relative Burn Index · blank dates have no observation record</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400" aria-label="Burn Index legend">
             <span>No observation</span>
@@ -169,11 +170,11 @@ export default function FireActivityCalendar() {
 
         {observedDateRange && !loading && !error && (
           <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
-            REAL BACKEND DATA · {observedDateRange}
+            Observed data · {observedDateRange}
           </div>
         )}
 
-        <div className="bg-slate-950 rounded-lg p-4 sm:p-5 border border-slate-800/60 overflow-x-auto">
+        <div className="bg-slate-950 rounded-lg p-4 sm:p-5 border border-slate-800/60 overflow-x-auto" onMouseLeave={() => setHoveredDate(null)}>
           {loading ? (
             <div role="status" className="min-h-32 flex flex-col items-center justify-center text-center">
               <span className="text-[9px] font-mono tracking-widest text-orange-400">CALENDAR TELEMETRY</span>
@@ -226,10 +227,11 @@ export default function FireActivityCalendar() {
                             type="button"
                             aria-label={label}
                             aria-pressed={selectedDate === cell.date}
-                            title={`${label}${selectedDate === cell.date ? ' · selected for map' : ''}`}
                             onClick={() => setSelectedDate(cell.date)}
                             onMouseEnter={() => setHoveredDate(cell.date)}
+                            onPointerEnter={() => setHoveredDate(cell.date)}
                             onFocus={() => setHoveredDate(cell.date)}
+                            onBlur={() => setHoveredDate(null)}
                             className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white border ${selectedDate === cell.date ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-slate-950' : ''} ${color ? 'border-white/20' : 'bg-slate-950 border-slate-800/80'}`}
                             style={color ? { backgroundColor: color } : undefined}
                           />
@@ -243,22 +245,22 @@ export default function FireActivityCalendar() {
           )}
         </div>
 
-        <div className="min-h-[64px] bg-slate-950/60 rounded-lg border border-slate-800 p-3 flex items-center text-xs">
-          {hoveredDate ? hoveredObservation ? (
+        <div className="calendar-detail min-h-[64px] bg-slate-950/60 rounded-lg border border-slate-800 p-3 flex items-center text-xs" aria-live="polite" aria-atomic="true">
+          {detailDate ? detailObservation ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full">
-              <Telemetry label="Date" value={hoveredObservation.date} />
-              <Telemetry label="Fire Count" value={hoveredObservation.fire_count.toLocaleString()} emphasis="text-green-300" />
-              <Telemetry label="Mean Burn Index" value={hoveredObservation.mean_burn_index === null ? 'Unavailable' : hoveredObservation.mean_burn_index.toFixed(1)} emphasis="text-orange-300" />
-              <Telemetry label="Max Burn Index" value={hoveredObservation.max_burn_index === null ? 'Unavailable' : hoveredObservation.max_burn_index.toFixed(1)} emphasis="text-orange-400" />
-              <Telemetry label="Anomaly Count" value={hoveredObservation.anomaly_count.toLocaleString()} emphasis="text-cyan-300" />
+              <Telemetry label="Date" value={detailObservation.date} />
+              <Telemetry label="Fire Count" value={detailObservation.fire_count.toLocaleString()} emphasis="text-green-300" />
+              <Telemetry label="Mean Burn Index" value={detailObservation.mean_burn_index === null ? 'Unavailable' : detailObservation.mean_burn_index.toFixed(1)} emphasis="text-orange-300" />
+              <Telemetry label="Max Burn Index" value={detailObservation.max_burn_index === null ? 'Unavailable' : detailObservation.max_burn_index.toFixed(1)} emphasis="text-orange-400" />
+              <Telemetry label="Anomaly Count" value={detailObservation.anomaly_count.toLocaleString()} emphasis="text-cyan-300" />
             </div>
           ) : (
             <div className="w-full text-center text-slate-400">
-              <span className="block text-[9px] font-mono tracking-wider text-slate-500">{hoveredDate}</span>
+              <span className="block text-[9px] font-mono tracking-wider text-slate-500">{detailDate}</span>
               NO OBSERVED FIRE ACTIVITY DATA
             </div>
           ) : (
-            <div className="text-slate-500 text-xs text-center w-full">Hover over a date to see daily telemetry.</div>
+            <div className="text-slate-500 text-xs text-center w-full">Hover over a date, or select one to keep its telemetry here.</div>
           )}
         </div>
       </section>
@@ -269,7 +271,7 @@ export default function FireActivityCalendar() {
             <h4 className="text-sm font-semibold text-white">Z-Score Outlier Report</h4>
             {!anomaliesLoading && !anomaliesError && anomalyData && (
               <span className="text-[9px] font-mono text-emerald-400">
-                REAL BACKEND DATA · {anomalyData.length.toLocaleString()} outliers
+                {anomalyData.length.toLocaleString()} anomaly records
               </span>
             )}
           </div>
