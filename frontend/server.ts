@@ -17,6 +17,36 @@ async function startServer() {
 
 
 
+  const BACKEND_URL = (process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
+  // Proxy /api and /health requests directly to FastAPI backend
+  app.use(['/api', '/health'], async (req, res) => {
+    try {
+      const targetUrl = `${BACKEND_URL}${req.originalUrl}`;
+      const backendRes = await fetch(targetUrl, {
+        method: req.method,
+        headers: {
+          'Accept': 'application/json',
+          ...(req.headers['content-type'] ? { 'Content-Type': req.headers['content-type'] as string } : {}),
+        },
+        body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
+      });
+
+      res.status(backendRes.status);
+      backendRes.headers.forEach((value, key) => {
+        if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) {
+          res.setHeader(key, value);
+        }
+      });
+      const data = await backendRes.arrayBuffer();
+      res.send(Buffer.from(data));
+    } catch (error) {
+      res.status(502).json({
+        detail: `Cannot connect to backend server at ${BACKEND_URL}. Ensure FastAPI is running on port 8000.`,
+      });
+    }
+  });
+
   // Mount Vite's development server as middleware inside Express
   const vite = await createViteServer({
     server: { middlewareMode: true },
