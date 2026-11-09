@@ -124,6 +124,105 @@ button:disabled { cursor: not-allowed; }
 
 main { min-height: 0; }
 
+/* Dataplay reference style for Fire Overview */
+.dataplay-overview {
+  background-color: #f4f6fa !important;
+  color: #0f172a !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+}
+
+.dataplay-overview .dataplay-card {
+  background-color: #ffffff !important;
+  border: 1px solid #eef2f6 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.dataplay-overview .dataplay-card-header {
+  color: #0f172a !important;
+}
+
+.dataplay-overview .dataplay-metric-val {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.dataplay-overview .dataplay-badge-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: #ecfdf5 !important;
+  color: #10b981 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 9999px !important;
+}
+
+.dataplay-overview .dataplay-badge-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: #fff1f2 !important;
+  color: #f43f5e !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 9999px !important;
+}
+
+.dataplay-overview .dataplay-subtext {
+  color: #64748b !important;
+}
+
+.dataplay-overview .dataplay-muted {
+  color: #94a3b8 !important;
+}
+
+.dataplay-overview .dataplay-accent-blue {
+  color: #0062ff !important;
+}
+
+.dataplay-overview .dataplay-accent-cyan {
+  color: #00c7d4 !important;
+}
+
+.dataplay-overview .dataplay-accent-green {
+  color: #84cc16 !important;
+}
+
+/* Dark mode overrides for Fire Overview */
+.app-shell[data-theme="dark"] .dataplay-overview {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+}
+
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-card {
+  background-color: #131b2e !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4) !important;
+}
+
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-card-header,
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-metric-val {
+  color: #f8fafc !important;
+}
+
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-subtext,
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-muted {
+  color: #94a3b8 !important;
+}
+
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-badge-up {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-badge-down {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #fb7185 !important;
+}
+
 /* Global view: clearer hierarchy and breathing room around the map and controls. */
 .app-shell main section[aria-label="Fire API filters"] { background: #fffefa !important; border-color: #dedacf !important; border-radius: 12px !important; padding: 16px !important; box-shadow: 0 2px 8px rgba(38, 39, 32, .035); }
 .global-view { gap: 18px !important; padding: clamp(14px, 2vw, 28px) !important; }

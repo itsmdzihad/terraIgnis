@@ -12,8 +12,20 @@ export function getAnomalies(params: AnomalyQuery = {}, signal?: AbortSignal): P
   return apiGet<AnomaliesResponse>('/api/anomalies', query, signal);
 }
 
-export function getCellAnomalyHistory(h3Cell: string, signal?: AbortSignal): Promise<AnomaliesResponse> {
-  const query = new URLSearchParams({ limit: String(MAX_PAGE_SIZE) });
+export function getCellAnomalyHistory(
+  h3Cell: string,
+  paramsOrSignal?: { start_date?: string; end_date?: string; limit?: number; offset?: number } | AbortSignal,
+  maybeSignal?: AbortSignal,
+): Promise<AnomaliesResponse> {
+  const isSignal = paramsOrSignal instanceof AbortSignal;
+  const params = isSignal ? undefined : paramsOrSignal;
+  const signal = isSignal ? paramsOrSignal : maybeSignal;
+
+  const query = new URLSearchParams({ limit: String(params?.limit ?? MAX_PAGE_SIZE) });
+  if (params?.start_date) query.set('start_date', params.start_date);
+  if (params?.end_date) query.set('end_date', params.end_date);
+  if (params?.offset !== undefined) query.set('offset', String(params.offset));
+
   return apiGet<AnomaliesResponse>(`/api/anomalies/${encodeURIComponent(h3Cell)}`, query, signal);
 }
 
