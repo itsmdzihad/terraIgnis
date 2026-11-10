@@ -23,6 +23,8 @@ import type { FireSensor } from "../types/fire";
 import { useDashboard } from "../context/DashboardContext";
 import { useAnomalies } from "../hooks/useAnomalies";
 import { useStats } from "../hooks/useStats";
+import { useCountries } from "../hooks/useCountries";
+import { useCountryFires } from "../hooks/useCountryFires";
 import { useCalendar } from "../hooks/useCalendar";
 import FireActivityTrendsChart from "./FireActivityTrendsChart";
 
@@ -255,6 +257,11 @@ export default function GlobalFirePulse() {
     return count;
   }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell, selectedCountry]);
 
+  const countryDetectionTotal = useMemo(
+    () => countryFires.records.reduce((total, record) => total + record.total_fire_count, 0),
+    [countryFires.records]
+  );
+
   const sortedCalendarDays = useMemo(
     () => [...(calendarData?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
     [calendarData]
@@ -358,8 +365,11 @@ export default function GlobalFirePulse() {
     };
   }, [stats]);
 
-  const activeDetectionsHeadline =
-    selectedDate || activeFiltersCount > 0
+  const activeDetectionsHeadline = selectedCountry
+    ? countryFires.loading
+      ? undefined
+      : countryDetectionTotal
+    : selectedDate || activeFiltersCount > 0
       ? loading
         ? undefined
         : data?.total
@@ -367,7 +377,7 @@ export default function GlobalFirePulse() {
 
   const activeCellsHeadline =
     activeFiltersCount > 0
-      ? loading
+      ? mapLoading
         ? undefined
         : h3Cells.length
       : stats?.coverage.unique_h3_cells ?? (h3Cells.length > 0 ? h3Cells.length : undefined);
@@ -727,9 +737,13 @@ export default function GlobalFirePulse() {
               </h1>
               <span className="h-3.5 w-px bg-[#A7A7A7]/45 shrink-0" />
               <span className="text-xs font-medium glass-muted truncate tabular-nums">
-                {data?.total == null
-                  ? "Detections by H3 cell"
-                  : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
+                {selectedCountry
+                  ? mapLoading
+                    ? `Loading ${selectedCountry}…`
+                    : `${selectedCountry} · ${formatCount(records.length)} cell-date records`
+                  : data?.total == null
+                    ? "Detections by H3 cell"
+                    : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
               </span>
             </div>
 
@@ -834,6 +848,26 @@ export default function GlobalFirePulse() {
                 </label>
 
                 <label className="text-[11px] font-medium glass-muted">
+                  Country
+                  <select
+                    value={selectedCountry ?? ""}
+                    onChange={(event) => {
+                      setSelectedCountry(event.target.value || null);
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                  >
+                    <option value="">All countries</option>
+                    {countries.map((country) => {
+                      const name = String(country.properties.ADMIN ?? country.properties.NAME_EN ?? country.properties.NAME);
+                      return <option key={`${name}-${country.properties.ADM0_A3 ?? ""}`} value={name}>{name}</option>;
+                    })}
+                  </select>
+                  <span className="block mt-1 text-[10px] glass-subtle">Matches H3 cell centers.</span>
+                  {countriesError && <span className="block mt-1 text-[10px] tone-rose">Country list unavailable.</span>}
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
                   Sensor Type
                   <select
                     value={selectedSensor ?? ""}
@@ -907,11 +941,13 @@ export default function GlobalFirePulse() {
                   </select>
                 </label>
 
-                <form onSubmit={handleCoordinateSubmit} className="flex flex-col justify-end">
-                  <span className="text-[11px] font-medium glass-muted block mb-1">
-                    Lat / Lon Jump
-                  </span>
-                  <div className="flex gap-1.5">
+              </div>
+
+              <div className="flex justify-end mt-3">
+                <form onSubmit={handleCoordinateSubmit} className="flex flex-wrap items-end gap-2.5">
+                  <span className="text-[11px] font-medium glass-muted pb-2">Lat / Lon Jump</span>
+                  <label className="text-[10px] font-medium glass-muted">
+                    Latitude
                     <input
                       aria-label="Latitude"
                       type="number"
@@ -921,8 +957,11 @@ export default function GlobalFirePulse() {
                       value={latitudeInput}
                       onChange={(event) => setLatitudeInput(event.target.value)}
                       placeholder="Lat"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                      className="mt-1 block w-36 glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                     />
+                  </label>
+                  <label className="text-[10px] font-medium glass-muted">
+                    Longitude
                     <input
                       aria-label="Longitude"
                       type="number"
@@ -932,26 +971,23 @@ export default function GlobalFirePulse() {
                       value={longitudeInput}
                       onChange={(event) => setLongitudeInput(event.target.value)}
                       placeholder="Lon"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                      className="mt-1 block w-36 glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                     />
-                    <button
-                      type="submit"
-                      className="px-3.5 py-1.5 rounded-full glass-btn-primary text-xs font-semibold shrink-0"
-                    >
-                      Go
-                    </button>
-                  </div>
-                  {coordinateError && (
-                    <span className="text-[10px] tone-rose mt-1">{coordinateError}</span>
-                  )}
+                  </label>
+                  <button type="submit" className="h-[34px] px-3 rounded-full glass-btn-primary text-xs font-semibold">Go</button>
+                  {coordinateError && <span className="basis-full text-right text-[10px] tone-rose">{coordinateError}</span>}
                 </form>
               </div>
 
               <div className="flex items-center justify-between glass-divider-t mt-3 pt-2.5">
                 <span className="text-xs glass-muted">
-                  Showing page {Math.floor(offset / pageSize) + 1} ({records.length} records)
+                  {selectedCountry
+                    ? mapLoading
+                      ? `Loading ${selectedCountry} observations…`
+                      : `${selectedCountry}: ${formatCount(records.length)} cell-date records`
+                    : `Showing page ${Math.floor(offset / pageSize) + 1} (${data?.count ?? 0} records)`}
                 </span>
-                <div className="flex items-center gap-1.5">
+                {!selectedCountry && <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     disabled={offset === 0 || loading}
@@ -968,7 +1004,7 @@ export default function GlobalFirePulse() {
                   >
                     Next
                   </button>
-                </div>
+                </div>}
               </div>
             </section>
           )}
@@ -986,22 +1022,22 @@ export default function GlobalFirePulse() {
             />
 
             {/* Loading / Error States Overlay */}
-            {(loading || error || (!loading && data?.count === 0)) && (
+            {(mapLoading || mapError || (!mapLoading && (selectedCountry ? records.length === 0 : data?.count === 0))) && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
-                {loading ? (
+                {mapLoading ? (
                   <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
                       Loading detections...
                     </span>
                   </div>
-                ) : error ? (
+                ) : mapError ? (
                   <div className="max-w-sm glass-panel-strong px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold tone-rose">
                       Unable to load fire detections.
                     </span>
                     <button
                       type="button"
-                      onClick={refetch}
+                      onClick={selectedCountry ? countryFires.refetch : refetch}
                       className="mt-3 px-4 py-1.5 glass-btn-primary rounded-full text-xs font-semibold"
                     >
                       Retry
@@ -1013,7 +1049,9 @@ export default function GlobalFirePulse() {
                       No matching records
                     </span>
                     <span className="block mt-1 text-xs glass-muted">
-                      No detections match the selected parameters.
+                      {selectedCountry
+                        ? `No detections for ${selectedCountry} match the selected filters.`
+                        : "No detections match the selected parameters."}
                     </span>
                   </div>
                 )}
