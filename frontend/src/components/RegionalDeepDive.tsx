@@ -5,17 +5,9 @@ import { useCellAnomalyHistory } from '../hooks/useCellAnomalyHistory';
 import { useDashboard } from '../context/DashboardContext';
 import { useFires } from '../hooks/useFires';
 import { useRegion } from '../hooks/useRegion';
-import type { AnomalyLevel } from '../types/anomaly';
 import type { FireRecord } from '../types/fire';
+import AnomalyHistoryChart from './AnomalyHistoryChart';
 import TerraIgnisMap from './TerraIgnisMap';
-
-const LEVEL_COLORS: Record<AnomalyLevel, string> = {
-  extreme_low: '#38bdf8',
-  low: '#22d3ee',
-  normal: '#64748b',
-  high: '#fb923c',
-  extreme_high: '#ef4444',
-};
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
@@ -119,35 +111,26 @@ export default function RegionalDeepDive() {
     return { latitude, longitude, zoom };
   }, [mapRecords, selectedH3Cell]);
 
-  const chartRecords = useMemo(() => (historyData?.data ?? []).slice(-90), [historyData]);
-  const chartPoints = useMemo(() => chartRecords.map((record, index) => {
-    const x = chartRecords.length <= 1 ? 100 : (index / (chartRecords.length - 1)) * 400;
-    const y = 112 - (record.burn_index / 100) * 100;
-    return { ...record, x, y };
-  }), [chartRecords]);
-  const chartPath = chartPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-
   const regionContent = !selectedH3Cell ? (
-    <PanelState title="NO H3 CELL SELECTED" message="Select a fire-activity cell from the map to inspect regional telemetry." />
+    <PanelState title="No cell selected" message="Select a cell on the map or from the dropdown to inspect its fire history." />
   ) : region.loading ? (
-    <PanelState title="H3 TELEMETRY" message="LOADING CELL ANALYSIS..." />
+    <PanelState title="Loading" message="Loading cell analysis..." />
   ) : region.error && region.notFound ? (
-    <PanelState title="NO H3 DATA" message="No analytical observations are available for this cell." />
+    <PanelState title="No cell data" message="No analytical observations are available for this cell." />
   ) : region.error ? (
     <PanelState
-      title="H3 TELEMETRY · CONNECTION ERROR"
+      title="Connection error"
       message="Unable to retrieve cell analysis."
-      action={<button onClick={region.refetch} className="mt-3 border border-slate-700 rounded px-3 py-1.5 text-[10px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>}
+      action={<button onClick={region.refetch} className="mt-3 border border-slate-700 rounded px-3 py-1.5 text-[10px] font-mono text-slate-200 hover:border-orange-500">Retry</button>}
     />
   ) : regionData ? (
     <div className="space-y-4">
       <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 pb-3">
           <div>
-            <p className="text-[9px] font-mono tracking-widest text-emerald-400">SELECTED H3 CELL · RESOLUTION 7</p>
+            <p className="text-[11px] font-medium text-emerald-400">H3 Cell · Resolution 7</p>
             <p className="mt-1 text-xs font-mono text-white break-all">{regionData.h3_cell}</p>
           </div>
-          <span className="text-[9px] font-mono text-slate-500">CELL SUMMARY</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4">
           <Metric label="OBSERVED CELL/DATES" value={formatCount(regionData.observed_cell_dates)} />
@@ -164,11 +147,7 @@ export default function RegionalDeepDive() {
 
       <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-slate-400">Sensor Detections</p>
-            <h3 className="text-sm font-semibold text-white mt-0.5">Selected-cell aggregate</h3>
-          </div>
-          <span className="text-[9px] font-mono text-emerald-400">REAL API DATA</span>
+          <h3 className="text-sm font-semibold text-white">Sensor Detections</h3>
         </div>
         <div className="mt-4 space-y-3">
           {([
@@ -193,52 +172,14 @@ export default function RegionalDeepDive() {
         <p className="mt-3 text-[10px] text-slate-500">Detection counts aggregated over observed cell/dates; not a count of distinct physical fires.</p>
       </section>
 
-      <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs text-slate-400">ANOMALY HISTORY</p>
-            <h3 className="text-sm font-semibold text-white mt-0.5">Observed Burn Index by cell/date</h3>
-          </div>
-          <span className="text-[9px] font-mono text-slate-500">CELL HISTORY</span>
-        </div>
-        {history.loading ? (
-          <p role="status" className="mt-4 text-[10px] font-mono text-amber-300">LOADING ANOMALY HISTORY...</p>
-        ) : history.error ? (
-          <div role="alert" className="mt-4 flex items-center justify-between gap-2 text-xs text-slate-400">
-            <span>ANOMALY HISTORY · UNAVAILABLE</span>
-            <button onClick={history.refetch} className="border border-slate-700 rounded px-2 py-1 text-[9px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
-          </div>
-        ) : chartRecords.length === 0 ? (
-          <p className="mt-4 text-xs text-slate-400">No observation history is available for this cell.</p>
-        ) : (
-          <>
-            <div className="mt-4 h-32">
-              <svg viewBox="0 0 400 120" className="w-full h-full" role="img" aria-label="Selected H3 cell Burn Index history colored by backend anomaly level">
-                {[0, 25, 50, 75, 100].map((level) => {
-                  const y = 112 - level;
-                  return <g key={level}><line x1="0" x2="400" y1={y} y2={y} stroke="#1e293b" strokeDasharray="3 4" /><text x="2" y={Math.max(9, y - 2)} fill="#64748b" fontSize="7">{level}</text></g>;
-                })}
-                {chartPath && <path d={chartPath} fill="none" stroke="#475569" strokeWidth="1.5" />}
-                {chartPoints.map((point) => (
-                  <circle key={`${point.acq_date}-${point.h3_cell}`} cx={point.x} cy={point.y} r="2.8" fill={LEVEL_COLORS[point.anomaly_level]}>
-                    <title>{`${point.acq_date} · Burn Index ${point.burn_index.toFixed(2)} · ${point.anomaly_level}`}</title>
-                  </circle>
-                ))}
-              </svg>
-            </div>
-            <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
-              <span>{chartRecords[0]?.acq_date}</span>
-              <span>{chartRecords.length} of {formatCount(historyData?.total ?? chartRecords.length)} records · Burn Index 0–100</span>
-              <span>{chartRecords[chartRecords.length - 1]?.acq_date}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-              {Object.entries(LEVEL_COLORS).map(([level, color]) => (
-                <span key={level} className="flex items-center gap-1 text-[9px] font-mono text-slate-400"><i className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />{level.replace('_', ' ')}</span>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+      <AnomalyHistoryChart
+        records={historyData?.data ?? []}
+        totalCount={historyData?.total}
+        loading={history.loading}
+        error={history.error}
+        onRetry={history.refetch}
+        h3Cell={selectedH3Cell}
+      />
     </div>
   ) : null;
 
@@ -247,11 +188,10 @@ export default function RegionalDeepDive() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
         <div>
           <h2 className="text-sm font-semibold text-white">Cell explorer</h2>
-          <p className="text-xs text-cyan-300 mt-0.5 font-mono">Inspect observed fire activity by H3 cell</p>
-          <p className="text-[10px] text-slate-500 mt-1">Selected: <span className="font-mono text-slate-300">{selectedH3Cell ?? 'None'}</span></p>
+          <p className="text-xs text-cyan-300 mt-0.5">Inspect observed fire activity by H3 cell</p>
         </div>
         <div className="flex flex-col sm:items-end gap-1">
-          <label htmlFor="h3-cell-select" className="text-[9px] font-mono tracking-widest text-slate-500">Choose an observed cell</label>
+          <label htmlFor="h3-cell-select" className="text-[11px] font-medium text-slate-500">Choose an observed cell</label>
           <div className="relative min-w-[260px]">
             <select
               id="h3-cell-select"
@@ -265,7 +205,7 @@ export default function RegionalDeepDive() {
             </select>
             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
-          {fires.loading ? <span className="text-[9px] font-mono text-amber-300">LOADING FIRE CELLS...</span> : fires.error ? <span className="text-[9px] text-red-300">CELL LIST UNAVAILABLE · <button onClick={fires.refetch} className="underline">RETRY</button></span> : <span className="text-[9px] font-mono text-slate-500">{formatCount(mapRecords.length)} loaded H3 cells · click a cell on map</span>}
+          {fires.loading ? <span className="text-[10px] font-medium text-amber-300">Loading fire cells...</span> : fires.error ? <span className="text-[10px] text-red-300">Cell list unavailable · <button onClick={fires.refetch} className="underline">Retry</button></span> : <span className="text-[10px] text-slate-500">{formatCount(mapRecords.length)} loaded H3 cells · click a cell on map</span>}
         </div>
       </header>
 
@@ -276,7 +216,7 @@ export default function RegionalDeepDive() {
               <p className="text-xs text-slate-400">H3 fire activity cells</p>
               <h3 className="text-sm font-semibold text-white mt-0.5">{selectedH3Cell ?? 'Select a cell'}</h3>
             </div>
-            {selectedH3Cell && <button onClick={() => selectCell('')} className="text-[9px] font-mono text-slate-400 hover:text-white">CLEAR</button>}
+            {selectedH3Cell && <button onClick={() => selectCell('')} className="text-[10px] font-medium text-slate-400 hover:text-white">Clear</button>}
           </div>
           <div className="flex-1 min-h-0">
             <TerraIgnisMap
@@ -289,7 +229,7 @@ export default function RegionalDeepDive() {
               onH3CellClick={selectCell}
             />
           </div>
-          <p className="text-[9px] font-mono text-slate-500">{fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to load its telemetry.'} Highlighted cell uses cyan.</p>
+          <p className="text-[10px] text-slate-500">{fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.</p>
         </section>
 
         <section className="xl:col-span-7 overflow-y-auto pr-1 min-h-0">

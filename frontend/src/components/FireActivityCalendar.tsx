@@ -766,7 +766,7 @@ export default function FireActivityCalendar() {
         type: "FeatureCollection",
         metadata: {
           generated: new Date().toISOString(),
-          mission: "TerraIgnis DAILY FIRE TELEMETRY",
+          dataset: "TerraIgnis Daily Fire Activity",
           year: selectedYear,
           total_records: calendarDays.length,
         },
@@ -803,7 +803,7 @@ export default function FireActivityCalendar() {
       setExportStatus("No calendar data to export for this year.");
       return;
     }
-    setExportStatus("Formatting telemetry CSV tables...");
+    setExportStatus("Formatting CSV table...");
     setTimeout(() => {
       let csvContent = "Date,Fire_Count,Mean_Burn_Index,Max_Burn_Index,Anomaly_Count\n";
       calendarDays.forEach((day) => {
@@ -858,87 +858,79 @@ export default function FireActivityCalendar() {
     <div className="activity-dashboard flex flex-col w-full h-full min-h-0 p-4 sm:p-6 lg:p-8 gap-6 overflow-y-auto overscroll-contain">
       {/* 1. TOP HEADER BAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="activity-muted text-xs font-medium tracking-wide block">
-            Satellite Telemetry
-          </span>
-          <div className="flex flex-wrap items-center gap-3 mt-0.5">
-            <h1 className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
-              Daily Activity Center
-            </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
+            Daily Activity Center
+          </h1>
 
-            {/* Statistic Year Pill Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
-                className="activity-surface-control flex items-center gap-2 px-3.5 py-1.5 border rounded-full text-xs font-semibold shadow-2xs transition-colors"
-              >
-                <span className="activity-on-accent w-4 h-4 rounded-md bg-[#524ad3] flex items-center justify-center text-[10px] font-bold">
-                  Σ
-                </span>
-                <span className="activity-muted font-normal">Year</span>
-                <span className="font-bold">{selectedYear}</span>
-                <ChevronDown size={13} className="activity-muted" />
-              </button>
+          {/* Statistic Year Pill Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+              className="activity-surface-control flex items-center gap-2 px-3.5 py-1.5 border rounded-full text-xs font-semibold shadow-2xs transition-colors"
+            >
+              <span className="activity-on-accent w-4 h-4 rounded-md bg-[#524ad3] flex items-center justify-center text-[10px] font-bold">
+                Σ
+              </span>
+              <span className="activity-muted font-normal">Year</span>
+              <span className="font-bold">{selectedYear}</span>
+              <ChevronDown size={13} className="activity-muted" />
+            </button>
 
-              {isYearDropdownOpen && (
-                <div className="activity-surface-control absolute left-0 mt-2 w-44 rounded-2xl shadow-xl border p-2 z-30 space-y-1">
-                  {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
-                    <button
-                      key={yr}
-                      type="button"
-                      onClick={() => {
-                        setSelectedYear(yr);
-                        setIsYearDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                        selectedYear === yr
-                          ? "bg-indigo-500/15 font-bold"
-                          : "activity-muted hover:bg-indigo-500/5"
-                      }`}
-                      style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
-                    >
-                      {yr}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {isYearDropdownOpen && (
+              <div className="activity-surface-control absolute left-0 mt-2 w-44 rounded-2xl shadow-xl border p-2 z-30 space-y-1">
+                {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => {
+                      setSelectedYear(yr);
+                      setIsYearDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                      selectedYear === yr
+                        ? "bg-indigo-500/15 font-bold"
+                        : "activity-muted hover:bg-indigo-500/5"
+                    }`}
+                    style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-            {/* Segmented Switcher: Fire Count | Burn Index */}
-            <div className="activity-pill-track flex items-center p-1 rounded-full border">
-              <button
-                type="button"
-                onClick={() => setMetricMode("fire_count")}
-                className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
-                  metricMode === "fire_count"
-                    ? "activity-pill-active shadow-xs font-semibold"
-                    : "activity-pill-inactive"
-                }`}
-              >
-                Fire Count
-              </button>
-              <button
-                type="button"
-                onClick={() => setMetricMode("burn_index")}
-                className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
-                  metricMode === "burn_index"
-                    ? "activity-pill-active shadow-xs font-semibold"
-                    : "activity-pill-inactive"
-                }`}
-              >
-                Burn Index
-              </button>
-            </div>
+          {/* Segmented Switcher: Fire Count | Burn Index */}
+          <div className="activity-pill-track flex items-center p-1 rounded-full border">
+            <button
+              type="button"
+              onClick={() => setMetricMode("fire_count")}
+              className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
+                metricMode === "fire_count"
+                  ? "activity-pill-active shadow-xs font-semibold"
+                  : "activity-pill-inactive"
+              }`}
+            >
+              Fire Count
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetricMode("burn_index")}
+              className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
+                metricMode === "burn_index"
+                  ? "activity-pill-active shadow-xs font-semibold"
+                  : "activity-pill-inactive"
+              }`}
+            >
+              Burn Index
+            </button>
           </div>
         </div>
 
         {/* Right Header Counter */}
         <div className="text-left sm:text-right">
-          <span className="activity-muted text-xs font-medium block">
-            Active Observations
-          </span>
           <span className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
             {stats.activeDaysCount} active days
           </span>
@@ -949,14 +941,14 @@ export default function FireActivityCalendar() {
       {loading ? (
         <div className="activity-card p-12 text-center flex flex-col items-center justify-center">
           <div className="w-8 h-8 border-3 border-[#524ad3] border-t-transparent rounded-full animate-spin mb-3" />
-          <span className="text-xs font-semibold text-[#524ad3] dark:text-indigo-400 tracking-wider uppercase">
-            Loading Satellite Telemetry...
+          <span className="text-xs font-semibold text-[#524ad3] dark:text-indigo-400 tracking-wide">
+            Loading daily activity...
           </span>
         </div>
       ) : error ? (
         <div className="activity-card p-6 text-center border-rose-300 dark:border-rose-900">
           <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-2" />
-          <span className="text-sm font-semibold text-rose-600">Telemetry Connection Error</span>
+          <span className="text-sm font-semibold text-rose-600">Unable to load daily activity</span>
           <button
             onClick={refetch}
             className="activity-on-accent mt-3 px-4 py-1.5 bg-rose-600 text-xs font-semibold rounded-xl"
@@ -1306,7 +1298,7 @@ export default function FireActivityCalendar() {
                   )
                 ) : (
                   <span className="activity-muted">
-                    Hover over or click any day square to inspect daily satellite telemetry
+                    Hover or click any day square to inspect daily activity
                   </span>
                 )}
               </div>
@@ -1456,7 +1448,7 @@ export default function FireActivityCalendar() {
                       })()
                     ) : (
                       <span className="activity-muted text-[10px]">
-                        Hover any axis vertex to inspect normalized telemetry
+                        Hover any axis vertex to inspect metrics
                       </span>
                     )}
                   </div>
@@ -1492,7 +1484,7 @@ export default function FireActivityCalendar() {
                 </div>
               </div>
 
-              {/* CARD 4: TERRAIGNIS TELEMETRY ARCHIVE EXPORT BANNER */}
+              {/* CARD 4: ACTIVITY ARCHIVE EXPORT BANNER */}
               <div className="activity-archive-banner bg-gradient-to-br from-[#5851d4] via-[#4a42c8] to-[#3129a3] rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between shadow-lg relative overflow-hidden">
                 <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -1502,12 +1494,12 @@ export default function FireActivityCalendar() {
                       TI
                     </div>
                     <span className="font-semibold text-sm tracking-tight text-white">
-                      TerraIgnis Archive
+                      Activity Archive
                     </span>
                   </div>
 
                   <h4 className="text-xl font-bold leading-tight text-white">
-                    Harmonized satellite telemetry exports
+                    Export annual fire activity data
                   </h4>
                 </div>
 
@@ -1554,7 +1546,7 @@ export default function FireActivityCalendar() {
           <div className="activity-surface-control rounded-3xl shadow-2xl border max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-400/20 mb-3">
               <h3 className="activity-card-title text-sm font-bold">
-                How TerraIgnis Aggregates Daily Telemetry
+                How Daily Activity Is Aggregated
               </h3>
               <button
                 type="button"
@@ -1568,7 +1560,7 @@ export default function FireActivityCalendar() {
             <div className="activity-subtext text-xs space-y-3">
               <p>
                 Each tile in the Daily Fire Activity grid represents one UTC calendar day.
-                Observations from NASA FIRMS MODIS and VIIRS instruments are standardized and
+                Detections from NASA FIRMS MODIS and VIIRS instruments are standardized and
                 aggregated into spatial H3 resolution-7 cells.
               </p>
               <p className="activity-card-title font-semibold">Intensity Ramp Levels:</p>
@@ -1589,11 +1581,11 @@ export default function FireActivityCalendar() {
                 </li>
                 <li>
                   <span className="font-semibold text-indigo-400">Low (Level 1):</span> Baseline
-                  detected fire telemetry.
+                  detected fire activity.
                 </li>
                 <li>
-                  <span className="activity-muted font-semibold">Blank (Level 0):</span> Zero active
-                  satellite detections recorded.
+                  <span className="activity-muted font-semibold">Blank (Level 0):</span> Zero fire
+                  detections recorded.
                 </li>
               </ul>
             </div>
@@ -1659,7 +1651,7 @@ function OutlierTelemetryGrid({
       {/* Subtle section header */}
       <div className="flex items-center justify-between px-1">
         <h3 className="activity-card-title text-sm font-semibold tracking-tight">
-          Anomaly & Outlier Telemetry
+          Anomaly & Outlier Summary
         </h3>
         {anomalyError ? (
           <button
@@ -1672,7 +1664,7 @@ function OutlierTelemetryGrid({
         ) : (
           <span className="activity-muted text-[11px] font-medium">
             {anomalyLoading
-              ? "Loading outlier telemetry..."
+              ? "Loading outlier summary..."
               : `${totalAnomalies.toLocaleString()} verified outliers`}
           </span>
         )}
