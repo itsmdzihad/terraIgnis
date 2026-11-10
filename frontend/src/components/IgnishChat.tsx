@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { LoaderCircle, MessageCircle, Send, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { sendIgnishMessage, type IgnishMessage } from '../services/chat';
@@ -71,7 +71,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
       {isOpen && (
         <section className="ignish-window" aria-label="Chat with Ignish">
           <header className="ignish-header">
-            <div className="ignish-avatar"><Sparkles size={17} /></div>
+            <div className="ignish-avatar"><img src="/terraignis-icon.svg" alt="" /></div>
             <div className="ignish-header-copy">
               <h2>Ignish</h2>
               <p>TerraIgnis data assistant</p>
@@ -84,7 +84,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
           <div className="ignish-transcript" ref={transcriptRef} aria-live="polite">
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`ignish-message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>
-                {message.role === 'assistant' && <div className="ignish-message-avatar"><Sparkles size={12} /></div>}
+                {message.role === 'assistant' && <div className="ignish-message-avatar"><img src="/terraignis-icon.svg" alt="" /></div>}
                 {message.role === 'assistant' ? (
                   <div className="ignish-message ignish-markdown">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
@@ -96,7 +96,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
             ))}
             {sending && (
               <div className="ignish-message-row is-assistant">
-                <div className="ignish-message-avatar"><Sparkles size={12} /></div>
+                <div className="ignish-message-avatar"><img src="/terraignis-icon.svg" alt="" /></div>
                 <p className="ignish-message ignish-thinking"><LoaderCircle size={14} className="animate-spin" /> Checking the dashboard data…</p>
               </div>
             )}
