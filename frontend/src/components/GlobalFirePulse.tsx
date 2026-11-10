@@ -359,33 +359,33 @@ export default function GlobalFirePulse() {
   return (
     <div className="dataplay-overview flex flex-col h-full w-full overflow-y-auto lg:overflow-hidden p-3 lg:p-4 gap-3">
       {/* MAIN CONTENT STAGE (Left Cards Panel & Right Map with Floating Controls) */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:overflow-hidden">
-        {/* LEFT COLUMN: CARDS DASHBOARD (No internal scrollbar on desktop) */}
-        <div className="w-full lg:w-[460px] xl:w-[490px] shrink-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:gap-4 lg:overflow-hidden">
+        {/* LEFT COLUMN: CARDS DASHBOARD */}
+        <div className="w-full lg:w-[54%] xl:w-[56%] lg:max-w-[960px] shrink-0 flex flex-col gap-3.5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-0.5">
           {/* ROW 1: SESSIONS & USERS CARDS (2-Col Grid) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 shrink-0">
             {/* CARD 1: ACTIVE DETECTIONS */}
-            <div className="dataplay-card p-3.5 flex flex-col justify-between">
+            <div className="dataplay-card p-4 sm:p-5 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold glass-title">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-base font-semibold glass-title">
                     Active Detections
                   </span>
                   <button
                     type="button"
                     title="More actions"
                     aria-label="More actions"
-                    className="glass-icon-btn p-1 rounded-full"
+                    className="glass-icon-btn p-1.5 rounded-full"
                   >
-                    <MoreHorizontal size={15} />
+                    <MoreHorizontal size={16} />
                   </button>
                 </div>
-                <span className="text-[11px] glass-subtle font-medium block">
+                <span className="text-xs glass-subtle font-medium block">
                   {selectedDate ? formatDate(selectedDate) : "Current Window"}
                 </span>
 
-                <div className="flex items-center gap-2 mt-0.5 mb-2">
-                  <span className="text-xl font-bold tracking-tight glass-heading tabular-nums">
+                <div className="flex items-center gap-2.5 mt-1.5 mb-3">
+                  <span className="text-2xl sm:text-3xl font-bold tracking-tight glass-heading tabular-nums">
                     {formatCount(activeDetectionsHeadline)}
                   </span>
                   {renderDeltaBadge(
@@ -395,7 +395,7 @@ export default function GlobalFirePulse() {
                 </div>
 
                 {/* Live Daily Waveform Bars (Last 22 Observed Days from /api/calendar) */}
-                <div className="flex items-center gap-[3px] h-4 py-0.5 mb-2.5">
+                <div className="flex items-center gap-1 h-7 py-0.5 mb-3.5">
                   {detectionBars.length > 0
                     ? detectionBars.map((bar, idx) => (
                         <div
@@ -422,20 +422,20 @@ export default function GlobalFirePulse() {
               </div>
 
               {/* Breakdown Rows */}
-              <div className="space-y-1 glass-divider-t pt-2">
-                <div className="flex items-center justify-between text-xs">
+              <div className="space-y-1.5 glass-divider-t pt-3">
+                <div className="flex items-center justify-between text-[13px]">
                   <span className="glass-muted">VIIRS Detections</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.viirs_observations)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-[13px]">
                   <span className="glass-muted">MODIS Detections</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.modis_observations)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-[13px]">
                   <span className="glass-muted">Dual-Sensor Match</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.both_sensor_cell_dates)}
@@ -445,27 +445,27 @@ export default function GlobalFirePulse() {
             </div>
 
             {/* CARD 2: H3 ACTIVE CELLS */}
-            <div className="dataplay-card p-3.5 flex flex-col justify-between">
+            <div className="dataplay-card p-4 sm:p-5 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold glass-title">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-base font-semibold glass-title">
                     H3 Active Cells
                   </span>
                   <button
                     type="button"
                     title="More actions"
                     aria-label="More actions"
-                    className="glass-icon-btn p-1 rounded-full"
+                    className="glass-icon-btn p-1.5 rounded-full"
                   >
-                    <MoreHorizontal size={15} />
+                    <MoreHorizontal size={16} />
                   </button>
                 </div>
-                <span className="text-[11px] glass-subtle font-medium block">
+                <span className="text-xs glass-subtle font-medium block">
                   Unique H3 Cells
                 </span>
 
-                <div className="flex items-center gap-2 mt-0.5 mb-1.5">
-                  <span className="text-xl font-bold tracking-tight glass-heading tabular-nums">
+                <div className="flex items-center gap-2.5 mt-1.5 mb-2.5">
+                  <span className="text-2xl sm:text-3xl font-bold tracking-tight glass-heading tabular-nums">
                     {formatCount(activeCellsHeadline)}
                   </span>
                   {renderDeltaBadge(
@@ -474,19 +474,19 @@ export default function GlobalFirePulse() {
                   )}
                 </div>
 
-                <span className="text-[11px] glass-subtle font-medium block mb-1.5">
+                <span className="text-xs glass-subtle font-medium block mb-2.5">
                   Observed anomalies per month
                 </span>
               </div>
 
               {/* Monthly Vertical Bar Chart */}
-              <div className="h-14 flex items-end gap-1.5 pt-1">
+              <div className="h-20 sm:h-24 flex items-end gap-1.5 sm:gap-2 pt-1">
                 {anomaliesLoading ? (
-                  <span className="w-full h-full flex items-center justify-center text-[10px] glass-subtle">
+                  <span className="w-full h-full flex items-center justify-center text-xs glass-subtle">
                     Loading anomaly data…
                   </span>
                 ) : anomaliesError ? (
-                  <span className="w-full h-full flex items-center justify-center text-[10px] tone-rose">
+                  <span className="w-full h-full flex items-center justify-center text-xs tone-rose">
                     Anomaly data unavailable
                   </span>
                 ) : (
@@ -506,11 +506,11 @@ export default function GlobalFirePulse() {
                             opacity: count === 0 ? 0.2 : 1,
                           }}
                         />
-                        <span className="text-[8px] glass-subtle mt-1 uppercase font-sans">
+                        <span className="text-[10px] font-medium glass-subtle mt-1.5 uppercase font-sans">
                           {monthNames[index][0]}
                         </span>
                         {/* Tooltip on hover */}
-                        <div className="glass-tooltip absolute -top-7 z-20 hidden group-hover:block text-[9px] px-2 py-0.5 rounded-full whitespace-nowrap pointer-events-none">
+                        <div className="glass-tooltip absolute -top-7 z-20 hidden group-hover:block text-[10px] px-2.5 py-0.5 rounded-full whitespace-nowrap pointer-events-none">
                           {monthNames[index]}: {count}
                         </div>
                       </div>
@@ -522,30 +522,30 @@ export default function GlobalFirePulse() {
           </div>
 
           {/* ROW 2: SEVERITY DISTRIBUTION */}
-          <div className="dataplay-card p-3.5 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold glass-title">
+          <div className="dataplay-card p-4 sm:p-5 shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-base font-semibold glass-title">
                 Burn Severity & Sensor Mix
               </span>
               <button
                 type="button"
                 title="More actions"
                 aria-label="More actions"
-                className="glass-icon-btn p-1 rounded-full"
+                className="glass-icon-btn p-1.5 rounded-full"
               >
-                <MoreHorizontal size={15} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
 
-            <div className="grid grid-cols-12 items-center gap-2">
+            <div className="grid grid-cols-12 items-center gap-4">
               {/* Left Column Stats */}
               <div className="col-span-3 flex flex-col justify-between h-full">
                 <div>
-                  <span className="text-[11px] glass-subtle font-medium block">Mean Index</span>
-                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
+                  <span className="text-xs glass-subtle font-medium block">Mean Index</span>
+                  <div className="text-xl sm:text-2xl font-bold glass-heading tabular-nums mt-1">
                     {formatBurnIndex(stats?.burn_index.mean)}
                   </div>
-                  <div className="mt-0.5">
+                  <div className="mt-1">
                     {renderDeltaBadge(
                       telemetryDeltas.burnIndexDelta30d,
                       "Last 30d vs prior 30d mean Burn Index (from /api/calendar)"
@@ -553,26 +553,26 @@ export default function GlobalFirePulse() {
                   </div>
                 </div>
 
-                <div className="space-y-1 mt-2.5">
+                <div className="space-y-1.5 mt-3.5">
                   <div
-                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    className="flex items-center gap-2 text-xs glass-muted"
                     title={`VIIRS raw share: ${sensorRingMetrics.viirsPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-viirs)" }} />
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-viirs)" }} />
                     <span>VIIRS Raw</span>
                   </div>
                   <div
-                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    className="flex items-center gap-2 text-xs glass-muted"
                     title={`MODIS raw share: ${sensorRingMetrics.modisPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-modis)" }} />
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-modis)" }} />
                     <span>MODIS Raw</span>
                   </div>
                   <div
-                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    className="flex items-center gap-2 text-xs glass-muted"
                     title={`Dual-sensor share of cell-dates: ${sensorRingMetrics.dualPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-dual)" }} />
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-dual)" }} />
                     <span>Dual Match</span>
                   </div>
                 </div>
@@ -580,7 +580,7 @@ export default function GlobalFirePulse() {
 
               {/* Center Concentric Rings Graphic (proportional to /api/stats) */}
               <div className="col-span-6 flex items-center justify-center">
-                <div className="relative w-32 h-32 flex items-center justify-center">
+                <div className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
                     {/* Ring 1 - Outer (VIIRS Share of Raw Observations) */}
                     <circle
@@ -648,10 +648,10 @@ export default function GlobalFirePulse() {
 
                   {/* Center Metric */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
-                    <span className="text-xs font-bold glass-heading tracking-tight tabular-nums">
+                    <span className="text-sm sm:text-base font-bold glass-heading tracking-tight tabular-nums">
                       {formatCount(stats?.coverage.total_raw_observations)}
                     </span>
-                    <span className="text-[9px] glass-subtle font-medium leading-tight">Observations</span>
+                    <span className="text-[10px] sm:text-[11px] glass-subtle font-medium leading-tight">Observations</span>
                   </div>
                 </div>
               </div>
@@ -659,11 +659,11 @@ export default function GlobalFirePulse() {
               {/* Right Column Stats */}
               <div className="col-span-3 flex flex-col justify-between h-full text-right">
                 <div>
-                  <span className="text-[11px] glass-subtle font-medium block">Outliers</span>
-                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
+                  <span className="text-xs glass-subtle font-medium block">Outliers</span>
+                  <div className="text-xl sm:text-2xl font-bold glass-heading tabular-nums mt-1">
                     {formatCount(stats?.anomalies.total_anomalous ?? anomalyRecords?.length)}
                   </div>
-                  <div className="mt-0.5">
+                  <div className="mt-1">
                     {renderDeltaBadge(
                       telemetryDeltas.anomalyDelta30d,
                       "Last 30d vs prior 30d anomalies (from /api/calendar)"
@@ -671,12 +671,12 @@ export default function GlobalFirePulse() {
                   </div>
                 </div>
 
-                <div className="mt-2.5">
-                  <span className="text-[11px] glass-subtle font-medium block">Cell-Dates</span>
-                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
+                <div className="mt-3.5">
+                  <span className="text-xs glass-subtle font-medium block">Cell-Dates</span>
+                  <div className="text-xl sm:text-2xl font-bold glass-heading tabular-nums mt-1">
                     {formatCount(stats?.coverage.total_h3_cell_dates)}
                   </div>
-                  <div className="mt-0.5">
+                  <div className="mt-1">
                     {renderDeltaBadge(
                       telemetryDeltas.cellDateDelta30d,
                       "Last 30d vs prior 30d active cell-dates (from /api/calendar)"
@@ -702,7 +702,7 @@ export default function GlobalFirePulse() {
         </div>
 
         {/* RIGHT COLUMN: MAP CONTAINER WITH FLOATING OVERLAYS */}
-        <div className="flex-1 min-w-0 min-h-[380px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
+        <div className="flex-1 min-w-0 min-h-[300px] sm:min-h-[340px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
           {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
           <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
             <div className="pointer-events-auto glass-panel-strong rounded-full px-4 py-1.5 flex items-center gap-2.5 max-w-full">
@@ -1006,7 +1006,7 @@ export default function GlobalFirePulse() {
           </div>
 
           {/* FLOATING LEGEND CARD (Bottom-Right) */}
-          <div className="absolute bottom-4 right-4 z-10 glass-panel-strong rounded-3xl p-4 w-72 pointer-events-auto">
+          <div className="absolute bottom-4 right-4 z-10 glass-panel-strong rounded-3xl p-4 w-64 xl:w-72 pointer-events-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-bold glass-heading">Legend</span>
               <button

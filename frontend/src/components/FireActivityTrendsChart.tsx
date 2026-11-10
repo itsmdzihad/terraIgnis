@@ -290,14 +290,14 @@ export default function FireActivityTrendsChart({
   }, [activePoint]);
 
   return (
-    <div className="dataplay-card p-3.5 flex-1 min-h-0 flex flex-col justify-between">
+    <div className="dataplay-card p-4 sm:p-5 flex-1 min-h-[215px] sm:min-h-[235px] flex flex-col justify-between">
       {/* Header Row matching reference: Title on left | • Metric + Timeframe v on right */}
-      <div className="relative z-30 flex items-center justify-between gap-2 mb-2 shrink-0">
-        <span className="text-sm font-semibold glass-heading tracking-tight">
+      <div className="relative z-30 flex items-center justify-between gap-2 mb-3 shrink-0">
+        <span className="text-base font-semibold glass-heading tracking-tight">
           Fire Activity Trends
         </span>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-[13px]">
           {/* Metric Switcher */}
           <div ref={metricMenuRef} className="relative">
             <button
@@ -405,7 +405,7 @@ export default function FireActivityTrendsChart({
       </div>
 
       {/* Chart Body */}
-      <div className="flex-1 min-h-[115px] flex flex-col">
+      <div className="flex-1 min-h-[145px] flex flex-col">
         {loading && chartPoints.length === 0 ? (
           <div className="flex-1 flex items-center justify-center gap-2 text-xs glass-muted">
             <span className="w-3.5 h-3.5 rounded-full border-2 border-[#E85002] border-t-transparent animate-spin" />
@@ -427,9 +427,9 @@ export default function FireActivityTrendsChart({
             No daily activity in selected window.
           </div>
         ) : (
-          <div className="flex-1 min-h-0 grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-2.5 gap-y-1.5">
+          <div className="flex-1 min-h-0 grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-3 gap-y-2">
             {/* Col 1, Row 1: Crisp HTML Y-axis ticks */}
-            <div className="flex flex-col justify-between items-end text-[10px] glass-subtle tabular-nums select-none py-[2px] min-w-[22px]">
+            <div className="flex flex-col justify-between items-end text-[11px] glass-subtle tabular-nums select-none py-[2px] min-w-[26px]">
               {ticks.map((tick) => (
                 <span key={tick} className="leading-none">
                   {formatTickValue(tick)}
@@ -506,7 +506,7 @@ export default function FireActivityTrendsChart({
                     left: `${markerPosition.xPct}%`,
                     top: `${markerPosition.yPct}%`,
                   }}
-                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[#E85002] shadow-xs z-10"
+                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#E85002] shadow-xs z-10"
                 />
               )}
 
@@ -514,14 +514,14 @@ export default function FireActivityTrendsChart({
               {activePoint && markerPosition && (
                 <div
                   style={markerPosition.calloutStyle}
-                  className="pointer-events-none absolute z-20 rounded-2xl px-3 py-2 bg-[#F9F9F9]/80 dark:bg-[#191919]/80 border border-[#A7A7A7]/30 dark:border-[#646464]/35 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(0,0,0,0.55)]"
+                  className="pointer-events-none absolute z-20 rounded-2xl px-3.5 py-2 bg-[#F9F9F9]/80 dark:bg-[#191919]/80 border border-[#A7A7A7]/30 dark:border-[#646464]/35 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(0,0,0,0.55)]"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-semibold leading-none tracking-tight glass-heading tabular-nums">
+                    <span className="text-base font-semibold leading-none tracking-tight glass-heading tabular-nums">
                       {formatMetricValue(activePoint.value, selectedMetric)}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums leading-none ${
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums leading-none ${
                         activeDelta.positive
                           ? 'bg-[#E85002]/14 text-[#E85002] dark:bg-[#E85002]/24 dark:text-[#F16001]'
                           : 'bg-[#646464]/14 text-[#646464] dark:bg-[#A7A7A7]/18 dark:text-[#D9C3AB]'
@@ -530,7 +530,7 @@ export default function FireActivityTrendsChart({
                       {activeDelta.label}
                     </span>
                   </div>
-                  <span className="block text-[10px] font-medium glass-subtle mt-1 whitespace-nowrap">
+                  <span className="block text-[11px] font-medium glass-subtle mt-1 whitespace-nowrap">
                     {formatCalloutDate(activePoint.date)}
                   </span>
                 </div>
@@ -541,7 +541,7 @@ export default function FireActivityTrendsChart({
             <div aria-hidden="true" />
 
             {/* Col 2, Row 2: Crisp HTML X-axis Labels aligned under plot box */}
-            <div className="flex items-center justify-between text-[10px] glass-subtle tabular-nums select-none">
+            <div className="flex items-center justify-between text-[11px] glass-subtle tabular-nums select-none">
               {xAxisLabels.map((label, idx) => (
                 <span key={`${label}-${idx}`} className="leading-none">
                   {label}
