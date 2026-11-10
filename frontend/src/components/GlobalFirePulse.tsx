@@ -21,8 +21,8 @@ import type { FireSensor } from "../types/fire";
 import { useDashboard } from "../context/DashboardContext";
 import { useAnomalies } from "../hooks/useAnomalies";
 import { useStats } from "../hooks/useStats";
-import { useCountries } from "../hooks/useCountries";
-import { useCountryFires } from "../hooks/useCountryFires";
+import { useCalendar } from "../hooks/useCalendar";
+import FireActivityTrendsChart from "./FireActivityTrendsChart";
 
 function formatCount(value: number | null | undefined): string {
   if (value == null) return "—";
@@ -44,6 +44,34 @@ function formatDate(value: string | null | undefined): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+function computePctChange(current: number, previous: number): number | null {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function renderDeltaBadge(delta: number | null, title: string) {
+  if (delta === null || !Number.isFinite(delta)) {
+    return (
+      <span
+        title={title}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold glass-subtle bg-[var(--glass-track-bg)]"
+      >
+        —
+      </span>
+    );
+  }
+  const isUp = delta >= 0;
+  return (
+    <span
+      title={title}
+      className={`${isUp ? "dataplay-badge-up" : "dataplay-badge-down"} inline-flex`}
+    >
+      {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+      {Math.abs(delta).toFixed(1)}%
+    </span>
+  );
 }
 
 export default function GlobalFirePulse() {
@@ -166,6 +194,18 @@ export default function GlobalFirePulse() {
     refetch: refetchStats,
   } = useStats();
 
+  const {
+    data: calendarData,
+    loading: calendarLoading,
+    error: calendarError,
+    refetch: refetchCalendar,
+  } = useCalendar({
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
+    limit: 366,
+    offset: 0,
+  });
+
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthlyAnomalyCounts = useMemo(() => {
     const counts: number[] = Array(12).fill(0);
@@ -213,393 +253,248 @@ export default function GlobalFirePulse() {
     return count;
   }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell, selectedCountry]);
 
-  const monthlyTrendPath = useMemo(() => {
-    const max = Math.max(1, ...monthlyAnomalyCounts);
-    return monthlyAnomalyCounts
-      .map((count, index) => {
-        const x = 35 + (310 * index) / Math.max(1, monthlyAnomalyCounts.length - 1);
-        const y = 96 - (count / max) * 72;
-        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(' ');
-  }, [monthlyAnomalyCounts]);
+  const sortedCalendarDays = useMemo(
+    () => [...(calendarData?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
+    [calendarData]
+  );
 
-  const totalObservations = stats?.coverage.total_raw_observations ?? 0;
-  const sensorRatios = stats
-    ? [stats.sensors.viirs_observations, stats.sensors.modis_observations, stats.sensors.both_sensor_cell_dates]
-        .map((value) => Math.max(0, Math.min(1, totalObservations > 0 ? value / totalObservations : 0)))
-    : [0, 0, 0];
+  const detectionBars = useMemo(() => {
+    const recent = sortedCalendarDays.slice(-22);
+    if (recent.length === 0) return [];
+    const maxFire = Math.max(1, ...recent.map((day) => day.fire_count));
+    return recent.map((day) => ({
+      date: day.date,
+      fireCount: day.fire_count,
+      pct: Math.max(18, Math.round((day.fire_count / maxFire) * 100)),
+    }));
+  }, [sortedCalendarDays]);
+
+  const telemetryDeltas = useMemo(() => {
+    const days = sortedCalendarDays;
+    let detectionDelta15d: number | null = null;
+    let burnIndexDelta30d: number | null = null;
+    let anomalyDelta30d: number | null = null;
+    let cellDateDelta30d: number | null = null;
+
+    if (days.length >= 2) {
+      const split15 = days.length >= 30;
+      const prior15 = split15 ? days.slice(-30, -15) : days.slice(0, Math.floor(days.length / 2));
+      const recent15 = split15 ? days.slice(-15) : days.slice(Math.floor(days.length / 2));
+      detectionDelta15d = computePctChange(
+        recent15.reduce((sum, day) => sum + day.fire_count, 0),
+        prior15.reduce((sum, day) => sum + day.fire_count, 0)
+      );
+
+      const split30 = days.length >= 60;
+      const prior30 = split30 ? days.slice(-60, -30) : prior15;
+      const recent30 = split30 ? days.slice(-30) : recent15;
+
+      cellDateDelta30d = computePctChange(
+        recent30.reduce((sum, day) => sum + day.fire_count, 0),
+        prior30.reduce((sum, day) => sum + day.fire_count, 0)
+      );
+      anomalyDelta30d = computePctChange(
+        recent30.reduce((sum, day) => sum + day.anomaly_count, 0),
+        prior30.reduce((sum, day) => sum + day.anomaly_count, 0)
+      );
+
+      const priorBurns = prior30
+        .map((day) => day.mean_burn_index)
+        .filter((val): val is number => val !== null);
+      const recentBurns = recent30
+        .map((day) => day.mean_burn_index)
+        .filter((val): val is number => val !== null);
+      if (priorBurns.length > 0 && recentBurns.length > 0) {
+        const priorMean = priorBurns.reduce((sum, v) => sum + v, 0) / priorBurns.length;
+        const recentMean = recentBurns.reduce((sum, v) => sum + v, 0) / recentBurns.length;
+        burnIndexDelta30d = computePctChange(recentMean, priorMean);
+      }
+    }
+
+    const activeMonths = monthlyAnomalyCounts
+      .map((count, index) => ({ count, index }))
+      .filter((entry) => entry.count > 0);
+    const monthlyAnomalyDelta =
+      activeMonths.length >= 2
+        ? computePctChange(
+            activeMonths[activeMonths.length - 1].count,
+            activeMonths[activeMonths.length - 2].count
+          )
+        : null;
+
+    return {
+      detectionDelta15d,
+      burnIndexDelta30d,
+      anomalyDelta30d,
+      cellDateDelta30d,
+      monthlyAnomalyDelta,
+    };
+  }, [sortedCalendarDays, monthlyAnomalyCounts]);
+
+  const sensorRingMetrics = useMemo(() => {
+    const totalRaw = stats?.coverage.total_raw_observations ?? 0;
+    const totalCellDates = stats?.coverage.total_h3_cell_dates ?? 0;
+    const viirsRatio = totalRaw > 0 ? Math.min(1, (stats?.sensors.viirs_observations ?? 0) / totalRaw) : 0;
+    const modisRatio = totalRaw > 0 ? Math.min(1, (stats?.sensors.modis_observations ?? 0) / totalRaw) : 0;
+    const dualRatio =
+      totalCellDates > 0 ? Math.min(1, (stats?.sensors.both_sensor_cell_dates ?? 0) / totalCellDates) : 0;
+
+    const viirsCirc = 2 * Math.PI * 62;
+    const modisCirc = 2 * Math.PI * 48;
+    const dualCirc = 2 * Math.PI * 34;
+
+    return {
+      viirsCirc,
+      modisCirc,
+      dualCirc,
+      viirsOffset: viirsCirc * (1 - viirsRatio),
+      modisOffset: modisCirc * (1 - modisRatio),
+      dualOffset: dualCirc * (1 - dualRatio),
+      viirsPct: viirsRatio * 100,
+      modisPct: modisRatio * 100,
+      dualPct: dualRatio * 100,
+    };
+  }, [stats]);
+
+  const activeDetectionsHeadline =
+    selectedDate || activeFiltersCount > 0
+      ? loading
+        ? undefined
+        : data?.total
+      : stats?.coverage.total_raw_observations ?? data?.total;
+
+  const activeCellsHeadline =
+    activeFiltersCount > 0
+      ? loading
+        ? undefined
+        : h3Cells.length
+      : stats?.coverage.unique_h3_cells ?? (h3Cells.length > 0 ? h3Cells.length : undefined);
 
   return (
-    <div className="dataplay-overview flex flex-col h-full w-full overflow-hidden p-4 lg:p-6 gap-4">
-      {/* 1. TOP HEADER */}
-      <header className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl lg:text-[26px] font-bold tracking-tight text-slate-900">
-            Fire Overview
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          {/* Dataset snapshot action pill */}
-          <button
-            type="button"
-            onClick={() => setIsSnapshotOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition-colors"
-          >
-            <Camera size={14} className="text-slate-500" />
-            <span>Dataset snapshot</span>
-          </button>
-
-          {/* Filters Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-xs transition-colors ${
-              isFiltersOpen || activeFiltersCount > 0
-                ? "bg-blue-50 border-blue-200 text-blue-600"
-                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            <SlidersHorizontal size={13} />
-            <span>Filters</span>
-            {activeFiltersCount > 0 && (
-              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-
-          {/* Refresh Action */}
-          <button
-            type="button"
-            onClick={() => {
-              refetch();
-              refetchStats();
-              refetchAnomalies();
-            }}
-            title="Refresh data"
-            className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
-          >
-            <RotateCw size={14} className={loading ? "animate-spin text-blue-600" : ""} />
-          </button>
-        </div>
-      </header>
-
-      {/* 2. COLLAPSIBLE FILTER DRAWER / PANEL */}
-      {isFiltersOpen && (
-        <section
-          aria-label="Fire API filters"
-          className="dataplay-card p-4 shrink-0 shadow-md border border-slate-200"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Filter size={15} className="text-blue-600" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Filter Controls
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              {activeFiltersCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearFilters();
-                    setOffset(0);
-                  }}
-                  className="text-xs font-semibold text-rose-500 hover:text-rose-600 px-2 py-0.5"
-                >
-                  Clear all
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsFiltersOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            <label className="text-[11px] font-medium text-slate-500">
-              Observation Date
-              <input
-                type="date"
-                value={selectedDate ?? ""}
-                onChange={(event) => {
-                  setSelectedDate(event.target.value || null);
-                  setOffset(0);
-                }}
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs focus:ring-1 focus:ring-blue-500"
-              />
-            </label>
-
-            <label className="text-[11px] font-medium text-slate-500">
-              Country
-              <select
-                value={selectedCountry ?? ""}
-                onChange={(event) => {
-                  setSelectedCountry(event.target.value || null);
-                  setOffset(0);
-                }}
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">All countries</option>
-                {countries.map((country) => {
-                  const name = String(country.properties.ADMIN ?? country.properties.NAME_EN ?? country.properties.NAME);
-                  return <option key={`${name}-${country.properties.ADM0_A3 ?? ""}`} value={name}>{name}</option>;
-                })}
-              </select>
-              <span className="block mt-1 text-[10px] text-slate-400">Matches H3 cell centers.</span>
-              {countriesError && <span className="block mt-1 text-[10px] text-rose-500">Country list unavailable.</span>}
-            </label>
-
-            <label className="text-[11px] font-medium text-slate-500">
-              Sensor Type
-              <select
-                value={selectedSensor ?? ""}
-                onChange={(event) => {
-                  setSelectedSensor((event.target.value || null) as FireSensor | null);
-                  setOffset(0);
-                }}
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">All sensors (Harmonized)</option>
-                <option value="MODIS">MODIS</option>
-                <option value="VIIRS">VIIRS</option>
-                <option value="BOTH">Both sensors</option>
-              </select>
-            </label>
-
-            <label className="text-[11px] font-medium text-slate-500">
-              Min Burn Index
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={minBurnIndex ?? ""}
-                onChange={(event) => {
-                  setBurnIndexRange(
-                    event.target.value === "" ? null : Number(event.target.value),
-                    maxBurnIndex
-                  );
-                  setOffset(0);
-                }}
-                placeholder="0"
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs placeholder:text-slate-400 focus:ring-1 focus:ring-blue-500"
-              />
-            </label>
-
-            <label className="text-[11px] font-medium text-slate-500">
-              Max Burn Index
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={maxBurnIndex ?? ""}
-                onChange={(event) => {
-                  setBurnIndexRange(
-                    minBurnIndex,
-                    event.target.value === "" ? null : Number(event.target.value)
-                  );
-                  setOffset(0);
-                }}
-                placeholder="100"
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs placeholder:text-slate-400 focus:ring-1 focus:ring-blue-500"
-              />
-            </label>
-
-            <label className="text-[11px] font-medium text-slate-500">
-              Selected H3 Cell
-              <select
-                value={selectedH3Cell ?? ""}
-                onChange={(event) => setSelectedH3Cell(event.target.value || null)}
-                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800 shadow-xs focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">No cell selected</option>
-                {selectedH3Cell && !h3Cells.includes(selectedH3Cell) && (
-                  <option value={selectedH3Cell}>{selectedH3Cell}</option>
-                )}
-                {h3Cells.map((cell) => (
-                  <option key={cell} value={cell}>
-                    {cell}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-          </div>
-
-          <div className="flex justify-end mt-3">
-            <form onSubmit={handleCoordinateSubmit} className="flex flex-wrap items-end gap-2.5">
-              <span className="text-[11px] font-medium text-slate-500 pb-2">Lat / Lon Jump</span>
-              <label className="text-[10px] font-medium text-slate-500">
-                Latitude
-                <input
-                  aria-label="Latitude"
-                  type="number"
-                  min="-90"
-                  max="90"
-                  step="any"
-                  value={latitudeInput}
-                  onChange={(event) => setLatitudeInput(event.target.value)}
-                  placeholder="Lat"
-                  className="mt-1 block w-36 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
-                />
-              </label>
-              <label className="text-[10px] font-medium text-slate-500">
-                Longitude
-                <input
-                  aria-label="Longitude"
-                  type="number"
-                  min="-180"
-                  max="180"
-                  step="any"
-                  value={longitudeInput}
-                  onChange={(event) => setLongitudeInput(event.target.value)}
-                  placeholder="Lon"
-                  className="mt-1 block w-36 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
-                />
-              </label>
-              <button
-                type="submit"
-                className="h-[34px] px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
-              >
-                Go
-              </button>
-              {coordinateError && (
-                <span className="basis-full text-right text-[10px] text-rose-500">{coordinateError}</span>
-              )}
-            </form>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-slate-100 mt-3 pt-2.5">
-            <span className="text-xs text-slate-500">
-              {selectedCountry
-                ? mapLoading
-                  ? `Loading ${selectedCountry} observations…`
-                  : `${selectedCountry}: ${formatCount(records.length)} cell-date records`
-                : `Showing page ${Math.floor(offset / pageSize) + 1} (${data?.count ?? 0} records)`}
-            </span>
-            {!selectedCountry && (
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={offset === 0 || loading}
-                  onClick={() => setOffset(Math.max(0, offset - pageSize))}
-                  className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={!data?.has_more || loading}
-                  onClick={() => setOffset(offset + pageSize)}
-                  className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* 3. MAIN CONTENT STAGE (Reference picture split layout: Left Cards Panel & Right Map) */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 overflow-hidden">
-        {/* LEFT COLUMN: CARDS DASHBOARD (Width ~480px on desktop) */}
-        <div className="w-full lg:w-[480px] xl:w-[500px] shrink-0 flex flex-col gap-3.5 overflow-y-auto pr-1">
+    <div className="dataplay-overview flex flex-col h-full w-full overflow-y-auto lg:overflow-hidden p-3 lg:p-4 gap-3">
+      {/* MAIN CONTENT STAGE (Left Cards Panel & Right Map with Floating Controls) */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:overflow-hidden">
+        {/* LEFT COLUMN: CARDS DASHBOARD (No internal scrollbar on desktop) */}
+        <div className="w-full lg:w-[460px] xl:w-[490px] shrink-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-hidden">
           {/* ROW 1: SESSIONS & USERS CARDS (2-Col Grid) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* CARD 1: SESSIONS EQUIVALENT -> ACTIVE DETECTIONS */}
-            <div className="dataplay-card p-4 flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+            {/* CARD 1: ACTIVE DETECTIONS */}
+            <div className="dataplay-card p-3.5 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-800">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold glass-title">
                     Active Detections
                   </span>
                   <button
                     type="button"
                     title="More actions"
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label="More actions"
+                    className="glass-icon-btn p-1 rounded-full"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-[11px] text-slate-400 font-medium block">
+                <span className="text-[11px] glass-subtle font-medium block">
                   {selectedDate ? formatDate(selectedDate) : "Current Window"}
                 </span>
 
-                <div className="flex items-center gap-2 mt-1 mb-3">
-                  <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-                    {formatCount(data?.total ?? stats?.coverage.total_raw_observations)}
+                <div className="flex items-center gap-2 mt-0.5 mb-2">
+                  <span className="text-xl font-bold tracking-tight glass-heading tabular-nums">
+                    {formatCount(activeDetectionsHeadline)}
                   </span>
+                  {renderDeltaBadge(
+                    telemetryDeltas.detectionDelta15d,
+                    "Recent 15d vs prior 15d active detections (from /api/calendar)"
+                  )}
+                </div>
+
+                {/* Live Daily Waveform Bars (Last 22 Observed Days from /api/calendar) */}
+                <div className="flex items-center gap-[3px] h-4 py-0.5 mb-2.5">
+                  {detectionBars.length > 0
+                    ? detectionBars.map((bar, idx) => (
+                        <div
+                          key={bar.date}
+                          title={`${formatDate(bar.date)}: ${bar.fireCount.toLocaleString()} cell-dates`}
+                          className="flex-1 rounded-full transition-all duration-200"
+                          style={{
+                            height: `${bar.pct}%`,
+                            backgroundColor: idx < Math.ceil(detectionBars.length / 2) ? "#0062ff" : "#00c7d4",
+                          }}
+                        />
+                      ))
+                    : Array.from({ length: 22 }, (_, idx) => (
+                        <div
+                          key={idx}
+                          className="flex-1 rounded-full bg-slate-400/25"
+                          style={{ height: "25%" }}
+                        />
+                      ))}
                 </div>
               </div>
 
               {/* Breakdown Rows */}
-              <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
+              <div className="space-y-1 glass-divider-t pt-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">VIIRS Detections</span>
-                  <span className="font-semibold text-slate-800 tabular-nums">
+                  <span className="glass-muted">VIIRS Detections</span>
+                  <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.viirs_observations)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">MODIS Detections</span>
-                  <span className="font-semibold text-slate-800 tabular-nums">
+                  <span className="glass-muted">MODIS Detections</span>
+                  <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.modis_observations)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Dual-Sensor Match</span>
-                  <span className="font-semibold text-slate-800 tabular-nums">
+                  <span className="glass-muted">Dual-Sensor Match</span>
+                  <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.both_sensor_cell_dates)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* CARD 2: USERS EQUIVALENT -> H3 ACTIVE CELLS */}
-            <div className="dataplay-card p-4 flex flex-col justify-between">
+            {/* CARD 2: H3 ACTIVE CELLS */}
+            <div className="dataplay-card p-3.5 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-800">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold glass-title">
                     H3 Active Cells
                   </span>
                   <button
                     type="button"
                     title="More actions"
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label="More actions"
+                    className="glass-icon-btn p-1 rounded-full"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-[11px] text-slate-400 font-medium block">
+                <span className="text-[11px] glass-subtle font-medium block">
                   Unique H3 Cells
                 </span>
 
-                <div className="flex items-center gap-2 mt-1 mb-2">
-                  <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-                    {formatCount(
-                      data ? h3Cells.length : stats?.coverage.unique_h3_cells
-                    )}
+                <div className="flex items-center gap-2 mt-0.5 mb-1.5">
+                  <span className="text-xl font-bold tracking-tight glass-heading tabular-nums">
+                    {formatCount(activeCellsHeadline)}
                   </span>
+                  {renderDeltaBadge(
+                    telemetryDeltas.monthlyAnomalyDelta,
+                    "Latest active month vs previous active month anomalies (from /api/anomalies)"
+                  )}
                 </div>
 
-                <span className="text-[11px] text-slate-400 font-medium block mb-2">
+                <span className="text-[11px] glass-subtle font-medium block mb-1.5">
                   Observed anomalies per month
                 </span>
               </div>
 
-              {/* Monthly Vertical Bar Chart (Matches "Users per minutes" in reference) */}
-              <div className="h-20 flex items-end gap-1.5 pt-2">
-                {anomalyRecords && monthlyAnomalyCounts.map((count, index) => {
-                  const normalizedHeight = count > 0
-                    ? Math.max(4, Math.round((count / maxMonthlyAnomalies) * 100))
-                    : 0;
+              {/* Monthly Vertical Bar Chart */}
+              <div className="h-14 flex items-end gap-1.5 pt-1">
+                {monthlyAnomalyCounts.map((count, index) => {
+                  const normalizedHeight =
+                    count === 0 ? 12 : Math.max(18, Math.round((count / maxMonthlyAnomalies) * 100));
                   return (
                     <div
                       key={monthNames[index]}
@@ -610,13 +505,14 @@ export default function GlobalFirePulse() {
                         style={{
                           height: `${normalizedHeight}%`,
                           backgroundColor: "#0062ff",
+                          opacity: count === 0 ? 0.2 : 1,
                         }}
                       />
-                      <span className="text-[8px] text-slate-400 mt-1 uppercase font-sans">
+                      <span className="text-[8px] glass-subtle mt-1 uppercase font-sans">
                         {monthNames[index][0]}
                       </span>
                       {/* Tooltip on hover */}
-                      <div className="absolute -top-7 z-20 hidden group-hover:block bg-slate-900 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap pointer-events-none">
+                      <div className="glass-tooltip absolute -top-7 z-20 hidden group-hover:block text-[9px] px-2 py-0.5 rounded-full whitespace-nowrap pointer-events-none">
                         {monthNames[index]}: {count}
                       </div>
                     </div>
@@ -628,18 +524,19 @@ export default function GlobalFirePulse() {
             </div>
           </div>
 
-          {/* ROW 2: USERS BY AUDIENCE EQUIVALENT -> SEVERITY DISTRIBUTION */}
-          <div className="dataplay-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-slate-800">
+          {/* ROW 2: SEVERITY DISTRIBUTION */}
+          <div className="dataplay-card p-3.5 shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold glass-title">
                 Burn Severity & Sensor Mix
               </span>
               <button
                 type="button"
                 title="More actions"
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="More actions"
+                className="glass-icon-btn p-1 rounded-full"
               >
-                <MoreHorizontal size={16} />
+                <MoreHorizontal size={15} />
               </button>
             </div>
 
@@ -647,39 +544,54 @@ export default function GlobalFirePulse() {
               {/* Left Column Stats */}
               <div className="col-span-3 flex flex-col justify-between h-full">
                 <div>
-                  <span className="text-[11px] text-slate-400 font-medium block">Mean Index</span>
-                  <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
+                  <span className="text-[11px] glass-subtle font-medium block">Mean Index</span>
+                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
                     {formatBurnIndex(stats?.burn_index.mean)}
+                  </div>
+                  <div className="mt-0.5">
+                    {renderDeltaBadge(
+                      telemetryDeltas.burnIndexDelta30d,
+                      "Last 30d vs prior 30d mean Burn Index (from /api/calendar)"
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-1.5 mt-4">
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                <div className="space-y-1 mt-2.5">
+                  <div
+                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    title={`VIIRS raw share: ${sensorRingMetrics.viirsPct.toFixed(1)}%`}
+                  >
                     <span className="h-2 w-2 rounded-full bg-[#0062ff]" />
                     <span>VIIRS Raw</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <div
+                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    title={`MODIS raw share: ${sensorRingMetrics.modisPct.toFixed(1)}%`}
+                  >
                     <span className="h-2 w-2 rounded-full bg-[#00c7d4]" />
                     <span>MODIS Raw</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <div
+                    className="flex items-center gap-1.5 text-[11px] glass-muted"
+                    title={`Dual-sensor share of cell-dates: ${sensorRingMetrics.dualPct.toFixed(1)}%`}
+                  >
                     <span className="h-2 w-2 rounded-full bg-[#84cc16]" />
                     <span>Dual Match</span>
                   </div>
                 </div>
               </div>
 
-              {/* Center Concentric Rings Graphic (Matches reference graphic) */}
+              {/* Center Concentric Rings Graphic (proportional to /api/stats) */}
               <div className="col-span-6 flex items-center justify-center">
-                <div className="relative w-40 h-40 flex items-center justify-center">
+                <div className="relative w-32 h-32 flex items-center justify-center">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
-                    {/* Ring 1 - Outer (Royal Blue) */}
+                    {/* Ring 1 - Outer (VIIRS Share of Raw Observations) */}
                     <circle
                       cx="80"
                       cy="80"
                       r="62"
                       fill="none"
-                      stroke="#eef2f8"
+                      stroke="var(--ring-track)"
                       strokeWidth="8"
                     />
                     <circle
@@ -689,18 +601,18 @@ export default function GlobalFirePulse() {
                       fill="none"
                       stroke="#0062ff"
                       strokeWidth="8"
-                      strokeDasharray="389.5"
-                      strokeDashoffset={389.5 * (1 - sensorRatios[0])}
+                      strokeDasharray={sensorRingMetrics.viirsCirc.toFixed(2)}
+                      strokeDashoffset={sensorRingMetrics.viirsOffset.toFixed(2)}
                       strokeLinecap="round"
                     />
 
-                    {/* Ring 2 - Middle (Cyan) */}
+                    {/* Ring 2 - Middle (MODIS Share of Raw Observations) */}
                     <circle
                       cx="80"
                       cy="80"
                       r="48"
                       fill="none"
-                      stroke="#eef2f8"
+                      stroke="var(--ring-track)"
                       strokeWidth="8"
                     />
                     <circle
@@ -710,18 +622,18 @@ export default function GlobalFirePulse() {
                       fill="none"
                       stroke="#00c7d4"
                       strokeWidth="8"
-                      strokeDasharray="301.6"
-                      strokeDashoffset={301.6 * (1 - sensorRatios[1])}
+                      strokeDasharray={sensorRingMetrics.modisCirc.toFixed(2)}
+                      strokeDashoffset={sensorRingMetrics.modisOffset.toFixed(2)}
                       strokeLinecap="round"
                     />
 
-                    {/* Ring 3 - Inner (Lime Green) */}
+                    {/* Ring 3 - Inner (Dual-Sensor Share of Cell-Dates) */}
                     <circle
                       cx="80"
                       cy="80"
                       r="34"
                       fill="none"
-                      stroke="#eef2f8"
+                      stroke="var(--ring-track)"
                       strokeWidth="8"
                     />
                     <circle
@@ -731,18 +643,18 @@ export default function GlobalFirePulse() {
                       fill="none"
                       stroke="#84cc16"
                       strokeWidth="8"
-                      strokeDasharray="213.6"
-                      strokeDashoffset={213.6 * (1 - sensorRatios[2])}
+                      strokeDasharray={sensorRingMetrics.dualCirc.toFixed(2)}
+                      strokeDashoffset={sensorRingMetrics.dualOffset.toFixed(2)}
                       strokeLinecap="round"
                     />
                   </svg>
 
                   {/* Center Metric */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-base font-bold text-slate-900 tracking-tight tabular-nums">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+                    <span className="text-xs font-bold glass-heading tracking-tight tabular-nums">
                       {formatCount(stats?.coverage.total_raw_observations)}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-medium">All Observations</span>
+                    <span className="text-[9px] glass-subtle font-medium leading-tight">Observations</span>
                   </div>
                 </div>
               </div>
@@ -750,93 +662,303 @@ export default function GlobalFirePulse() {
               {/* Right Column Stats */}
               <div className="col-span-3 flex flex-col justify-between h-full text-right">
                 <div>
-                  <span className="text-[11px] text-slate-400 font-medium block">Outliers</span>
-                  <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
-                    {formatCount(anomalyRecords?.length)}
+                  <span className="text-[11px] glass-subtle font-medium block">Outliers</span>
+                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
+                    {formatCount(stats?.anomalies.total_anomalous ?? anomalyRecords?.length)}
+                  </div>
+                  <div className="mt-0.5">
+                    {renderDeltaBadge(
+                      telemetryDeltas.anomalyDelta30d,
+                      "Last 30d vs prior 30d anomalies (from /api/calendar)"
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <span className="text-[11px] text-slate-400 font-medium block">Cell-Dates</span>
-                  <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
+                <div className="mt-2.5">
+                  <span className="text-[11px] glass-subtle font-medium block">Cell-Dates</span>
+                  <div className="text-lg font-bold glass-heading tabular-nums mt-0.5">
                     {formatCount(stats?.coverage.total_h3_cell_dates)}
                   </div>
+                  <div className="mt-0.5">
+                    {renderDeltaBadge(
+                      telemetryDeltas.cellDateDelta30d,
+                      "Last 30d vs prior 30d active cell-dates (from /api/calendar)"
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ROW 3: Dataset metrics and monthly anomaly history */}
-          <div className="dataplay-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-slate-800">
-                Dataset Metrics
-              </span>
-              <button
-                type="button"
-                title="More actions"
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <MoreHorizontal size={16} />
-              </button>
-            </div>
-
-            {/* Values are supplied by the statistics endpoint. */}
-            <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 mb-2">
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Mean Score</span>
-                <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatBurnIndex(stats?.burn_index.mean)}
-                </div>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Max Index</span>
-                <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatBurnIndex(stats?.burn_index.maximum)}
-                </div>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Cell-Dates</span>
-                <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatCount(stats?.coverage.total_h3_cell_dates)}
-                </div>
-              </div>
-            </div>
-
-            <div className="h-28 relative flex items-center">
-              {anomaliesLoading ? (
-                <p className="w-full text-center text-xs text-slate-500">Loading monthly anomaly data…</p>
-              ) : anomaliesError ? (
-                <p className="w-full text-center text-xs text-slate-500">Monthly anomaly data unavailable.</p>
-              ) : anomalyRecords?.length === 0 ? (
-                <p className="w-full text-center text-xs text-slate-500">No anomaly records in the selected period.</p>
-              ) : anomalyRecords ? (
-                <svg className="w-full h-full" viewBox="0 0 360 110" preserveAspectRatio="none" aria-label="Monthly anomaly counts">
-                  <text x="2" y="24" className="text-[9px] fill-slate-400 font-mono">{formatCount(maxMonthlyAnomalies)}</text>
-                  <text x="2" y="62" className="text-[9px] fill-slate-400 font-mono">{formatCount(Math.round(maxMonthlyAnomalies / 2))}</text>
-                  <text x="2" y="100" className="text-[9px] fill-slate-400 font-mono">0</text>
-                  {[20, 56, 92].map((y) => <line key={y} x1="32" y1={y} x2="355" y2={y} stroke="#64748b" strokeOpacity=".25" strokeWidth="1" />)}
-                  <path d={monthlyTrendPath} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ) : null}
-            </div>
-          </div>
+          {/* ROW 3: FIRE ACTIVITY TRENDS */}
+          <FireActivityTrendsChart
+            days={calendarData?.data ?? []}
+            loading={calendarLoading}
+            error={calendarError}
+            onRetry={refetchCalendar}
+            selectedDate={selectedDate}
+            onSelectDate={(date) => {
+              setSelectedDate(date === selectedDate ? null : date);
+              setOffset(0);
+            }}
+          />
         </div>
 
         {/* RIGHT COLUMN: MAP CONTAINER WITH FLOATING OVERLAYS */}
-        <div className="flex-1 min-w-0 h-full relative rounded-2xl overflow-hidden border border-slate-200/80 bg-white shadow-xs flex flex-col">
-          {/* Top Left Floating Pill: Record Count Summary */}
-          <div className="absolute top-4 left-4 z-10 bg-white/95 border border-slate-200/90 rounded-xl px-3.5 py-2 shadow-md backdrop-blur-md max-w-sm pointer-events-none">
-            <span className="text-xs font-semibold text-slate-800 block">
-              {selectedCountry
-                ? mapLoading
-                  ? `Loading ${selectedCountry} fire cells`
-                  : `${selectedCountry} · ${formatCount(records.length)} cell-date records`
-                : data?.total == null
-                ? "Detections by H3 cell"
-                : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
-            </span>
+        <div className="flex-1 min-w-0 min-h-[380px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
+          {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
+          <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+            <div className="pointer-events-auto glass-panel-strong rounded-full px-4 py-1.5 flex items-center gap-2.5 max-w-full">
+              <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
+                Fire Overview
+              </h1>
+              <span className="h-3.5 w-px bg-slate-400/35 shrink-0" />
+              <span className="text-xs font-medium glass-muted truncate tabular-nums">
+                {data?.total == null
+                  ? "Detections by H3 cell"
+                  : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
+              </span>
+            </div>
+
+            <div className="pointer-events-auto glass-panel-strong rounded-full p-1 flex items-center gap-1.5">
+              {/* Dataset snapshot action pill */}
+              <button
+                type="button"
+                onClick={() => setIsSnapshotOpen(true)}
+                className="glass-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold"
+              >
+                <Camera size={13} className="glass-muted" />
+                <span>Dataset snapshot</span>
+              </button>
+
+              {/* Filters Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
+                  isFiltersOpen || activeFiltersCount > 0 ? "glass-btn-active" : "glass-btn"
+                }`}
+              >
+                <SlidersHorizontal size={13} />
+                <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Refresh Action */}
+              <button
+                type="button"
+                onClick={() => {
+                  refetch();
+                  refetchStats();
+                  refetchAnomalies();
+                  refetchCalendar();
+                }}
+                title="Refresh data"
+                aria-label="Refresh data"
+                className="glass-btn p-1.5 rounded-full"
+              >
+                <RotateCw
+                  size={13}
+                  className={loading || calendarLoading ? "animate-spin tone-blue" : "glass-muted"}
+                />
+              </button>
+            </div>
           </div>
+
+          {/* COLLAPSIBLE FLOATING FILTER DRAWER / POPOVER */}
+          {isFiltersOpen && (
+            <section
+              aria-label="Fire API filters"
+              className="absolute top-16 left-3.5 right-3.5 z-30 glass-panel-strong rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 glass-divider-b">
+                <div className="flex items-center gap-2">
+                  <Filter size={15} className="tone-blue" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider glass-title">
+                    Filter Controls
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  {activeFiltersCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearFilters();
+                        setOffset(0);
+                      }}
+                      className="glass-btn-ghost text-xs font-semibold tone-rose px-3 py-1 rounded-full"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsFiltersOpen(false)}
+                    aria-label="Close filters"
+                    className="glass-icon-btn p-1.5 rounded-full"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <label className="text-[11px] font-medium glass-muted">
+                  Observation Date
+                  <input
+                    type="date"
+                    value={selectedDate ?? ""}
+                    onChange={(event) => {
+                      setSelectedDate(event.target.value || null);
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  />
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
+                  Sensor Type
+                  <select
+                    value={selectedSensor ?? ""}
+                    onChange={(event) => {
+                      setSelectedSensor((event.target.value || null) as FireSensor | null);
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  >
+                    <option value="">All sensors (Harmonized)</option>
+                    <option value="MODIS">MODIS</option>
+                    <option value="VIIRS">VIIRS</option>
+                    <option value="BOTH">Both sensors</option>
+                  </select>
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
+                  Min Burn Index
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={minBurnIndex ?? ""}
+                    onChange={(event) => {
+                      setBurnIndexRange(
+                        event.target.value === "" ? null : Number(event.target.value),
+                        maxBurnIndex
+                      );
+                      setOffset(0);
+                    }}
+                    placeholder="0"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  />
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
+                  Max Burn Index
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={maxBurnIndex ?? ""}
+                    onChange={(event) => {
+                      setBurnIndexRange(
+                        minBurnIndex,
+                        event.target.value === "" ? null : Number(event.target.value)
+                      );
+                      setOffset(0);
+                    }}
+                    placeholder="100"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  />
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
+                  Selected H3 Cell
+                  <select
+                    value={selectedH3Cell ?? ""}
+                    onChange={(event) => setSelectedH3Cell(event.target.value || null)}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  >
+                    <option value="">No cell selected</option>
+                    {selectedH3Cell && !h3Cells.includes(selectedH3Cell) && (
+                      <option value={selectedH3Cell}>{selectedH3Cell}</option>
+                    )}
+                    {h3Cells.map((cell) => (
+                      <option key={cell} value={cell}>
+                        {cell}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <form onSubmit={handleCoordinateSubmit} className="flex flex-col justify-end">
+                  <span className="text-[11px] font-medium glass-muted block mb-1">
+                    Lat / Lon Jump
+                  </span>
+                  <div className="flex gap-1.5">
+                    <input
+                      aria-label="Latitude"
+                      type="number"
+                      min="-90"
+                      max="90"
+                      step="any"
+                      value={latitudeInput}
+                      onChange={(event) => setLatitudeInput(event.target.value)}
+                      placeholder="Lat"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    />
+                    <input
+                      aria-label="Longitude"
+                      type="number"
+                      min="-180"
+                      max="180"
+                      step="any"
+                      value={longitudeInput}
+                      onChange={(event) => setLongitudeInput(event.target.value)}
+                      placeholder="Lon"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3.5 py-1.5 rounded-full glass-btn-primary text-xs font-semibold shrink-0"
+                    >
+                      Go
+                    </button>
+                  </div>
+                  {coordinateError && (
+                    <span className="text-[10px] tone-rose mt-1">{coordinateError}</span>
+                  )}
+                </form>
+              </div>
+
+              <div className="flex items-center justify-between glass-divider-t mt-3 pt-2.5">
+                <span className="text-xs glass-muted">
+                  Showing page {Math.floor(offset / pageSize) + 1} ({records.length} records)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={offset === 0 || loading}
+                    onClick={() => setOffset(Math.max(0, offset - pageSize))}
+                    className="px-3.5 py-1 rounded-full glass-btn text-xs font-semibold disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!data?.has_more || loading}
+                    onClick={() => setOffset(offset + pageSize)}
+                    className="px-3.5 py-1 rounded-full glass-btn text-xs font-semibold disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* Map Canvas Visualizer: Calling TerraIgnisMap with exact unchanged props */}
           <div className="w-full h-full select-none relative">
@@ -851,36 +973,34 @@ export default function GlobalFirePulse() {
             />
 
             {/* Loading / Error States Overlay */}
-            {(mapLoading || mapError || (!mapLoading && (selectedCountry ? records.length === 0 : data?.count === 0))) && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-xs p-4">
-                {mapLoading ? (
-                  <div className="bg-white border border-slate-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-xs font-semibold text-slate-700">
+            {(loading || error || (!loading && data?.count === 0)) && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/35 backdrop-blur-xs p-4">
+                {loading ? (
+                  <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                    <span className="block text-xs font-semibold glass-heading">
                       Loading detections...
                     </span>
                   </div>
-                ) : mapError ? (
-                  <div className="max-w-sm bg-white border border-rose-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-xs font-semibold text-rose-600">
+                ) : error ? (
+                  <div className="max-w-sm glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                    <span className="block text-xs font-semibold tone-rose">
                       Unable to load fire detections.
                     </span>
                     <button
                       type="button"
-                      onClick={selectedCountry ? countryFires.refetch : refetch}
-                      className="mt-3 px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
+                      onClick={refetch}
+                      className="mt-3 px-4 py-1.5 glass-btn-primary rounded-full text-xs font-semibold"
                     >
                       Retry
                     </button>
                   </div>
                 ) : (
-                  <div className="bg-white border border-slate-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-xs font-semibold text-slate-700">
+                  <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                    <span className="block text-xs font-semibold glass-heading">
                       No matching records
                     </span>
-                    <span className="block mt-1 text-xs text-slate-500">
-                      {selectedCountry
-                        ? `No detections for ${selectedCountry} match the selected filters.`
-                        : "No detections match the selected parameters."}
+                    <span className="block mt-1 text-xs glass-muted">
+                      No detections match the selected parameters.
                     </span>
                   </div>
                 )}
@@ -888,31 +1008,30 @@ export default function GlobalFirePulse() {
             )}
           </div>
 
-          {/* FLOATING LEGEND CARD (Bottom-Right, matches reference mockup) */}
-          <div className="absolute bottom-4 right-4 z-10 bg-white/95 border border-slate-200/90 rounded-2xl p-4 shadow-xl backdrop-blur-md w-72 pointer-events-auto">
+          {/* FLOATING LEGEND CARD (Bottom-Right) */}
+          <div className="absolute bottom-4 right-4 z-10 glass-panel-strong rounded-3xl p-4 w-72 pointer-events-auto">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-bold text-slate-800">Legend</span>
+              <span className="text-sm font-bold glass-heading">Legend</span>
               <button
                 type="button"
                 onClick={() => setIsLegendCollapsed(!isLegendCollapsed)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="glass-icon-btn p-1.5 rounded-full"
+                aria-label={isLegendCollapsed ? "Expand legend" : "Collapse legend"}
                 title={isLegendCollapsed ? "Expand legend" : "Collapse legend"}
               >
-                {isLegendCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {isLegendCollapsed ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </button>
             </div>
 
             {!isLegendCollapsed && (
               <>
-                {/* Segmented Filter Control (Matches State | County | Region in reference) */}
-                <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-3">
+                {/* Segmented Filter Control */}
+                <div className="glass-pill-track p-1 rounded-full flex gap-1 mb-3">
                   <button
                     type="button"
                     onClick={() => setSelectedSensor(null)}
-                    className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
-                      selectedSensor === null
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-slate-500 hover:text-slate-800"
+                    className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
+                      selectedSensor === null ? "glass-pill-active" : "glass-pill-inactive"
                     }`}
                   >
                     All
@@ -920,10 +1039,8 @@ export default function GlobalFirePulse() {
                   <button
                     type="button"
                     onClick={() => setSelectedSensor("MODIS")}
-                    className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
-                      selectedSensor === "MODIS"
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-slate-500 hover:text-slate-800"
+                    className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
+                      selectedSensor === "MODIS" ? "glass-pill-active" : "glass-pill-inactive"
                     }`}
                   >
                     MODIS
@@ -931,25 +1048,23 @@ export default function GlobalFirePulse() {
                   <button
                     type="button"
                     onClick={() => setSelectedSensor("VIIRS")}
-                    className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
-                      selectedSensor === "VIIRS"
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-slate-500 hover:text-slate-800"
+                    className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
+                      selectedSensor === "VIIRS" ? "glass-pill-active" : "glass-pill-inactive"
                     }`}
                   >
                     VIIRS
                   </button>
                 </div>
 
-                {/* Audience / Metric Row */}
+                {/* Burn Severity Row */}
                 <div className="mb-2">
-                  <span className="text-[11px] text-slate-400 font-medium block">
+                  <span className="text-[11px] glass-subtle font-medium block">
                     Burn Severity
                   </span>
-                  <div className="text-xl font-bold text-slate-900 tabular-nums">
-                    {stats?.burn_index.mean == null ? "Unavailable" : `${formatBurnIndex(stats.burn_index.mean)} Avg.`}
+                  <div className="text-xl font-bold glass-heading tabular-nums">
+                    {stats?.burn_index.mean ? `${formatBurnIndex(stats.burn_index.mean)} Avg.` : "0 — 100"}
                   </div>
-                  <span className="text-[10px] text-slate-400 block">
+                  <span className="text-[10px] glass-subtle block">
                     Relative fire-activity score
                   </span>
                 </div>
@@ -962,7 +1077,7 @@ export default function GlobalFirePulse() {
                       "linear-gradient(to right, #c7f9cc, #80ed99, #38bdf8, #0062ff, #0a2540)",
                   }}
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-mono">
+                <div className="flex justify-between text-[10px] glass-subtle mt-1 font-sans tabular-nums">
                   <span>0</span>
                   <span>20</span>
                   <span>40</span>
@@ -978,121 +1093,122 @@ export default function GlobalFirePulse() {
 
       {/* 4. DATASET SNAPSHOT MODAL (Triggered by "Dataset snapshot") */}
       {isSnapshotOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4">
+          <div className="glass-panel-strong rounded-3xl max-w-lg w-full p-6 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between pb-3 glass-divider-b mb-4">
               <div className="flex items-center gap-2">
-                <Camera size={18} className="text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">
+                <Camera size={18} className="tone-blue" />
+                <h3 className="text-base font-bold glass-heading">
                   Dataset Snapshot
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSnapshotOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                aria-label="Close snapshot modal"
+                className="glass-icon-btn p-1.5 rounded-full"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
               {statsLoading ? (
-                <div className="text-center py-6 text-sm text-slate-500">
+                <div className="text-center py-6 text-sm glass-muted">
                   Loading system statistics...
                 </div>
               ) : statsError ? (
-                <div className="text-center py-6 text-sm text-rose-500">
+                <div className="text-center py-6 text-sm tone-rose">
                   Unable to load statistics.
                 </div>
               ) : stats ? (
                 <>
-                  <section className="bg-slate-50 rounded-xl p-3.5 space-y-2">
-                    <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  <section className="glass-subcard rounded-2xl p-4 space-y-2">
+                    <h4 className="text-xs font-bold tone-blue uppercase tracking-wider">
                       Dataset Coverage
                     </h4>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Period</span>
-                      <span className="font-semibold text-slate-800">
+                      <span className="glass-muted">Period</span>
+                      <span className="font-semibold glass-heading">
                         {formatDate(stats.coverage.start_date)} — {formatDate(stats.coverage.end_date)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Observed Dates</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
+                      <span className="glass-muted">Observed Dates</span>
+                      <span className="font-semibold glass-heading tabular-nums">
                         {formatCount(stats.coverage.observed_dates)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Unique H3 Cells</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
+                      <span className="glass-muted">Unique H3 Cells</span>
+                      <span className="font-semibold glass-heading tabular-nums">
                         {formatCount(stats.coverage.unique_h3_cells)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">H3 Resolution</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
-                        {stats.coverage.h3_resolution ?? "—"}
+                      <span className="glass-muted">H3 Resolution</span>
+                      <span className="font-semibold glass-heading tabular-nums">
+                        {stats.coverage.h3_resolution ?? "7"}
                       </span>
                     </div>
                   </section>
 
-                  <section className="bg-slate-50 rounded-xl p-3.5 space-y-2">
-                    <h4 className="text-xs font-bold text-cyan-600 uppercase tracking-wider">
+                  <section className="glass-subcard rounded-2xl p-4 space-y-2">
+                    <h4 className="text-xs font-bold tone-cyan uppercase tracking-wider">
                       Sensor Mix
                     </h4>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">MODIS Raw Detections</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
+                      <span className="glass-muted">MODIS Raw Detections</span>
+                      <span className="font-semibold glass-heading tabular-nums">
                         {formatCount(stats.sensors.modis_observations)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">VIIRS Raw Detections</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
+                      <span className="glass-muted">VIIRS Raw Detections</span>
+                      <span className="font-semibold glass-heading tabular-nums">
                         {formatCount(stats.sensors.viirs_observations)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Dual-Sensor Harmonized</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">
+                      <span className="glass-muted">Dual-Sensor Harmonized</span>
+                      <span className="font-semibold glass-heading tabular-nums">
                         {formatCount(stats.sensors.both_sensor_cell_dates)}
                       </span>
                     </div>
                   </section>
 
-                  <section className="bg-slate-50 rounded-xl p-3.5 space-y-2">
-                    <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+                  <section className="glass-subcard rounded-2xl p-4 space-y-2">
+                    <h4 className="text-xs font-bold tone-emerald uppercase tracking-wider">
                       Burn Index Metrics
                     </h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Mean</span>
-                        <span className="font-semibold text-slate-800">
+                        <span className="glass-muted">Mean</span>
+                        <span className="font-semibold glass-heading tabular-nums">
                           {formatBurnIndex(stats.burn_index.mean)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Median</span>
-                        <span className="font-semibold text-slate-800">
+                        <span className="glass-muted">Median</span>
+                        <span className="font-semibold glass-heading tabular-nums">
                           {formatBurnIndex(stats.burn_index.median)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Minimum</span>
-                        <span className="font-semibold text-slate-800">
+                        <span className="glass-muted">Minimum</span>
+                        <span className="font-semibold glass-heading tabular-nums">
                           {formatBurnIndex(stats.burn_index.minimum)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Maximum</span>
-                        <span className="font-semibold text-slate-800">
+                        <span className="glass-muted">Maximum</span>
+                        <span className="font-semibold glass-heading tabular-nums">
                           {formatBurnIndex(stats.burn_index.maximum)}
                         </span>
                       </div>
                       <div className="flex justify-between col-span-2">
-                        <span className="text-slate-500">P95 (Extreme Threshold)</span>
-                        <span className="font-semibold text-slate-800">
+                        <span className="glass-muted">P95 (Extreme Threshold)</span>
+                        <span className="font-semibold glass-heading tabular-nums">
                           {formatBurnIndex(stats.burn_index.p95)}
                         </span>
                       </div>
@@ -1106,7 +1222,7 @@ export default function GlobalFirePulse() {
               <button
                 type="button"
                 onClick={() => setIsSnapshotOpen(false)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs"
+                className="px-5 py-2 glass-btn-primary rounded-full text-xs font-semibold"
               >
                 Close Snapshot
               </button>
