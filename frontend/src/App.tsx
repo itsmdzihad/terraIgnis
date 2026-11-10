@@ -3,6 +3,7 @@ import { motion, MotionConfig } from 'motion/react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Navbar from './Navbar';
 import DataPipeline from './components/DataPipeline';
+import IgnishChat from './components/IgnishChat';
 import GlobalFirePulse from './components/GlobalFirePulse';
 import RegionalDeepDive from './components/RegionalDeepDive';
 import FireActivityCalendar from './components/FireActivityCalendar';
@@ -127,6 +128,7 @@ function DashboardView({
           );
         })}
       </main>
+      <IgnishChat theme={theme} />
     </div>
   );
 }

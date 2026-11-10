@@ -90,11 +90,13 @@ export default function GlobalFirePulse() {
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
     setSelectedDate,
     setSelectedH3Cell,
+    setSelectedCountry,
     setSelectedSensor,
     setBurnIndexRange,
     clearFilters,
@@ -114,16 +116,29 @@ export default function GlobalFirePulse() {
     offset,
   });
 
-  const records = data?.data ?? [];
+  const { countries, error: countriesError } = useCountries();
+  const countryQuery = {
+    date: selectedDate || undefined,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
+    sensor: selectedSensor || undefined,
+    min_burn_index: minBurnIndex ?? undefined,
+    max_burn_index: maxBurnIndex ?? undefined,
+  };
+  const countryFires = useCountryFires(countryQuery, selectedCountry);
+
+  const records = selectedCountry ? countryFires.records : data?.data ?? [];
+  const mapLoading = selectedCountry ? countryFires.loading : loading;
+  const mapError = selectedCountry ? countryFires.error : error;
   const mapFireData = useMemo(
     () =>
-      loading
+      mapLoading
         ? []
         : records.map((record) => ({
             h3Index: record.h3_cell,
             burnIndex: record.burn_index,
           })),
-    [loading, records]
+    [mapLoading, records]
   );
 
   const mapOverview = useMemo(() => {
@@ -236,8 +251,9 @@ export default function GlobalFirePulse() {
     if (minBurnIndex != null) count++;
     if (maxBurnIndex != null) count++;
     if (selectedH3Cell) count++;
+    if (selectedCountry) count++;
     return count;
-  }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell]);
+  }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell, selectedCountry]);
 
   const sortedCalendarDays = useMemo(
     () => [...(calendarData?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
