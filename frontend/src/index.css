@@ -1372,9 +1372,10 @@ main {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: var(--ignish-accent);
-  color: #ffffff;
+  background: #fff8f2;
+  border: 1px solid rgba(255, 132, 61, 0.24);
 }
+.ignish-avatar img, .ignish-message-avatar img { width: 78%; height: 78%; object-fit: contain; }
 .ignish-avatar { width: 38px; height: 38px; }
 .ignish-header-copy { min-width: 0; flex: 1; }
 .ignish-header-copy h2 { margin: 0; color: var(--ignish-ink); font-size: 15px; font-weight: 700; }
