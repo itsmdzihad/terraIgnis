@@ -506,6 +506,7 @@ main { min-height: 0; }
 .app-shell main section[aria-label="Project statistics"] > div:last-child > div > span:nth-child(2) { font-size: 26px; letter-spacing: -.04em; }
 .app-shell main section[aria-label="Project statistics"] > div:last-child > div > span:last-child { font-size: 11px; }
 
+
 @media (max-width: 900px) {
   .site-header { grid-template-columns: 1fr auto; gap: 10px 18px; padding: 10px 16px; }
   .site-nav { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; justify-content: center; }
@@ -747,3 +748,167 @@ main { min-height: 0; }
   --ah-lvl-high: #fb923c;
   --ah-lvl-extreme-high: #f87171;
 }
+
+/* Dark theme: use the same slate palette across every dashboard surface. */
+.app-shell[data-theme="dark"] {
+  --paper: #0b1020;
+  --surface: #151c2e;
+  --surface-muted: #1c2539;
+  --ink: #e8edf7;
+  --muted: #9aa7bd;
+  --line: #2a354c;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  color-scheme: dark;
+}
+
+.app-shell[data-theme="dark"] .site-header {
+  background: #111827;
+  border-color: #283349;
+  color: #e8edf7;
+}
+.app-shell[data-theme="dark"] .site-brand-name { color: #e8edf7; }
+.app-shell[data-theme="dark"] .site-brand-name span { color: #fb8b55; }
+.app-shell[data-theme="dark"] .site-brand-divider { background: #344057; }
+.app-shell[data-theme="dark"] .site-brand-caption { color: #9aa7bd; }
+.app-shell[data-theme="dark"] .site-nav { background: #151c2e; border-color: #2a354c; }
+.app-shell[data-theme="dark"] .site-nav-link { color: #aab5c8; }
+.app-shell[data-theme="dark"] .site-nav-link:hover:not(.is-active) { color: #f1f5fb; background: #202b40; }
+.app-shell[data-theme="dark"] .site-nav-link.is-active { color: #f8fafc; }
+.app-shell[data-theme="dark"] .site-nav-pill { background: #28354c; box-shadow: inset 0 0 0 1px #394761; }
+.app-shell[data-theme="dark"] .theme-toggle { background: #182235; color: #dbe4f2; border-color: #344057; }
+.app-shell[data-theme="dark"] .theme-toggle:hover { background: #222e44; border-color: #465570; }
+
+/* Undo the light-only utility remapping above when dark mode is active. */
+.app-shell[data-theme="dark"] [class~="bg-slate-950"] { background-color: #0b1020 !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-950/95"],
+.app-shell[data-theme="dark"] [class~="bg-slate-950/90"],
+.app-shell[data-theme="dark"] [class~="bg-slate-950/80"] { background-color: rgba(21, 28, 46, .97) !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-950/70"] { background-color: rgba(17, 24, 39, .92) !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-950/60"],
+.app-shell[data-theme="dark"] [class~="bg-slate-950/50"],
+.app-shell[data-theme="dark"] [class~="bg-slate-900/70"],
+.app-shell[data-theme="dark"] [class~="bg-slate-900/50"],
+.app-shell[data-theme="dark"] [class~="bg-slate-900/40"] { background-color: #1a2337 !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-900"],
+.app-shell[data-theme="dark"] [class~="bg-slate-900/30"] { background-color: #151c2e !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-800"] { background-color: #26324a !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-100"] { background-color: #202a3e !important; }
+.app-shell[data-theme="dark"] [class~="bg-slate-50"] { background-color: #1b2539 !important; }
+.app-shell[data-theme="dark"] [class~="bg-white"] { background-color: #1a2337 !important; }
+.app-shell[data-theme="dark"] [class~="border-slate-800"],
+.app-shell[data-theme="dark"] [class~="border-slate-800/80"],
+.app-shell[data-theme="dark"] [class~="border-slate-800/60"],
+.app-shell[data-theme="dark"] [class~="border-slate-200"],
+.app-shell[data-theme="dark"] [class~="border-slate-100"] { border-color: #2a354c !important; }
+.app-shell[data-theme="dark"] [class~="border-slate-700"] { border-color: #394760 !important; }
+.app-shell[data-theme="dark"] [class~="text-white"],
+.app-shell[data-theme="dark"] [class~="text-slate-100"],
+.app-shell[data-theme="dark"] [class~="text-slate-200"],
+.app-shell[data-theme="dark"] [class~="text-slate-900"],
+.app-shell[data-theme="dark"] [class~="text-slate-800"],
+.app-shell[data-theme="dark"] [class~="text-slate-700"] { color: #e8edf7 !important; }
+.app-shell[data-theme="dark"] [class~="text-slate-300"] { color: #c4cede !important; }
+.app-shell[data-theme="dark"] [class~="text-slate-400"] { color: #a0aec3 !important; }
+.app-shell[data-theme="dark"] [class~="text-slate-500"] { color: #8b99b0 !important; }
+.app-shell[data-theme="dark"] [class~="text-slate-600"] { color: #74839d !important; }
+.app-shell[data-theme="dark"] [class~="placeholder:text-slate-600"]::placeholder,
+.app-shell[data-theme="dark"] [class~="placeholder:text-slate-400"]::placeholder { color: #8290a7 !important; }
+.app-shell[data-theme="dark"] [class~="hover:bg-slate-800"]:hover,
+.app-shell[data-theme="dark"] [class~="hover:bg-slate-800/50"]:hover,
+.app-shell[data-theme="dark"] [class~="hover:bg-slate-50"]:hover { background-color: #28354c !important; }
+.app-shell[data-theme="dark"] [class~="hover:text-slate-600"]:hover,
+.app-shell[data-theme="dark"] [class~="hover:text-slate-700"]:hover,
+.app-shell[data-theme="dark"] [class~="hover:text-slate-800"]:hover { color: #f8fafc !important; }
+.app-shell[data-theme="dark"] input[class~="bg-white"],
+.app-shell[data-theme="dark"] select[class~="bg-white"],
+.app-shell[data-theme="dark"] input[class~="bg-slate-950"],
+.app-shell[data-theme="dark"] select[class~="bg-slate-950"],
+.app-shell[data-theme="dark"] .filter-panel input,
+.app-shell[data-theme="dark"] .filter-panel select {
+  background-color: #111a2b !important;
+  color: #e8edf7 !important;
+  border-color: #344057 !important;
+  color-scheme: dark;
+}
+.app-shell[data-theme="dark"] input[type="date"] { color-scheme: dark !important; }
+
+.app-shell[data-theme="dark"] .dataplay-overview {
+  background-color: #0b1020 !important;
+  color: #e8edf7 !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-card {
+  background-color: #151c2e !important;
+  border-color: #26324a !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .22) !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-card-header,
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-metric-val { color: #e8edf7 !important; }
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-subtext,
+.app-shell[data-theme="dark"] .dataplay-overview .dataplay-muted { color: #9aa7bd !important; }
+.app-shell[data-theme="dark"] .dataplay-overview [class~="bg-white/95"] {
+  background-color: rgba(21, 28, 46, .97) !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview [class~="bg-white/70"] {
+  background-color: rgba(11, 16, 32, .78) !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview [class~="border-slate-200/90"] {
+  border-color: #344057 !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview .filter-panel,
+.app-shell[data-theme="dark"] .dataplay-overview section[aria-label="Fire API filters"] {
+  background: #151c2e !important;
+  border-color: #2a354c !important;
+  color: #e8edf7 !important;
+}
+.app-shell[data-theme="dark"] .dataplay-overview section[aria-label="Fire API filters"] label { color: #aab5c8 !important; }
+
+.app-shell[data-theme="dark"] .regional-view > header,
+.app-shell[data-theme="dark"] .regional-view > main > section:first-child {
+  background: #151c2e !important;
+  border-color: #2a354c !important;
+  color: #e8edf7 !important;
+}
+.app-shell[data-theme="dark"] .regional-view > header label { color: #aab5c8 !important; }
+.app-shell[data-theme="dark"] .regional-view section[class*="bg-slate"] { border-color: #2a354c !important; }
+
+.app-shell[data-theme="dark"] .activity-dashboard {
+  background-color: #0b1020 !important;
+  color: #e8edf7 !important;
+}
+.app-shell[data-theme="dark"] .activity-dashboard .activity-card {
+  background-color: #151c2e !important;
+  border-color: #26324a !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .22) !important;
+}
+.app-shell[data-theme="dark"] .activity-dashboard .activity-metric-val,
+.app-shell[data-theme="dark"] .activity-dashboard .activity-card-title { color: #e8edf7 !important; }
+.app-shell[data-theme="dark"] .activity-dashboard .activity-subtext { color: #c4cede !important; }
+.app-shell[data-theme="dark"] .activity-dashboard .activity-muted { color: #9aa7bd !important; }
+.app-shell[data-theme="dark"] .activity-dashboard .activity-surface-control { background-color: #151c2e !important; border-color: #344057 !important; color: #dce5f2 !important; }
+
+.app-shell[data-theme="dark"] .isometric-card { background-color: #151c2e !important; border-color: #2a354c !important; }
+.app-shell[data-theme="dark"] .anomaly-history-panel {
+  --ah-panel-bg: #111827;
+  --ah-panel-border: #2a354c;
+  --ah-card-bg: #151c2e;
+  --ah-card-border: #2a354c;
+  --ah-heading-prefix: #a0aec3;
+  --ah-heading-window: #e8edf7;
+  --ah-kicker: #8b99b0;
+  --ah-subbadge: #9aa7bd;
+  --ah-axis: #9aa7bd;
+  --ah-grid: rgba(203, 213, 225, .08);
+  --ah-node-bg: #e8edf7;
+  --ah-menu-bg: #151c2e;
+  --ah-menu-border: #344057;
+  --ah-menu-hover: #26324a;
+  --ah-tooltip-bg: #151c2e;
+  --ah-tooltip-border: #344057;
+  --ah-tooltip-ink: #e8edf7;
+  --ah-tooltip-muted: #9aa7bd;
+  --ah-divider: rgba(203, 213, 225, .12);
+  --ah-legend: #a0aec3;
+}
+.app-shell[data-theme="dark"] :focus-visible { outline-color: #8b83ff; }
+

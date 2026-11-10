@@ -6,8 +6,6 @@ import {
   MoreHorizontal,
   ChevronUp,
   ChevronDown,
-  TrendingDown,
-  TrendingUp,
   RotateCw,
   X,
   Search,
@@ -197,10 +195,22 @@ export default function GlobalFirePulse() {
     return count;
   }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell]);
 
-  // Dynamic pill soundwave bars for Card 1
-  const soundwaveHeights = [
-    40, 65, 80, 50, 90, 75, 60, 85, 95, 70, 55, 80, 100, 85, 60, 75, 90, 65, 50, 70, 85, 60
-  ];
+  const monthlyTrendPath = useMemo(() => {
+    const max = Math.max(1, ...monthlyAnomalyCounts);
+    return monthlyAnomalyCounts
+      .map((count, index) => {
+        const x = 35 + (310 * index) / Math.max(1, monthlyAnomalyCounts.length - 1);
+        const y = 96 - (count / max) * 72;
+        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }, [monthlyAnomalyCounts]);
+
+  const totalObservations = stats?.coverage.total_raw_observations ?? 0;
+  const sensorRatios = stats
+    ? [stats.sensors.viirs_observations, stats.sensors.modis_observations, stats.sensors.both_sensor_cell_dates]
+        .map((value) => Math.max(0, Math.min(1, totalObservations > 0 ? value / totalObservations : 0)))
+    : [0, 0, 0];
 
   return (
     <div className="dataplay-overview flex flex-col h-full w-full overflow-hidden p-4 lg:p-6 gap-4">
@@ -475,26 +485,8 @@ export default function GlobalFirePulse() {
 
                 <div className="flex items-center gap-2 mt-1 mb-3">
                   <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-                    {formatCount(data?.total ?? stats?.coverage.total_raw_observations ?? 243324)}
+                    {formatCount(data?.total ?? stats?.coverage.total_raw_observations)}
                   </span>
-                  <span className="dataplay-badge-down">
-                    <TrendingDown size={11} />
-                    32.2%
-                  </span>
-                </div>
-
-                {/* Soundwave / Pill Bars Graphic (Matches reference graphic) */}
-                <div className="flex items-center gap-[3px] h-6 py-1 mb-4">
-                  {soundwaveHeights.map((pct, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-1 rounded-full"
-                      style={{
-                        height: `${pct}%`,
-                        backgroundColor: idx < 11 ? "#0062ff" : "#00c7d4",
-                      }}
-                    />
-                  ))}
                 </div>
               </div>
 
@@ -503,19 +495,19 @@ export default function GlobalFirePulse() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">VIIRS Detections</span>
                   <span className="font-semibold text-slate-800 tabular-nums">
-                    {formatCount(stats?.sensors.viirs_observations ?? 12324)}
+                    {formatCount(stats?.sensors.viirs_observations)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">MODIS Detections</span>
                   <span className="font-semibold text-slate-800 tabular-nums">
-                    {formatCount(stats?.sensors.modis_observations ?? 10532)}
+                    {formatCount(stats?.sensors.modis_observations)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">Dual-Sensor Match</span>
                   <span className="font-semibold text-slate-800 tabular-nums">
-                    {formatCount(stats?.sensors.both_sensor_cell_dates ?? 8954)}
+                    {formatCount(stats?.sensors.both_sensor_cell_dates)}
                   </span>
                 </div>
               </div>
@@ -543,12 +535,8 @@ export default function GlobalFirePulse() {
                 <div className="flex items-center gap-2 mt-1 mb-2">
                   <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
                     {formatCount(
-                      h3Cells.length > 0 ? h3Cells.length : stats?.coverage.unique_h3_cells ?? 12343
+                      data ? h3Cells.length : stats?.coverage.unique_h3_cells
                     )}
-                  </span>
-                  <span className="dataplay-badge-up">
-                    <TrendingUp size={11} />
-                    21.56%
                   </span>
                 </div>
 
@@ -559,11 +547,10 @@ export default function GlobalFirePulse() {
 
               {/* Monthly Vertical Bar Chart (Matches "Users per minutes" in reference) */}
               <div className="h-20 flex items-end gap-1.5 pt-2">
-                {monthlyAnomalyCounts.map((count, index) => {
-                  const normalizedHeight = Math.max(
-                    15,
-                    Math.round((count / maxMonthlyAnomalies) * 100)
-                  );
+                {anomalyRecords && monthlyAnomalyCounts.map((count, index) => {
+                  const normalizedHeight = count > 0
+                    ? Math.max(4, Math.round((count / maxMonthlyAnomalies) * 100))
+                    : 0;
                   return (
                     <div
                       key={monthNames[index]}
@@ -586,6 +573,8 @@ export default function GlobalFirePulse() {
                     </div>
                   );
                 })}
+                {anomaliesLoading && <span className="w-full text-center text-[10px] text-slate-500">Loading anomaly data…</span>}
+                {anomaliesError && <span className="w-full text-center text-[10px] text-slate-500">Anomaly data unavailable</span>}
               </div>
             </div>
           </div>
@@ -611,12 +600,8 @@ export default function GlobalFirePulse() {
                 <div>
                   <span className="text-[11px] text-slate-400 font-medium block">Mean Index</span>
                   <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
-                    {formatBurnIndex(stats?.burn_index.mean ?? 3.32)}
+                    {formatBurnIndex(stats?.burn_index.mean)}
                   </div>
-                  <span className="dataplay-badge-up mt-1">
-                    <TrendingUp size={11} />
-                    10.96%
-                  </span>
                 </div>
 
                 <div className="space-y-1.5 mt-4">
@@ -656,7 +641,7 @@ export default function GlobalFirePulse() {
                       stroke="#0062ff"
                       strokeWidth="8"
                       strokeDasharray="389.5"
-                      strokeDashoffset="105"
+                      strokeDashoffset={389.5 * (1 - sensorRatios[0])}
                       strokeLinecap="round"
                     />
 
@@ -677,7 +662,7 @@ export default function GlobalFirePulse() {
                       stroke="#00c7d4"
                       strokeWidth="8"
                       strokeDasharray="301.6"
-                      strokeDashoffset="95"
+                      strokeDashoffset={301.6 * (1 - sensorRatios[1])}
                       strokeLinecap="round"
                     />
 
@@ -698,7 +683,7 @@ export default function GlobalFirePulse() {
                       stroke="#84cc16"
                       strokeWidth="8"
                       strokeDasharray="213.6"
-                      strokeDashoffset="80"
+                      strokeDashoffset={213.6 * (1 - sensorRatios[2])}
                       strokeLinecap="round"
                     />
                   </svg>
@@ -706,7 +691,7 @@ export default function GlobalFirePulse() {
                   {/* Center Metric */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-base font-bold text-slate-900 tracking-tight tabular-nums">
-                      {formatCount(stats?.coverage.total_raw_observations ?? 343320)}
+                      {formatCount(stats?.coverage.total_raw_observations)}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">All Observations</span>
                   </div>
@@ -718,33 +703,25 @@ export default function GlobalFirePulse() {
                 <div>
                   <span className="text-[11px] text-slate-400 font-medium block">Outliers</span>
                   <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
-                    {formatCount(anomalyRecords?.length ?? 29300)}
+                    {formatCount(anomalyRecords?.length)}
                   </div>
-                  <span className="dataplay-badge-down mt-1 inline-flex">
-                    <TrendingDown size={11} />
-                    32.2%
-                  </span>
                 </div>
 
                 <div className="mt-4">
                   <span className="text-[11px] text-slate-400 font-medium block">Cell-Dates</span>
                   <div className="text-xl font-bold text-slate-900 tabular-nums mt-0.5">
-                    {formatCount(stats?.coverage.total_h3_cell_dates ?? 74540)}
+                    {formatCount(stats?.coverage.total_h3_cell_dates)}
                   </div>
-                  <span className="dataplay-badge-up mt-1 inline-flex">
-                    <TrendingUp size={11} />
-                    1.4%
-                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ROW 3: SALES REPORT EQUIVALENT -> TELEMETRY & ACTIVITY TRENDS */}
+          {/* ROW 3: Dataset metrics and monthly anomaly history */}
           <div className="dataplay-card p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-slate-800">
-                Fire Activity Trends
+                Dataset Metrics
               </span>
               <button
                 type="button"
@@ -755,83 +732,44 @@ export default function GlobalFirePulse() {
               </button>
             </div>
 
-            {/* 3 Metric Headers */}
+            {/* Values are supplied by the statistics endpoint. */}
             <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 mb-2">
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block">Mean Score</span>
                 <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatBurnIndex(stats?.burn_index.mean ?? 43.32)}
+                  {formatBurnIndex(stats?.burn_index.mean)}
                 </div>
-                <span className="dataplay-badge-down mt-1 inline-flex">
-                  <TrendingDown size={11} />
-                  9.43%
-                </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block">Max Index</span>
                 <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatBurnIndex(stats?.burn_index.maximum ?? 854.56)}
+                  {formatBurnIndex(stats?.burn_index.maximum)}
                 </div>
-                <span className="dataplay-badge-down mt-1 inline-flex">
-                  <TrendingDown size={11} />
-                  32.2%
-                </span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Annual Total</span>
+                <span className="text-[11px] text-slate-400 font-medium block">Cell-Dates</span>
                 <div className="text-base font-bold text-slate-900 tabular-nums mt-0.5">
-                  {formatCount(stats?.coverage.total_h3_cell_dates ?? 92430)}
+                  {formatCount(stats?.coverage.total_h3_cell_dates)}
                 </div>
-                <span className="dataplay-badge-up mt-1 inline-flex">
-                  <TrendingUp size={11} />
-                  23.68%
-                </span>
               </div>
             </div>
 
-            {/* Smooth Multi-Line Spline Wave Chart (Matches reference graphic) */}
             <div className="h-28 relative flex items-center">
-              <svg className="w-full h-full" viewBox="0 0 360 110" preserveAspectRatio="none">
-                {/* Y-Axis Label Ticks */}
-                <text x="5" y="24" className="text-[9px] fill-slate-400 font-mono">100</text>
-                <text x="5" y="54" className="text-[9px] fill-slate-400 font-mono">75</text>
-                <text x="5" y="84" className="text-[9px] fill-slate-400 font-mono">50</text>
-                <text x="5" y="104" className="text-[9px] fill-slate-400 font-mono">25</text>
-
-                {/* Horizontal Grid lines */}
-                <line x1="32" y1="20" x2="355" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="32" y1="50" x2="355" y2="50" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="32" y1="80" x2="355" y2="80" stroke="#f1f5f9" strokeWidth="1" />
-
-                {/* Spline Wave 1 (Navy/Royal) */}
-                <path
-                  d="M 35 48 C 75 42, 105 58, 145 52 C 185 46, 215 32, 255 35 C 285 38, 310 46, 345 42"
-                  fill="none"
-                  stroke="#0043a8"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-
-                {/* Spline Wave 2 (Royal Blue with Nodes) */}
-                <path
-                  d="M 35 68 C 75 62, 105 78, 145 70 C 185 62, 215 50, 255 54 C 285 58, 310 68, 345 62"
-                  fill="none"
-                  stroke="#0062ff"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <circle cx="345" cy="62" r="4" fill="#ffffff" stroke="#0062ff" strokeWidth="2.5" />
-
-                {/* Spline Wave 3 (Cyan with Nodes) */}
-                <path
-                  d="M 35 90 C 75 86, 105 96, 145 90 C 185 82, 215 72, 255 76 C 285 80, 310 90, 345 84"
-                  fill="none"
-                  stroke="#00c7d4"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <circle cx="345" cy="84" r="4" fill="#ffffff" stroke="#00c7d4" strokeWidth="2.5" />
-              </svg>
+              {anomaliesLoading ? (
+                <p className="w-full text-center text-xs text-slate-500">Loading monthly anomaly data…</p>
+              ) : anomaliesError ? (
+                <p className="w-full text-center text-xs text-slate-500">Monthly anomaly data unavailable.</p>
+              ) : anomalyRecords?.length === 0 ? (
+                <p className="w-full text-center text-xs text-slate-500">No anomaly records in the selected period.</p>
+              ) : anomalyRecords ? (
+                <svg className="w-full h-full" viewBox="0 0 360 110" preserveAspectRatio="none" aria-label="Monthly anomaly counts">
+                  <text x="2" y="24" className="text-[9px] fill-slate-400 font-mono">{formatCount(maxMonthlyAnomalies)}</text>
+                  <text x="2" y="62" className="text-[9px] fill-slate-400 font-mono">{formatCount(Math.round(maxMonthlyAnomalies / 2))}</text>
+                  <text x="2" y="100" className="text-[9px] fill-slate-400 font-mono">0</text>
+                  {[20, 56, 92].map((y) => <line key={y} x1="32" y1={y} x2="355" y2={y} stroke="#64748b" strokeOpacity=".25" strokeWidth="1" />)}
+                  <path d={monthlyTrendPath} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : null}
             </div>
           </div>
         </div>
@@ -954,7 +892,7 @@ export default function GlobalFirePulse() {
                     Burn Severity
                   </span>
                   <div className="text-xl font-bold text-slate-900 tabular-nums">
-                    {stats?.burn_index.mean ? `${formatBurnIndex(stats.burn_index.mean)} Avg.` : "0 — 100"}
+                    {stats?.burn_index.mean == null ? "Unavailable" : `${formatBurnIndex(stats.burn_index.mean)} Avg.`}
                   </div>
                   <span className="text-[10px] text-slate-400 block">
                     Relative fire-activity score
@@ -1039,7 +977,7 @@ export default function GlobalFirePulse() {
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-500">H3 Resolution</span>
                       <span className="font-semibold text-slate-800 tabular-nums">
-                        {stats.coverage.h3_resolution ?? "7"}
+                        {stats.coverage.h3_resolution ?? "—"}
                       </span>
                     </div>
                   </section>

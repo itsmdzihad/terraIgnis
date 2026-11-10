@@ -1,50 +1,49 @@
 import { CalendarDays, Globe2, MapPinned, Moon, Sun } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Link, NavLink } from 'react-router-dom';
 import TerraIgnisLogo from './components/TerraIgnisLogo';
 
 interface NavbarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
   theme: 'light' | 'dark';
   onThemeToggle: () => void;
 }
 
 const navItems = [
-  { id: 'global', label: 'Fire overview', icon: Globe2 },
-  { id: 'regional', label: 'Cell explorer', icon: MapPinned },
-  { id: 'calendar', label: 'Daily activity', icon: CalendarDays },
+  { id: 'global', label: 'Fire overview', path: '/', icon: Globe2 },
+  { id: 'regional', label: 'Cell explorer', path: '/cells', icon: MapPinned },
+  { id: 'calendar', label: 'Daily activity', path: '/activity', icon: CalendarDays },
 ];
 
-export default function Navbar({ activeTab, setActiveTab, theme, onThemeToggle }: NavbarProps) {
+export default function Navbar({ theme, onThemeToggle }: NavbarProps) {
   return (
     <header className="site-header">
-      <a href="/" className="site-brand" aria-label="TerraIgnis home">
+      <Link to="/" className="site-brand" aria-label="TerraIgnis home">
         <TerraIgnisLogo theme={theme} className="site-logo" />
-      </a>
+      </Link>
 
       <nav className="site-nav" aria-label="Primary navigation">
-        {navItems.map(({ id, label, icon: Icon }) => {
-          const isActive = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`site-nav-link${isActive ? ' is-active' : ''}`}
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="site-nav-active-pill"
-                  className="site-nav-pill"
-                  transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.85 }}
-                />
-              )}
-              <Icon size={15} strokeWidth={1.8} className="relative z-10" />
-              <span className="relative z-10">{label}</span>
-            </button>
-          );
-        })}
+        {navItems.map(({ id, label, path, icon: Icon }) => (
+          <NavLink
+            key={id}
+            to={path}
+            end={id === 'global'}
+            className={({ isActive }) => `site-nav-link${isActive ? ' is-active' : ''}`}
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <motion.span
+                    layoutId="site-nav-active-pill"
+                    className="site-nav-pill"
+                    transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.85 }}
+                  />
+                )}
+                <Icon size={15} strokeWidth={1.8} className="relative z-10" />
+                <span className="relative z-10">{label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="site-header-actions">
