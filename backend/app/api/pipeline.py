@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import csv
+import ctypes
+import errno
 import hashlib
 import logging
+import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import uuid
 from copy import deepcopy
@@ -21,6 +23,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from starlette.datastructures import UploadFile
 
 from app.services.fire_ingestion import MODIS_REQUIRED, VIIRS_REQUIRED
+from app.services.processing_lock import analytical_processing_lock
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pipeline", tags=["data pipeline"])
@@ -49,14 +52,8 @@ PIPELINE_OUTPUTS = (
     BACKEND_ROOT / "data" / "processed" / "anomalies.parquet",
 )
 
-PROCESSED_OUTPUTS = (
-    BACKEND_ROOT / "data" / "processed" / "standardized_fires.parquet",
-    BACKEND_ROOT / "data" / "processed" / "h3_fire_daily.parquet",
-    BACKEND_ROOT / "data" / "processed" / "harmonized_fire.parquet",
-    BACKEND_ROOT / "data" / "processed" / "burn_index.parquet",
-    BACKEND_ROOT / "data" / "processed" / "anomalies.parquet",
-    BACKEND_ROOT / "data" / "reports" / "fire_profile.json",
-)
+DATA_ROOT = BACKEND_ROOT / "data"
+GENERATIONS_ROOT = DATA_ROOT / ".generations"
 
 _LOCK = threading.Lock()
 _ACTIVE_UPLOADS = 0
@@ -73,8 +70,8 @@ _JOB: dict[str, object] = {
 
 
 def _raw_file_counts() -> dict[str, int]:
-    modis = sum(1 for path in (RAW_ROOT / "modis").glob("*.txt") if path.is_file())
-    viirs = sum(1 for path in (RAW_ROOT / "viirs").glob("*.txt") if path.is_file())
+    modis = sum(1 for path in (RAW_ROOT / "modis").rglob("*") if path.is_file() and path.suffix.lower() in {".txt", ".csv"})
+    viirs = sum(1 for path in (RAW_ROOT / "viirs").rglob("*") if path.is_file() and path.suffix.lower() in {".txt", ".csv"})
     return {"MODIS": modis, "VIIRS": viirs, "total": modis + viirs}
 
 
@@ -122,34 +119,129 @@ def _set_stage_status(index: int, stage_status: str) -> None:
         stages[index]["status"] = stage_status
 
 
-def _restore_outputs(backup_root: Path) -> None:
-    for output in PROCESSED_OUTPUTS:
-        backup = backup_root / output.relative_to(BACKEND_ROOT)
-        if backup.is_file():
-            output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(backup, output)
-        elif output.exists():
-            output.unlink()
+def _prepare_generation_root(generation_root: Path) -> None:
+    """Prepare isolated output folders and link existing raw inputs read-only."""
+    (generation_root / "processed").mkdir(parents=True, exist_ok=True)
+    (generation_root / "reports").mkdir(parents=True, exist_ok=True)
+    for sensor in ("modis", "viirs"):
+        source_root = RAW_ROOT / sensor
+        if not source_root.exists():
+            continue
+        for source in source_root.rglob("*"):
+            if not source.is_file():
+                continue
+            destination = generation_root / "raw" / sensor / source.relative_to(source_root)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                destination.symlink_to(source.resolve())
+            except OSError:
+                shutil.copy2(source, destination)
+
+
+def _rename_exchange(left: Path, right: Path) -> bool:
+    """Atomically exchange two paths on Linux; return false when unavailable."""
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError):
+        return False
+    renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(-100, os.fsencode(left), -100, os.fsencode(right), 2)  # AT_FDCWD, RENAME_EXCHANGE
+    if result == 0:
+        return True
+    error = ctypes.get_errno()
+    if error in {errno.ENOSYS, errno.EINVAL, errno.EXDEV, errno.ENOTSUP}:
+        return False
+    raise OSError(error, os.strerror(error), f"{left} <-> {right}")
+
+
+def _publish_generation(generation_root: Path, job_id: str) -> None:
+    """Atomically switch all processed Parquet files through one directory link."""
+    processed_path = DATA_ROOT / "processed"
+    new_processed = generation_root / "processed"
+    link_path = DATA_ROOT / f".processed-{job_id}.link"
+    relative_target = os.path.relpath(new_processed, DATA_ROOT)
+    link_path.symlink_to(relative_target, target_is_directory=True)
+    legacy_path = GENERATIONS_ROOT / f"legacy-{job_id}" / "processed"
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if not processed_path.exists() and not processed_path.is_symlink():
+            os.replace(link_path, processed_path)
+            return
+        if processed_path.is_symlink():
+            os.replace(link_path, processed_path)
+            return
+        if _rename_exchange(link_path, processed_path):
+            try:
+                os.replace(link_path, legacy_path)
+            except OSError:
+                logger.warning("Published generation %s but could not archive the prior processed directory", job_id)
+            return
+
+        # Portable fallback: retain the old generation and restore it if the
+        # second rename fails. POSIX/Linux takes the atomic exchange above.
+        os.replace(processed_path, legacy_path)
+        try:
+            os.replace(link_path, processed_path)
+        except Exception:
+            os.replace(legacy_path, processed_path)
+            raise
+    finally:
+        if link_path.is_symlink() or link_path.is_file():
+            link_path.unlink(missing_ok=True)
+
+
+def _validate_staged_outputs(generation_root: Path) -> None:
+    """Require every output and preserve the currently published Parquet schema."""
+    import polars as pl
+
+    for output in PIPELINE_OUTPUTS:
+        staged = generation_root / output.relative_to(DATA_ROOT)
+        if not staged.is_file() or staged.stat().st_size == 0:
+            raise RuntimeError(f"Pipeline did not produce a non-empty {output.relative_to(BACKEND_ROOT)}.")
+        if staged.suffix == ".parquet" and (output.is_file() or output.is_symlink()):
+            old_schema = pl.read_parquet_schema(output)
+            new_schema = pl.read_parquet_schema(staged)
+            if old_schema != new_schema:
+                raise RuntimeError(f"Staged dataset schema changed unexpectedly for {output.name}.")
+
+
+def _publish_profile_report(generation_root: Path) -> None:
+    staged = generation_root / "reports" / "fire_profile.json"
+    destination = DATA_ROOT / "reports" / "fire_profile.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        shutil.copy2(staged, temporary)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _run_pipeline(job_id: str) -> None:
+    with analytical_processing_lock():
+        _run_pipeline_locked(job_id)
+
+
+def _run_pipeline_locked(job_id: str) -> None:
     started_at = datetime.now(timezone.utc).isoformat()
-    backup_root = Path(tempfile.mkdtemp(prefix="terraignis-pipeline-backup-"))
+    GENERATIONS_ROOT.mkdir(parents=True, exist_ok=True)
+    generation_root = GENERATIONS_ROOT / job_id
+    shutil.rmtree(generation_root, ignore_errors=True)
+    _prepare_generation_root(generation_root)
+    published = False
     with _LOCK:
         _JOB.update({"status": "running", "started_at": started_at, "message": "Generating processed datasets."})
 
     try:
-        for output in PROCESSED_OUTPUTS:
-            if output.is_file():
-                backup = backup_root / output.relative_to(BACKEND_ROOT)
-                backup.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(output, backup)
-
         for index, (stage_name, script_path) in enumerate(PIPELINE_STAGES):
             with _LOCK:
                 _JOB["stage"] = stage_name
             _set_stage_status(index, "running")
             _append_log(f"Starting: {stage_name}")
+            child_env = os.environ.copy()
+            child_env["TERRAIGNIS_DATA_ROOT"] = str(generation_root)
             result = subprocess.run(
                 [sys.executable, script_path],
                 cwd=BACKEND_ROOT,
@@ -157,6 +249,7 @@ def _run_pipeline(job_id: str) -> None:
                 text=True,
                 check=False,
                 timeout=6 * 60 * 60,
+                env=child_env,
             )
             if result.stdout.strip():
                 _append_log(result.stdout[-12000:])
@@ -165,16 +258,24 @@ def _run_pipeline(job_id: str) -> None:
             if result.returncode != 0:
                 _set_stage_status(index, "failed")
                 raise RuntimeError(f"{stage_name} failed with exit code {result.returncode}.")
-            expected_output = PIPELINE_OUTPUTS[index]
+            expected_output = generation_root / PIPELINE_OUTPUTS[index].relative_to(DATA_ROOT)
             if not expected_output.is_file():
                 _set_stage_status(index, "failed")
                 raise RuntimeError(
                     f"{stage_name} exited successfully but did not create "
-                    f"{expected_output.relative_to(BACKEND_ROOT)}."
+                    f"{PIPELINE_OUTPUTS[index].relative_to(BACKEND_ROOT)}."
                 )
             _set_stage_status(index, "succeeded")
             _append_log(f"Completed: {stage_name}")
 
+        _validate_staged_outputs(generation_root)
+        _publish_generation(generation_root, job_id)
+        published = True
+        try:
+            _publish_profile_report(generation_root)
+        except OSError:
+            logger.exception("Published datasets but could not update the supplementary profile report")
+            _append_log("Datasets were published; the supplementary profile report could not be updated.")
         with _LOCK:
             _JOB.update({
                 "status": "succeeded",
@@ -184,13 +285,10 @@ def _run_pipeline(job_id: str) -> None:
             })
     except Exception as exc:
         logger.exception("TerraIgnis data pipeline failed (job_id=%s)", job_id)
-        try:
-            if backup_root.exists():
-                _restore_outputs(backup_root)
-                _append_log("Restored the last complete processed dataset after the failure.")
-        except Exception:
-            logger.exception("Could not restore processed outputs after pipeline failure")
-            _append_log("Warning: automatic restore of previous processed outputs also failed.")
+        if published:
+            _append_log("The new processed generation was published; a follow-up report write failed.")
+        else:
+            _append_log("The previous processed generation remains active; the staged output was not published.")
 
         with _LOCK:
             stages = _JOB["stages"]
@@ -205,7 +303,8 @@ def _run_pipeline(job_id: str) -> None:
             })
         _append_log(f"Pipeline failed: {exc}")
     finally:
-        shutil.rmtree(backup_root, ignore_errors=True)
+        if not published:
+            shutil.rmtree(generation_root, ignore_errors=True)
 
 
 @router.post("/uploads", status_code=status.HTTP_201_CREATED)

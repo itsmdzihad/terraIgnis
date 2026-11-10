@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -14,15 +15,16 @@ import duckdb
 
 logger = logging.getLogger(__name__)
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PARQUET_PATH = BACKEND_ROOT / "data" / "processed" / "standardized_fires.parquet"
-DEFAULT_REPORT_PATH = BACKEND_ROOT / "data" / "reports" / "fire_profile.json"
+DATA_ROOT = Path(os.environ.get("TERRAIGNIS_DATA_ROOT", BACKEND_ROOT / "data")).expanduser().resolve()
+DEFAULT_PARQUET_PATH = DATA_ROOT / "processed" / "standardized_fires.parquet"
+DEFAULT_REPORT_PATH = DATA_ROOT / "reports" / "fire_profile.json"
 
 
 def get_parquet_path(path: str | Path | None = None) -> Path:
     """Resolve the input Parquet independently of the caller's working directory."""
     resolved = Path(path) if path is not None else DEFAULT_PARQUET_PATH
     if not resolved.is_absolute():
-        resolved = BACKEND_ROOT / resolved
+        resolved = DATA_ROOT / resolved
     resolved = resolved.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(f"Standardized FIRMS Parquet not found: {resolved}")
@@ -347,7 +349,7 @@ def save_json_report(report: dict[str, Any], output_path: str | Path = DEFAULT_R
     """Write the profiling report as indented, standards-compliant JSON."""
     path = Path(output_path)
     if not path.is_absolute():
-        path = BACKEND_ROOT / path
+        path = DATA_ROOT / path
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:

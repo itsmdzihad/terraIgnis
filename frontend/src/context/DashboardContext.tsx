@@ -4,6 +4,7 @@ import type { FireSensor } from '../types/fire';
 
 interface DashboardContextValue {
   selectedDate: string | null;
+  calendarYear: number;
   selectedStartDate: string;
   selectedEndDate: string;
   selectedH3Cell: string | null;
@@ -28,6 +29,7 @@ const DashboardContext = createContext<DashboardContextValue | null>(null);
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDateState] = useState<string | null>(null);
+  const [calendarYear, setCalendarYear] = useState(Number(INITIAL_START_DATE.slice(0, 4)));
   const [selectedStartDate, setSelectedStartDate] = useState(INITIAL_START_DATE);
   const [selectedEndDate, setSelectedEndDate] = useState(INITIAL_END_DATE);
   const [selectedH3Cell, updateSelectedH3Cell] = useState<string | null>(null);
@@ -44,15 +46,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSelectedYear = useCallback((year: number) => {
+    setCalendarYear(year);
+    setSelectedDateState(null);
     setDateRange(`${year}-01-01`, `${year}-12-31`);
   }, [setDateRange]);
 
   const setSelectedDate = useCallback((date: string | null) => {
     setSelectedDateState(date);
-    if (date && (date < selectedStartDate || date > selectedEndDate)) {
+    if (date) {
       const year = date.slice(0, 4);
-      setSelectedStartDate(`${year}-01-01`);
-      setSelectedEndDate(`${year}-12-31`);
+      setCalendarYear(Number(year));
+      if (date < selectedStartDate || date > selectedEndDate) {
+        setSelectedStartDate(`${year}-01-01`);
+        setSelectedEndDate(`${year}-12-31`);
+      }
     }
   }, [selectedEndDate, selectedStartDate]);
 
@@ -76,6 +83,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const clearFilters = useCallback(() => {
     setSelectedDateState(null);
+    setCalendarYear(Number(INITIAL_START_DATE.slice(0, 4)));
     setSelectedStartDate(INITIAL_START_DATE);
     setSelectedEndDate(INITIAL_END_DATE);
     setSelectedH3Cell(null);
@@ -87,6 +95,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DashboardContextValue>(() => ({
     selectedDate,
+    calendarYear,
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
@@ -104,6 +113,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     clearFilters,
   }), [
     selectedDate,
+    calendarYear,
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,

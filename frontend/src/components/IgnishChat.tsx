@@ -10,14 +10,21 @@ interface IgnishChatProps {
 
 const GREETING: IgnishMessage = {
   role: 'assistant',
-  content: "Hi, I’m Ignish. Ask me about the fire data in your TerraIgnis dashboard.",
+  content: "Hi, I’m Ignish. I’m checking the latest processed fire data for the most useful updates. Need anything specific?",
 };
 
 const SUGGESTIONS = [
-  'Summarize the fire data in Bangladesh',
-  'Which days had the most detections?',
-  'Explain the Burn Index',
+  'Summarize fire activity in a country',
+  'Which date had the most detections?',
+  'What are the latest burn index anomalies?',
 ];
+
+const INITIAL_BRIEFING_PROMPT = [
+  'Give me a brief proactive briefing using only the processed TerraIgnis fire data currently available.',
+  'Highlight the most useful verifiable findings, such as overall activity, the busiest observed date, burn index or anomalies, and dataset coverage dates when available.',
+  'Do not invent values or imply missing data is zero. If no processed data is available, say that clearly.',
+  'End by asking what I would like to explore next.',
+].join(' ');
 
 export default function IgnishChat({ theme }: IgnishChatProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,6 +34,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const hasStartedWelcomeRef = useRef(false);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
@@ -35,6 +43,27 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
   useEffect(() => {
     if (isOpen) inputRef.current?.focus();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (hasStartedWelcomeRef.current) return;
+    hasStartedWelcomeRef.current = true;
+
+    try {
+      if (window.sessionStorage.getItem('terraignis-ignish-welcome-shown') === 'true') return;
+      window.sessionStorage.setItem('terraignis-ignish-welcome-shown', 'true');
+    } catch {
+      // Continue with the welcome briefing if session storage is unavailable.
+    }
+
+    setIsOpen(true);
+    setSending(true);
+    void sendIgnishMessage([{ role: 'user', content: INITIAL_BRIEFING_PROMPT }])
+      .then((reply) => setMessages((current) => [...current, { role: 'assistant', content: reply }]))
+      .catch((briefingError: unknown) => {
+        setError(briefingError instanceof Error ? briefingError.message : 'Could not load the latest fire briefing.');
+      })
+      .finally(() => setSending(false));
+  }, []);
 
   const send = async (value: string) => {
     const content = value.trim();
@@ -101,7 +130,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
               </div>
             )}
             {error && <p className="ignish-error" role="alert">{error}</p>}
-            {messages.length === 1 && !sending && (
+            {!messages.some((message) => message.role === 'user') && !sending && (
               <div className="ignish-suggestions">
                 {SUGGESTIONS.map((suggestion) => (
                   <button type="button" key={suggestion} onClick={() => void send(suggestion)}>{suggestion}</button>

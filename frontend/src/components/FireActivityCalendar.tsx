@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   X,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCalendar } from "../hooks/useCalendar";
 import { useAnomalies } from "../hooks/useAnomalies";
+import { useStats } from "../hooks/useStats";
 import type { CalendarDay } from "../types/calendar";
 import { useDashboard } from "../context/DashboardContext";
 
@@ -74,13 +75,28 @@ function formatFullDate(dateStr: string): string {
 export default function FireActivityCalendar() {
   const {
     selectedDate,
-    selectedStartDate,
-    selectedEndDate,
+    calendarYear,
     setSelectedDate,
     setSelectedYear,
   } = useDashboard();
 
-  const selectedYear = Number(selectedStartDate.slice(0, 4));
+  const selectedYear = calendarYear;
+  const { data: coverageStats } = useStats();
+  const yearOptions = useMemo(() => {
+    const dataStartYear = coverageStats?.coverage.start_date
+      ? Number(coverageStats.coverage.start_date.slice(0, 4))
+      : selectedYear;
+    const dataEndYear = coverageStats?.coverage.end_date
+      ? Number(coverageStats.coverage.end_date.slice(0, 4))
+      : selectedYear;
+    const firstYear = Math.min(dataStartYear, selectedYear);
+    const lastYear = Math.max(dataEndYear, selectedYear);
+
+    return Array.from(
+      { length: lastYear - firstYear + 1 },
+      (_, index) => lastYear - index
+    );
+  }, [coverageStats, selectedYear]);
 
   // UI state controls
   const [metricMode, setMetricMode] = useState<"fire_count" | "burn_index">("fire_count");
@@ -92,11 +108,34 @@ export default function FireActivityCalendar() {
   const [hoveredRadarKey, setHoveredRadarKey] = useState<string | null>(null);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const yearPickerRef = useRef<HTMLDivElement>(null);
+  const calendarActionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (isYearDropdownOpen && !yearPickerRef.current?.contains(target)) {
+        setIsYearDropdownOpen(false);
+      }
+      if (
+        (isCardEditOpen || isCardMoreOpen) &&
+        !calendarActionsRef.current?.contains(target)
+      ) {
+        setIsCardEditOpen(false);
+        setIsCardMoreOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+  }, [isYearDropdownOpen, isCardEditOpen, isCardMoreOpen]);
 
   // API Hooks - Strictly real backend telemetry, NO mock data
   const { data, loading, error, refetch } = useCalendar({
-    start_date: selectedStartDate,
-    end_date: selectedEndDate,
+    start_date: `${selectedYear}-01-01`,
+    end_date: `${selectedYear}-12-31`,
     limit: PAGE_SIZE,
     offset: 0,
   });
@@ -107,8 +146,8 @@ export default function FireActivityCalendar() {
     error: anomalyError,
     refetch: refetchAnomalies,
   } = useAnomalies({
-    start_date: selectedStartDate,
-    end_date: selectedEndDate,
+    start_date: `${selectedYear}-01-01`,
+    end_date: `${selectedYear}-12-31`,
   });
 
   const observationsByDate = useMemo(
@@ -857,7 +896,7 @@ export default function FireActivityCalendar() {
   const yearAndMetricControls = (
     <div className="flex flex-wrap items-center gap-2">
       {/* Statistic Year Pill Dropdown */}
-      <div className="relative">
+      <div className="relative" ref={yearPickerRef}>
         <button
           type="button"
           onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
@@ -873,7 +912,7 @@ export default function FireActivityCalendar() {
 
         {isYearDropdownOpen && (
           <div className="activity-surface-popover absolute left-0 mt-2 w-44 rounded-3xl p-2 z-30 space-y-1">
-            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
+            {yearOptions.map((yr) => (
               <button
                 key={yr}
                 type="button"
@@ -1005,7 +1044,7 @@ export default function FireActivityCalendar() {
                   {yearAndMetricControls}
 
                   {/* Top-Right Compact Segmented Action Toolbar [ Expand | Edit | More ] */}
-                  <div className="relative flex items-center">
+                  <div className="relative flex items-center" ref={calendarActionsRef}>
                     <div className="activity-surface-control inline-flex items-center rounded-full px-1.5 py-1 gap-1">
                       <button
                         type="button"
@@ -1052,7 +1091,7 @@ export default function FireActivityCalendar() {
                             Select Year
                           </span>
                           <div className="grid grid-cols-3 gap-1.5">
-                            {[2026, 2025, 2024, 2023, 2022, 2021].map((yr) => (
+                            {yearOptions.map((yr) => (
                               <button
                                 key={yr}
                                 type="button"

@@ -1,23 +1,41 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   Database,
   ExternalLink,
   FileText,
   LoaderCircle,
+  LockKeyhole,
   Play,
+  Radio,
   RotateCw,
+  XCircle,
   UploadCloud,
 } from 'lucide-react';
 import {
   fetchPipelineStatus,
+  fetchIngestionStatus,
+  startNrtIngestion,
+  startHistoricalIngestion,
+  resumeHistoricalIngestion,
+  cancelHistoricalIngestion,
   startPipeline,
   uploadRawFiles,
   type BatchUploadResult,
+  type IngestionStatus,
   type PipelineStatus,
 } from '../services/pipeline';
+
+const HISTORICAL_PRODUCTS = ['MODIS_SP', 'VIIRS_SNPP_SP', 'VIIRS_NOAA20_SP', 'VIIRS_NOAA21_SP'];
+
+function formatTimestamp(value?: string | null): string {
+  if (!value) return 'Not yet run';
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -34,6 +52,7 @@ function stageIcon(stageStatus: string) {
 
 export default function DataPipeline() {
   const [status, setStatus] = useState<PipelineStatus | null>(null);
+  const [ingestion, setIngestion] = useState<IngestionStatus | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedSensor, setSelectedSensor] = useState<'MODIS' | 'VIIRS' | ''>('');
   const [uploadResult, setUploadResult] = useState<BatchUploadResult | null>(null);
@@ -41,6 +60,14 @@ export default function DataPipeline() {
   const [uploading, setUploading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [ingestionError, setIngestionError] = useState<string | null>(null);
+  const [ingestionNotice, setIngestionNotice] = useState<string | null>(null);
+  const [operatorToken, setOperatorToken] = useState('');
+  const [historicalStart, setHistoricalStart] = useState('');
+  const [historicalEnd, setHistoricalEnd] = useState('');
+  const [historicalArea, setHistoricalArea] = useState('world');
+  const [historicalSources, setHistoricalSources] = useState<string[]>(['MODIS_SP', 'VIIRS_SNPP_SP', 'VIIRS_NOAA20_SP', 'VIIRS_NOAA21_SP']);
+  const [historicalBusy, setHistoricalBusy] = useState(false);
 
   const refreshStatus = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -55,17 +82,40 @@ export default function DataPipeline() {
     }
   }, []);
 
+  const refreshIngestion = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const nextStatus = await fetchIngestionStatus(signal);
+      setIngestion(nextStatus);
+      setIngestionError(null);
+      return nextStatus;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return null;
+      setIngestionError(error instanceof Error ? error.message : 'Could not load FIRMS ingestion status.');
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     void refreshStatus(controller.signal);
+    void refreshIngestion(controller.signal);
     return () => controller.abort();
-  }, [refreshStatus]);
+  }, [refreshIngestion, refreshStatus]);
 
   useEffect(() => {
     if (status?.status !== 'queued' && status?.status !== 'running') return;
     const timer = window.setInterval(() => void refreshStatus(), 1500);
     return () => window.clearInterval(timer);
   }, [refreshStatus, status?.status]);
+
+  useEffect(() => {
+    const nrtRunning = ingestion?.nrt.status === 'running';
+    const jobStatus = ingestion?.historical.active_job?.status;
+    const historicalRunning = jobStatus === 'queued' || jobStatus === 'running' || jobStatus === 'processing';
+    if (!nrtRunning && !historicalRunning) return;
+    const timer = window.setInterval(() => void refreshIngestion(), 2500);
+    return () => window.clearInterval(timer);
+  }, [ingestion?.historical.active_job?.status, ingestion?.nrt.status, refreshIngestion]);
 
   const canGenerate = useMemo(
     () => (status?.raw_files.total ?? 0) > 0 && !uploading && !starting && status?.status !== 'queued' && status?.status !== 'running',
@@ -111,6 +161,68 @@ export default function DataPipeline() {
     }
   };
 
+  const handleNrtRun = async () => {
+    setHistoricalBusy(true);
+    setIngestionError(null);
+    setIngestionNotice(null);
+    try {
+      const result = await startNrtIngestion(operatorToken);
+      setIngestionNotice(result.message);
+      await refreshIngestion();
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : 'Could not start an NRT poll.');
+    } finally {
+      setHistoricalBusy(false);
+    }
+  };
+
+  const handleHistoricalStart = async () => {
+    setIngestionError(null);
+    setIngestionNotice(null);
+    if (!historicalStart || !historicalEnd) {
+      setIngestionError('Choose both a start date and an end date for the historical backfill.');
+      return;
+    }
+    if (historicalStart > historicalEnd) {
+      setIngestionError('The start date must be on or before the end date.');
+      return;
+    }
+    if (historicalSources.length === 0) {
+      setIngestionError('Select at least one Standard Processing product.');
+      return;
+    }
+    setHistoricalBusy(true);
+    try {
+      const job = await startHistoricalIngestion({
+        start_date: historicalStart,
+        end_date: historicalEnd,
+        area: historicalArea.trim() || 'world',
+        sources: historicalSources,
+      }, operatorToken);
+      setIngestionNotice(`Historical backfill queued (${job.total_chunks} date chunks).`);
+      await refreshIngestion();
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : 'Could not start the historical backfill.');
+    } finally {
+      setHistoricalBusy(false);
+    }
+  };
+
+  const handleHistoricalAction = async (action: 'resume' | 'cancel', jobId: string) => {
+    setHistoricalBusy(true);
+    setIngestionError(null);
+    setIngestionNotice(null);
+    try {
+      if (action === 'resume') await resumeHistoricalIngestion(jobId, operatorToken);
+      else await cancelHistoricalIngestion(jobId, operatorToken);
+      await refreshIngestion();
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : `Could not ${action} this historical job.`);
+    } finally {
+      setHistoricalBusy(false);
+    }
+  };
+
   const running = status?.status === 'queued' || status?.status === 'running';
 
   return (
@@ -140,6 +252,83 @@ export default function DataPipeline() {
             <span>{loadError}</span>
           </div>
         )}
+
+        {(ingestionError || ingestionNotice) && (
+          <div role={ingestionError ? 'alert' : 'status'} className={`rounded-xl border px-4 py-3 text-sm ${ingestionError ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/35 dark:bg-rose-500/15 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300'}`}>
+            {ingestionError || ingestionNotice}
+          </div>
+        )}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"><Radio size={20} /></div>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Automated FIRMS ingestion</h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600">Track scheduled Near Real-Time polling and request resumable Standard Processing backfills. Downloaded files are preserved and flow through the existing dataset pipeline.</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => void handleNrtRun()} disabled={!ingestion?.nrt.configured || ingestion?.nrt.status === 'running' || historicalBusy} className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45">
+              {ingestion?.nrt.status === 'running' || historicalBusy ? <LoaderCircle size={16} className="animate-spin" /> : <RotateCw size={16} />}
+              Run NRT poll
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 px-4 py-3"><span className="text-xs font-medium text-slate-500">NRT scheduler</span><p className="mt-1 text-sm font-semibold text-slate-900">{ingestion ? ingestion.nrt.enabled ? `Enabled · every ${ingestion.nrt.interval_minutes ?? 30} min` : 'Disabled' : 'Loading…'}</p></div>
+            <div className="rounded-xl bg-slate-50 px-4 py-3"><span className="text-xs font-medium text-slate-500">Last successful poll</span><p className="mt-1 text-sm font-semibold text-slate-900">{formatTimestamp(ingestion?.nrt.last_success_at)}</p></div>
+            <div className="rounded-xl bg-slate-50 px-4 py-3"><span className="text-xs font-medium text-slate-500">Next scheduled poll</span><p className="mt-1 text-sm font-semibold text-slate-900">{formatTimestamp(ingestion?.nrt.next_run_at)}</p></div>
+          </div>
+
+          {ingestion?.nrt.last_error && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{ingestion.nrt.last_error}</p>}
+          {ingestion?.nrt.sources && Object.keys(ingestion.nrt.sources).length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">{Object.entries(ingestion.nrt.sources).map(([source, result]) => <span key={source} className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600">{source}: {result.status}{result.downloaded_records !== undefined ? ` · ${result.downloaded_records.toLocaleString()} records` : ''}</span>)}</div>
+          )}
+
+          <details className="mt-4 rounded-xl border border-slate-200 px-4 py-3">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-slate-600"><LockKeyhole size={14} /> Operator authorization (optional)</summary>
+            <label className="mt-3 block text-xs text-slate-500" htmlFor="firms-operator-token">Bearer token</label>
+            <input id="firms-operator-token" type="password" autoComplete="off" value={operatorToken} onChange={(event) => setOperatorToken(event.currentTarget.value)} placeholder="Enter FIRMS_INGESTION_TOKEN if configured" className="mt-1 w-full max-w-lg rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm" />
+            <p className="mt-1 text-xs text-slate-500">Kept only in this page while it is open; it is sent only with operator actions.</p>
+          </details>
+
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <div className="flex items-center gap-2"><CalendarDays size={17} className="text-indigo-600 dark:text-indigo-300" /><h3 className="text-sm font-semibold text-slate-900">Historical backfill</h3></div>
+            <p className="mt-1 text-xs text-slate-500">FIRMS availability is checked before the download. Requests are split into chunks of up to five days and can resume after interruptions.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-medium text-slate-600">Start date<input type="date" value={historicalStart} onChange={(event) => setHistoricalStart(event.currentTarget.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800" /></label>
+              <label className="text-xs font-medium text-slate-600">End date<input type="date" value={historicalEnd} onChange={(event) => setHistoricalEnd(event.currentTarget.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800" /></label>
+              <label className="text-xs font-medium text-slate-600">Coverage: world or west,south,east,north<input type="text" value={historicalArea} onChange={(event) => setHistoricalArea(event.currentTarget.value)} placeholder="world" className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800" /></label>
+              <div className="flex items-end"><button type="button" onClick={() => void handleHistoricalStart()} disabled={historicalBusy || !ingestion?.historical.configured || !ingestion.historical.enabled} className="pipeline-action-button inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-45">{historicalBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Play size={16} />}Start backfill</button></div>
+            </div>
+            {ingestion && !ingestion.historical.enabled && <p className="mt-2 text-xs text-slate-500">Enable historical backfills with FIRMS_HISTORICAL_ENABLED=true in backend/.env.</p>}
+            <fieldset className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+              <legend className="mb-2 text-xs font-medium text-slate-600">Standard Processing products</legend>
+              {HISTORICAL_PRODUCTS.map((source) => <label key={source} className="inline-flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={historicalSources.includes(source)} onChange={(event) => {
+                const checked = event.currentTarget.checked;
+                setHistoricalSources((current) => {
+                  if (checked) return current.includes(source) ? current : [...current, source];
+                  return current.filter((item) => item !== source);
+                });
+              }} />{source}</label>)}
+            </fieldset>
+          </div>
+
+          {ingestion?.historical.active_job && (() => {
+            const job = ingestion.historical.active_job;
+            const active = ['queued', 'running', 'processing'].includes(job.status);
+            const retryable = ['partial_failure', 'processing_failed', 'cancelled'].includes(job.status);
+            return <div className="mt-5 rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><p className="text-sm font-semibold text-slate-900">Historical job · {job.status.replaceAll('_', ' ')}</p><p className="mt-1 text-xs text-slate-500">{job.requested_start_date} – {job.requested_end_date} · {job.sources.join(', ')} · {job.completed_chunks}/{job.total_chunks} chunks · {job.downloaded_records.toLocaleString()} records</p></div>
+                <div className="flex gap-2">{active && <button type="button" onClick={() => void handleHistoricalAction('cancel', job.job_id)} disabled={historicalBusy} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-45"><XCircle size={14} />Cancel</button>}{retryable && <button type="button" onClick={() => void handleHistoricalAction('resume', job.job_id)} disabled={historicalBusy} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-45"><RotateCw size={14} />Resume</button>}</div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${job.progress_percent}%` }} /></div>
+              {job.last_error && <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">{job.last_error}</p>}
+              <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Review date chunks ({job.chunks.length})</summary><ul className="mt-2 max-h-44 space-y-1 overflow-y-auto">{job.chunks.map((chunk, index) => <li key={`${chunk.source}-${chunk.start_date}-${index}`} className="flex justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600"><span>{chunk.source} · {chunk.start_date} – {chunk.end_date}</span><span>{chunk.status}{chunk.records ? ` · ${chunk.records.toLocaleString()} records` : ''}</span></li>)}</ul></details>
+            </div>;
+          })()}
+        </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex items-start gap-3">

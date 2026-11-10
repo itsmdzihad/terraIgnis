@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -22,8 +23,9 @@ from app.services.spatial import (
 )
 
 logger = logging.getLogger(__name__)
-INPUT_PATH = BACKEND_ROOT / "data" / "processed" / "standardized_fires.parquet"
-OUTPUT_PATH = BACKEND_ROOT / "data" / "processed" / "h3_fire_daily.parquet"
+DATA_ROOT = Path(os.environ.get("TERRAIGNIS_DATA_ROOT", BACKEND_ROOT / "data")).expanduser().resolve()
+INPUT_PATH = DATA_ROOT / "processed" / "standardized_fires.parquet"
+OUTPUT_PATH = DATA_ROOT / "processed" / "h3_fire_daily.parquet"
 
 
 def build_h3_grid(

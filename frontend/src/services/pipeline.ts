@@ -42,6 +42,67 @@ export interface PipelineStatus {
   raw_files: RawFileInventory;
 }
 
+export interface NRTIngestionStatus {
+  enabled: boolean;
+  configured: boolean;
+  status: string;
+  last_started_at?: string | null;
+  last_finished_at?: string | null;
+  next_run_at?: string | null;
+  last_success_at?: string | null;
+  last_error?: string | null;
+  pending_generation?: boolean;
+  interval_minutes?: number;
+  downloaded_records?: number;
+  raw_files_added?: number;
+  sources_configured?: string[];
+  sources?: Record<string, { status: string; downloaded_records?: number; date_start?: string; date_end?: string; error?: string }>;
+}
+
+export interface HistoricalIngestionChunk {
+  source: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  records: number;
+  error?: string | null;
+}
+
+export interface HistoricalIngestionJob {
+  job_id: string;
+  status: string;
+  stage?: string | null;
+  area?: string;
+  requested_start_date: string;
+  requested_end_date: string;
+  sources: string[];
+  total_chunks: number;
+  completed_chunks: number;
+  pending_chunks: number;
+  failed_chunks: number;
+  progress_percent: number;
+  downloaded_records: number;
+  last_error?: string | null;
+  chunks: HistoricalIngestionChunk[];
+}
+
+export interface IngestionStatus {
+  nrt: NRTIngestionStatus;
+  historical: {
+    enabled: boolean;
+    configured: boolean;
+    active_job: HistoricalIngestionJob | null;
+    jobs: HistoricalIngestionJob[];
+  };
+}
+
+export interface HistoricalIngestionRequest {
+  start_date: string;
+  end_date: string;
+  area?: string;
+  sources: string[];
+}
+
 async function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let message = `Request failed (${response.status}).`;
@@ -86,4 +147,53 @@ export async function startPipeline(): Promise<{ job_id: string; status: 'queued
     headers: { Accept: 'application/json' },
   });
   return readResponse(response);
+}
+
+function operatorHeaders(token?: string): Record<string, string> {
+  const normalized = token?.trim();
+  return normalized ? { Authorization: `Bearer ${normalized}` } : {};
+}
+
+export async function fetchIngestionStatus(signal?: AbortSignal): Promise<IngestionStatus> {
+  const response = await fetch(buildApiUrl('/api/ingestion/status'), {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  return readResponse<IngestionStatus>(response);
+}
+
+export async function startNrtIngestion(token?: string): Promise<{ status: string; message: string }> {
+  const response = await fetch(buildApiUrl('/api/ingestion/nrt/run'), {
+    method: 'POST',
+    headers: { Accept: 'application/json', ...operatorHeaders(token) },
+  });
+  return readResponse(response);
+}
+
+export async function startHistoricalIngestion(
+  request: HistoricalIngestionRequest,
+  token?: string,
+): Promise<HistoricalIngestionJob> {
+  const response = await fetch(buildApiUrl('/api/ingestion/historical/start'), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...operatorHeaders(token) },
+    body: JSON.stringify(request),
+  });
+  return readResponse<HistoricalIngestionJob>(response);
+}
+
+export async function resumeHistoricalIngestion(jobId: string, token?: string): Promise<HistoricalIngestionJob> {
+  const response = await fetch(buildApiUrl(`/api/ingestion/historical/${encodeURIComponent(jobId)}/resume`), {
+    method: 'POST',
+    headers: { Accept: 'application/json', ...operatorHeaders(token) },
+  });
+  return readResponse<HistoricalIngestionJob>(response);
+}
+
+export async function cancelHistoricalIngestion(jobId: string, token?: string): Promise<HistoricalIngestionJob> {
+  const response = await fetch(buildApiUrl(`/api/ingestion/historical/${encodeURIComponent(jobId)}/cancel`), {
+    method: 'POST',
+    headers: { Accept: 'application/json', ...operatorHeaders(token) },
+  });
+  return readResponse<HistoricalIngestionJob>(response);
 }

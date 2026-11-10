@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.database import fetch_all, fetch_one, get_dataset_path
+from app.services.firms_ingestion import firms_ingestion
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -87,6 +88,32 @@ DATA_TOOL = {
         "additionalProperties": False,
     },
 }
+
+INGESTION_STATUS_TOOL = {
+    "type": "function",
+    "name": "get_ingestion_status",
+    "description": (
+        "Read the latest TerraIgnis NASA FIRMS ingestion status, including NRT polling, "
+        "last successful update, and historical backfill progress. This is read-only; "
+        "it never starts, resumes, or cancels an ingestion job."
+    ),
+    "strict": True,
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": False,
+    },
+}
+
+
+def _query_ingestion_status() -> dict[str, object]:
+    """Return only safe operational state for Ignish; never expose credentials."""
+    status = firms_ingestion.get_status()
+    return {
+        "nrt": status.get("nrt", {}),
+        "historical": status.get("historical", {}),
+    }
 
 
 def _parse_date(value: str, field_name: str) -> date | None:
@@ -381,7 +408,7 @@ async def _call_openai(api_key: str, model: str, instructions: str, input_items:
         "model": model,
         "instructions": instructions,
         "input": input_items,
-        "tools": [DATA_TOOL],
+        "tools": [DATA_TOOL, INGESTION_STATUS_TOOL],
         "tool_choice": "auto",
         "max_output_tokens": 1000,
         "store": False,
@@ -408,6 +435,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
     instructions = (
         "You are Ignish, TerraIgnis's wildfire-data chat assistant. Be concise, clear, and helpful. "
         "For questions about TerraIgnis observations or metrics, call get_fire_data before answering. "
+        "For questions about data freshness, the latest FIRMS update, NRT polling, or historical backfill progress, "
+        "call get_ingestion_status and answer from its returned operational status. Never claim an ingestion run "
+        "was started unless the user started it through the operator controls. This status tool is read-only. "
         "Base every numerical or geographic claim on the returned database result. Never invent values. "
         "Country queries are supported for every country in the bundled Natural Earth boundary data. "
         "When a user names a country, set region_scope to country and pass its name in country. "
@@ -439,7 +469,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
             input_items.extend(output)
             for call in function_calls:
-                if call.get("name") != "get_fire_data":
+                if call.get("name") == "get_ingestion_status":
+                    try:
+                        result = _query_ingestion_status()
+                    except Exception:
+                        logger.exception("Ignish could not read FIRMS ingestion status")
+                        result = {"error": "FIRMS ingestion status is temporarily unavailable."}
+                elif call.get("name") != "get_fire_data":
                     result: object = {"error": "Unknown read-only data tool."}
                 else:
                     try:

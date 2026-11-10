@@ -89,6 +89,7 @@ export default function GlobalFirePulse() {
 
   const {
     selectedDate,
+    calendarYear,
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
@@ -97,6 +98,8 @@ export default function GlobalFirePulse() {
     minBurnIndex,
     maxBurnIndex,
     setSelectedDate,
+    setDateRange,
+    setSelectedYear,
     setSelectedH3Cell,
     setSelectedCountry,
     setSelectedSensor,
@@ -197,6 +200,15 @@ export default function GlobalFirePulse() {
     error: statsError,
     refetch: refetchStats,
   } = useStats();
+  const allYearsStart = stats?.coverage.start_date;
+  const allYearsEnd = stats?.coverage.end_date;
+  const isAllYearsSelected = Boolean(
+    allYearsStart &&
+      allYearsEnd &&
+      selectedStartDate === allYearsStart &&
+      selectedEndDate === allYearsEnd &&
+      !selectedDate
+  );
 
   const {
     data: calendarData,
@@ -836,6 +848,28 @@ export default function GlobalFirePulse() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <label className="text-[11px] font-medium glass-muted">
+                  Observation Period
+                  <select
+                    value={isAllYearsSelected ? "all" : "year"}
+                    onChange={(event) => {
+                      setSelectedDate(null);
+                      if (event.target.value === "all" && allYearsStart && allYearsEnd) {
+                        setDateRange(allYearsStart, allYearsEnd);
+                      } else {
+                        setSelectedYear(calendarYear);
+                      }
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                  >
+                    <option value="year">Selected year ({calendarYear})</option>
+                    <option value="all" disabled={!allYearsStart || !allYearsEnd}>
+                      All years ({allYearsStart?.slice(0, 4) ?? "…"}–{allYearsEnd?.slice(0, 4) ?? "…"})
+                    </option>
+                  </select>
+                </label>
+
                 <label className="text-[11px] font-medium glass-muted">
                   Observation Date
                   <input

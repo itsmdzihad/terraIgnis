@@ -624,11 +624,309 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "NASA FIRMS ingestion",
+      "item": [
+        {
+          "name": "Combined ingestion status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NRT status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/nrt/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "nrt",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Run NRT poll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ingestion_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/nrt/run",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "nrt",
+                "run"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historical jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/historical/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "historical",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start historical backfill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ingestion_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/historical/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "historical",
+                "start"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_date\": \"2025-01-01\",\n  \"end_date\": \"2025-01-31\",\n  \"area\": \"world\",\n  \"sources\": [\n    \"MODIS_SP\",\n    \"VIIRS_SNPP_SP\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get historical job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/historical/status?job_id={{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "historical",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resume historical job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ingestion_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/historical/{{job_id}}/resume",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "historical",
+                "{{job_id}}",
+                "resume"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel historical job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ingestion_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ingestion/historical/{{job_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingestion",
+                "historical",
+                "{{job_id}}",
+                "cancel"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Data pipeline",
+      "description": "Manual multi-file upload and dataset generation controls used by the frontend pipeline page.",
+      "item": [
+        {
+          "name": "Upload raw files (batch)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pipeline/uploads/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pipeline",
+                "uploads",
+                "batch"
+              ]
+            },
+            "description": "Upload one batch of same-sensor FIRMS text or CSV files. Set sensor to MODIS or VIIRS and attach each file under the repeated files field.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "sensor",
+                  "value": "MODIS",
+                  "type": "text"
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Pipeline status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pipeline/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pipeline",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate datasets",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pipeline/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pipeline",
+                "generate"
+              ]
+            },
+            "description": "Starts the six-stage dataset generation workflow. Poll Pipeline status to follow progress."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
     {
       "key": "base_url",
+      "value": ""
+    },
+    {
+      "key": "ingestion_token",
+      "value": ""
+    },
+    {
+      "key": "job_id",
       "value": ""
     }
   ]
