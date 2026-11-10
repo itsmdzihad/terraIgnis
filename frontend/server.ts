@@ -17,7 +17,9 @@ async function startServer() {
 
 
 
-  const BACKEND_URL = (process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  const BACKEND_URL = (process.env.BACKEND_API_URL || process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000')
+    .replace('localhost', '127.0.0.1')
+    .replace(/\/$/, '');
 
   // Proxy /api and /health requests directly to FastAPI backend
   app.use(['/api', '/health'], async (req, res) => {
