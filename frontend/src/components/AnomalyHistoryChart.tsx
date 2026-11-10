@@ -336,7 +336,7 @@ export default function AnomalyHistoryChart({
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="listbox"
             aria-expanded={menuOpen}
-            className="anomaly-history-window-btn inline-flex items-center gap-1.5 font-bold rounded-md px-1.5 py-0.5 -mx-1 transition-colors"
+            className="anomaly-history-window-btn inline-flex items-center gap-1.5 font-semibold rounded-full px-3 py-0.5 -mx-1 transition-colors"
           >
             <span>{activeWindowLabel}</span>
             <span
@@ -351,7 +351,7 @@ export default function AnomalyHistoryChart({
             <div
               role="listbox"
               aria-label="Anomaly history timeframe"
-              className="anomaly-history-menu absolute left-0 top-full mt-1.5 z-30 min-w-[190px] py-1.5 rounded-xl shadow-lg"
+              className="anomaly-history-menu absolute left-0 top-full mt-1.5 z-30 min-w-[196px] p-1.5 rounded-2xl shadow-lg space-y-0.5"
             >
               {WINDOW_OPTIONS.map((option) => {
                 const isSelected = option.id === selectedWindow;
@@ -366,12 +366,12 @@ export default function AnomalyHistoryChart({
                       setHoveredIndex(null);
                       setMenuOpen(false);
                     }}
-                    className={`anomaly-history-menu-item w-full text-left px-3.5 py-1.5 text-xs flex items-center justify-between transition-colors ${
+                    className={`anomaly-history-menu-item w-full text-left px-3 py-1.5 rounded-full text-xs flex items-center justify-between transition-colors ${
                       isSelected ? 'is-selected font-semibold' : ''
                     }`}
                   >
                     <span>{option.label}</span>
-                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#4b9cf5]" />}
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] dark:bg-[#60a5fa]" />}
                   </button>
                 );
               })}
@@ -396,7 +396,7 @@ export default function AnomalyHistoryChart({
           <button
             type="button"
             onClick={onRetry}
-            className="anomaly-history-retry-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+            className="anomaly-history-retry-btn rounded-full px-4 py-1.5 text-xs font-semibold transition-colors"
           >
             Retry
           </button>
@@ -434,7 +434,7 @@ export default function AnomalyHistoryChart({
                 {/* Inner Top Metric Header */}
                 <div className="h-[68px] px-5 sm:px-6 pt-4 pb-1 flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="anomaly-history-metric text-[30px] sm:text-[34px] leading-none font-light tracking-tight tabular-nums">
+                    <span className="anomaly-history-metric text-[30px] sm:text-[34px] leading-none font-medium tracking-tight tabular-nums">
                       {headlineValue.toFixed(2)}
                     </span>
                     <button
@@ -443,7 +443,7 @@ export default function AnomalyHistoryChart({
                       aria-pressed={showBaseline}
                       title={showBaseline ? 'Hide daily median baseline' : 'Show daily median baseline'}
                       aria-label={showBaseline ? 'Hide daily median baseline' : 'Show daily median baseline'}
-                      className={`anomaly-history-eye-btn p-1 rounded-full transition-colors ${
+                      className={`anomaly-history-eye-btn p-1.5 rounded-full transition-colors ${
                         showBaseline ? 'is-active' : ''
                       }`}
                     >
@@ -458,7 +458,7 @@ export default function AnomalyHistoryChart({
                         <span className="anomaly-history-subbadge inline-flex items-center gap-1.5 text-[11px] font-medium">
                           <span>{formatTooltipDate(activePoint.acq_date)}</span>
                           <span>·</span>
-                          <span style={{ color: activeMeta.dotColor }} className="font-semibold">
+                          <span style={{ color: activeMeta.pillTextVar }} className="font-semibold">
                             {activeMeta.label}
                           </span>
                         </span>
@@ -478,7 +478,7 @@ export default function AnomalyHistoryChart({
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   {/* Clipped SVG Curve + Area Layer */}
-                  <div className="absolute inset-0 rounded-b-[13px] overflow-hidden pointer-events-none">
+                  <div className="absolute inset-0 rounded-b-[18px] overflow-hidden pointer-events-none">
                     <svg
                       viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
                       preserveAspectRatio="none"
@@ -684,7 +684,9 @@ export default function AnomalyHistoryChart({
               ))}
               {showBaseline && (
                 <span className="anomaly-history-legend-item inline-flex items-center gap-1.5">
-                  <span className="w-3 border-t border-dashed border-current inline-block" />
+                  <svg width="14" height="2" viewBox="0 0 14 2" aria-hidden="true">
+                    <line x1="0" y1="1" x2="14" y2="1" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
+                  </svg>
                   <span>Daily median</span>
                 </span>
               )}
