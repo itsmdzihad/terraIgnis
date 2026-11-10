@@ -383,31 +383,31 @@ export default function GlobalFirePulse() {
       {/* MAIN CONTENT STAGE (Left Cards Panel & Right Map with Floating Controls) */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:gap-4 lg:overflow-hidden">
         {/* LEFT COLUMN: CARDS DASHBOARD */}
-        <div className="w-full lg:w-[54%] xl:w-[56%] lg:max-w-[960px] shrink-0 flex flex-col gap-3.5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-0.5">
+        <div className="w-full lg:w-[54%] xl:w-[56%] lg:max-w-[960px] shrink-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-0.5">
           {/* ROW 1: SESSIONS & USERS CARDS (2-Col Grid) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
             {/* CARD 1: ACTIVE DETECTIONS */}
-            <div className="dataplay-card p-4 sm:p-5 flex flex-col justify-between">
+            <div className="dataplay-card p-3.5 sm:p-4 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-base font-semibold glass-title">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm sm:text-[15px] font-semibold glass-title">
                     Active Detections
                   </span>
                   <button
                     type="button"
                     title="More actions"
                     aria-label="More actions"
-                    className="glass-icon-btn p-1.5 rounded-full"
+                    className="glass-icon-btn p-1 rounded-full"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-xs glass-subtle font-medium block">
+                <span className="text-[11px] glass-subtle font-medium block">
                   {selectedDate ? formatDate(selectedDate) : "Current Window"}
                 </span>
 
-                <div className="flex items-center gap-2.5 mt-1.5 mb-3">
-                  <span className="text-2xl sm:text-3xl font-bold tracking-tight glass-heading tabular-nums">
+                <div className="flex items-center gap-2 mt-1 mb-2">
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
                     {formatCount(activeDetectionsHeadline)}
                   </span>
                   {renderDeltaBadge(
@@ -417,7 +417,7 @@ export default function GlobalFirePulse() {
                 </div>
 
                 {/* Live Daily Waveform Bars (Last 22 Observed Days from /api/calendar) */}
-                <div className="flex items-center gap-1 h-7 py-0.5 mb-3.5">
+                <div className="flex items-center gap-[3px] h-5 py-0.5 mb-2.5">
                   {detectionBars.length > 0
                     ? detectionBars.map((bar, idx) => (
                         <div
@@ -436,7 +436,7 @@ export default function GlobalFirePulse() {
                     : Array.from({ length: 22 }, (_, idx) => (
                         <div
                           key={idx}
-                          className="flex-1 rounded-full bg-[#A7A7A7]/35"
+                          className="flex-1 rounded-full bg-slate-400/25"
                           style={{ height: "25%" }}
                         />
                       ))}
@@ -444,20 +444,20 @@ export default function GlobalFirePulse() {
               </div>
 
               {/* Breakdown Rows */}
-              <div className="space-y-1.5 glass-divider-t pt-3">
-                <div className="flex items-center justify-between text-[13px]">
+              <div className="space-y-1 glass-divider-t pt-2.5">
+                <div className="flex items-center justify-between text-xs">
                   <span className="glass-muted">VIIRS Detections</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.viirs_observations)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-[13px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="glass-muted">MODIS Detections</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.modis_observations)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-[13px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="glass-muted">Dual-Sensor Match</span>
                   <span className="font-semibold glass-title tabular-nums">
                     {formatCount(stats?.sensors.both_sensor_cell_dates)}
@@ -467,27 +467,27 @@ export default function GlobalFirePulse() {
             </div>
 
             {/* CARD 2: H3 ACTIVE CELLS */}
-            <div className="dataplay-card p-4 sm:p-5 flex flex-col justify-between">
+            <div className="dataplay-card p-3.5 sm:p-4 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-base font-semibold glass-title">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm sm:text-[15px] font-semibold glass-title">
                     H3 Active Cells
                   </span>
                   <button
                     type="button"
                     title="More actions"
                     aria-label="More actions"
-                    className="glass-icon-btn p-1.5 rounded-full"
+                    className="glass-icon-btn p-1 rounded-full"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-xs glass-subtle font-medium block">
+                <span className="text-[11px] glass-subtle font-medium block">
                   Unique H3 Cells
                 </span>
 
-                <div className="flex items-center gap-2.5 mt-1.5 mb-2.5">
-                  <span className="text-2xl sm:text-3xl font-bold tracking-tight glass-heading tabular-nums">
+                <div className="flex items-center gap-2 mt-1 mb-1.5">
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
                     {formatCount(activeCellsHeadline)}
                   </span>
                   {renderDeltaBadge(
@@ -496,13 +496,13 @@ export default function GlobalFirePulse() {
                   )}
                 </div>
 
-                <span className="text-xs glass-subtle font-medium block mb-2.5">
+                <span className="text-[11px] glass-subtle font-medium block mb-1.5">
                   Observed anomalies per month
                 </span>
               </div>
 
               {/* Monthly Vertical Bar Chart */}
-              <div className="h-20 sm:h-24 flex items-end gap-1.5 sm:gap-2 pt-1">
+              <div className="h-14 sm:h-16 flex items-end gap-1.5 pt-1">
                 {anomaliesLoading ? (
                   <span className="w-full h-full flex items-center justify-center text-xs glass-subtle">
                     Loading anomaly data…
@@ -524,11 +524,11 @@ export default function GlobalFirePulse() {
                           className="w-full rounded-t-sm transition-all duration-300 group-hover:brightness-110"
                           style={{
                             height: `${normalizedHeight}%`,
-                            backgroundColor: "var(--brand-orange)",
+                            backgroundColor: "var(--brand-primary)",
                             opacity: count === 0 ? 0.2 : 1,
                           }}
                         />
-                        <span className="text-[10px] font-medium glass-subtle mt-1.5 uppercase font-sans">
+                        <span className="text-[9px] font-medium glass-subtle mt-1 uppercase font-sans">
                           {monthNames[index][0]}
                         </span>
                         {/* Tooltip on hover */}
@@ -731,7 +731,7 @@ export default function GlobalFirePulse() {
               <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
                 Fire Overview
               </h1>
-              <span className="h-3.5 w-px bg-[#A7A7A7]/45 shrink-0" />
+              <span className="h-3.5 w-px bg-slate-400/35 shrink-0" />
               <span className="text-xs font-medium glass-muted truncate tabular-nums">
                 {selectedCountry
                   ? mapLoading
@@ -765,7 +765,7 @@ export default function GlobalFirePulse() {
                 <SlidersHorizontal size={13} />
                 <span>Filters</span>
                 {activeFiltersCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-[#E85002] text-[#F9F9F9] text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-[#2563eb] text-white text-[10px] font-bold">
                     {activeFiltersCount}
                   </span>
                 )}
@@ -840,7 +840,7 @@ export default function GlobalFirePulse() {
                       setSelectedDate(event.target.value || null);
                       setOffset(0);
                     }}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   />
                 </label>
 
@@ -852,7 +852,7 @@ export default function GlobalFirePulse() {
                       setSelectedCountry(event.target.value || null);
                       setOffset(0);
                     }}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   >
                     <option value="">All countries</option>
                     {countries.map((country) => {
@@ -876,7 +876,7 @@ export default function GlobalFirePulse() {
                       setSelectedSensor((event.target.value || null) as FireSensor | null);
                       setOffset(0);
                     }}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   >
                     <option value="">All sensors (Harmonized)</option>
                     <option value="MODIS">MODIS</option>
@@ -900,7 +900,7 @@ export default function GlobalFirePulse() {
                       setOffset(0);
                     }}
                     placeholder="0"
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   />
                 </label>
 
@@ -919,7 +919,7 @@ export default function GlobalFirePulse() {
                       setOffset(0);
                     }}
                     placeholder="100"
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   />
                 </label>
 
@@ -928,7 +928,7 @@ export default function GlobalFirePulse() {
                   <select
                     value={selectedH3Cell ?? ""}
                     onChange={(event) => setSelectedH3Cell(event.target.value || null)}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                   >
                     <option value="">No cell selected</option>
                     {selectedH3Cell && !h3Cells.includes(selectedH3Cell) && (
@@ -956,7 +956,7 @@ export default function GlobalFirePulse() {
                       value={latitudeInput}
                       onChange={(event) => setLatitudeInput(event.target.value)}
                       placeholder="Lat"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                     />
                     <input
                       aria-label="Longitude"
@@ -967,7 +967,7 @@ export default function GlobalFirePulse() {
                       value={longitudeInput}
                       onChange={(event) => setLongitudeInput(event.target.value)}
                       placeholder="Lon"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
                     />
                     <button
                       type="submit"
@@ -1028,7 +1028,7 @@ export default function GlobalFirePulse() {
 
             {/* Loading / Error States Overlay */}
             {(mapLoading || mapError || (!mapLoading && records.length === 0)) && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/35 backdrop-blur-xs p-4">
                 {mapLoading ? (
                   <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
@@ -1128,7 +1128,7 @@ export default function GlobalFirePulse() {
                   className="h-2 rounded-full w-full mt-2"
                   style={{
                     background:
-                      "linear-gradient(to right, #D9C3AB, #F16001, #E85002, #C10801, #000000)",
+                      "linear-gradient(to right, #c7d2fe, #818cf8, #38bdf8, #2563eb, #1e1b4b)",
                   }}
                 />
                 <div className="flex justify-between text-[10px] glass-subtle mt-1 font-sans tabular-nums">
@@ -1147,7 +1147,7 @@ export default function GlobalFirePulse() {
 
       {/* 4. DATASET SNAPSHOT MODAL (Triggered by "Dataset snapshot") */}
       {isSnapshotOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4">
           <div className="glass-panel-strong rounded-3xl max-w-lg w-full p-6 animate-in fade-in duration-200">
             <div className="flex items-center justify-between pb-3 glass-divider-b mb-4">
               <div className="flex items-center gap-2">

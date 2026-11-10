@@ -26,10 +26,10 @@ function formatBytes(bytes: number): string {
 }
 
 function stageIcon(stageStatus: string) {
-  if (stageStatus === 'succeeded') return <CheckCircle2 size={17} className="text-[#333333] dark:text-[#D9C3AB]" />;
-  if (stageStatus === 'running') return <LoaderCircle size={17} className="animate-spin text-[#E85002]" />;
-  if (stageStatus === 'failed') return <AlertTriangle size={17} className="text-[#C10801] dark:text-[#FF6E59]" />;
-  return <Clock3 size={17} className="text-[#A7A7A7] dark:text-[#646464]" />;
+  if (stageStatus === 'succeeded') return <CheckCircle2 size={17} className="text-emerald-500" />;
+  if (stageStatus === 'running') return <LoaderCircle size={17} className="animate-spin text-blue-600 dark:text-blue-400" />;
+  if (stageStatus === 'failed') return <AlertTriangle size={17} className="text-rose-500" />;
+  return <Clock3 size={17} className="text-slate-400" />;
 }
 
 export default function DataPipeline() {
@@ -118,7 +118,7 @@ export default function DataPipeline() {
       <div className="mx-auto flex max-w-5xl flex-col gap-5 pb-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="pipeline-kicker text-xs font-semibold uppercase tracking-[.16em] text-[#E85002] dark:text-[#F16001]">NASA FIRMS · MODIS + VIIRS</p>
+            <p className="pipeline-kicker text-xs font-semibold uppercase tracking-[.16em] text-blue-600 dark:text-[#60a5fa]">NASA FIRMS · MODIS + VIIRS</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Data pipeline</h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-600">
               Download active-fire text or CSV files from NASA FIRMS, upload them here, then regenerate the datasets used by the dashboard API.
@@ -135,7 +135,7 @@ export default function DataPipeline() {
         </header>
 
         {loadError && (
-          <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#C10801]/25 bg-[#C10801]/10 backdrop-blur-md px-4 py-3 text-sm text-[#C10801] dark:border-[#C10801]/40 dark:bg-[#C10801]/20 dark:text-[#FF6E59]">
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 backdrop-blur-md px-4 py-3 text-sm text-rose-700 dark:border-rose-500/35 dark:bg-rose-500/15 dark:text-rose-300">
             <AlertTriangle size={17} className="mt-0.5 shrink-0" />
             <span>{loadError}</span>
           </div>
@@ -143,7 +143,7 @@ export default function DataPipeline() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E85002]/12 text-[#E85002] dark:bg-[#E85002]/20 dark:text-[#F16001]">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
               <UploadCloud size={20} />
             </div>
             <div>
@@ -174,7 +174,7 @@ export default function DataPipeline() {
             <span className="text-xs text-slate-500">Upload one sensor type per batch; mixed batches are rejected.</span>
           </div>
 
-          <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition hover:border-[#E85002] hover:bg-[#E85002]/6">
+          <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-500/10">
             <UploadCloud size={24} className="text-slate-500" />
             <span className="mt-2 text-sm font-semibold text-slate-800">Choose NASA FIRMS files</span>
             <span className="mt-1 text-xs text-slate-500">TXT or CSV · up to 512 MB per file</span>
@@ -220,7 +220,7 @@ export default function DataPipeline() {
               type="button"
               onClick={() => void handleUpload()}
               disabled={uploading || running}
-              className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-[#E85002] px-4 py-2.5 text-sm font-semibold text-[#F9F9F9] shadow-sm transition hover:bg-[#C10801] disabled:cursor-not-allowed disabled:opacity-45"
+              className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {uploading ? <LoaderCircle size={16} className="animate-spin" /> : <UploadCloud size={16} />}
               {uploading ? `Uploading ${selectedFiles.length} files…` : `Upload ${selectedFiles.length || ''} files together`}
@@ -231,17 +231,17 @@ export default function DataPipeline() {
           </div>
 
           {uploadResult && (
-            <div className="mt-4 rounded-lg bg-[#D9C3AB]/28 px-3 py-2 text-xs text-[#333333] dark:bg-[#D9C3AB]/16 dark:text-[#D9C3AB]" aria-live="polite">
+            <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" aria-live="polite">
               Uploaded batch: {uploadResult.total_files} {uploadResult.sensor} files · {uploadResult.uploaded_files} new · {uploadResult.duplicate_files} already present.
             </div>
           )}
-          {uploadError && <p role="alert" className="mt-4 rounded-lg bg-[#C10801]/10 px-3 py-2 text-xs text-[#C10801] dark:bg-[#C10801]/20 dark:text-[#FF6E59]">{uploadError}</p>}
+          {uploadError && <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{uploadError}</p>}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#333333]/8 text-[#333333] dark:bg-[#D9C3AB]/14 dark:text-[#D9C3AB]">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
                 <Database size={20} />
               </div>
               <div>
@@ -255,7 +255,7 @@ export default function DataPipeline() {
               type="button"
               onClick={() => void handleGenerate()}
               disabled={!canGenerate}
-              className="pipeline-action-button inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#000000] px-4 py-2.5 text-sm font-semibold text-[#F9F9F9] shadow-sm transition hover:bg-[#333333] dark:bg-[#333333] dark:hover:bg-[#E85002] disabled:cursor-not-allowed disabled:opacity-45"
+              className="pipeline-action-button inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {running || starting ? <LoaderCircle size={16} className="animate-spin" /> : status?.status === 'succeeded' ? <RotateCw size={16} /> : <Play size={16} />}
               {running ? 'Generating…' : starting ? 'Starting…' : status?.status === 'succeeded' ? 'Generate again' : 'Generate datasets'}
@@ -280,7 +280,7 @@ export default function DataPipeline() {
                   </p>
                   <p className="mt-1 text-xs text-slate-600">{status.message}</p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${status.status === 'succeeded' ? 'bg-[#333333]/10 text-[#333333] dark:bg-[#D9C3AB]/18 dark:text-[#D9C3AB]' : status.status === 'failed' ? 'bg-[#C10801]/14 text-[#C10801] dark:bg-[#C10801]/24 dark:text-[#FF6E59]' : 'bg-[#E85002]/14 text-[#E85002] dark:bg-[#E85002]/24 dark:text-[#F16001]'}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${status.status === 'succeeded' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' : status.status === 'failed' ? 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300'}`}>
                   {status.status}
                 </span>
               </div>
@@ -298,7 +298,7 @@ export default function DataPipeline() {
               {status.logs.length > 0 && (
                 <details className="mt-4">
                   <summary className="cursor-pointer text-xs font-semibold text-slate-600">Pipeline log</summary>
-                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-[#000000] p-3 text-[11px] leading-relaxed text-[#F9F9F9]">{status.logs.join('\n')}</pre>
+                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-100">{status.logs.join('\n')}</pre>
                 </details>
               )}
             </div>

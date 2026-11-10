@@ -311,7 +311,7 @@ export default function FireActivityTrendsChart({
               title="Switch charted metric"
               className="inline-flex items-center gap-1.5 glass-muted hover:text-[var(--ink-strong)] hover:bg-[var(--glass-track-bg)] transition-colors py-0.5 px-2 rounded-full"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E85002] shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] dark:bg-[#60a5fa] shrink-0" />
               <span className="font-medium">{activeMetricLabel}</span>
             </button>
 
@@ -342,7 +342,7 @@ export default function FireActivityTrendsChart({
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          isSelected ? 'bg-[#E85002]' : 'bg-transparent'
+                          isSelected ? 'bg-[#2563eb] dark:bg-[#60a5fa]' : 'bg-transparent'
                         }`}
                       />
                       <span>{opt.label}</span>
@@ -408,7 +408,7 @@ export default function FireActivityTrendsChart({
       <div className="flex-1 min-h-[145px] flex flex-col">
         {loading && chartPoints.length === 0 ? (
           <div className="flex-1 flex items-center justify-center gap-2 text-xs glass-muted">
-            <span className="w-3.5 h-3.5 rounded-full border-2 border-[#E85002] border-t-transparent animate-spin" />
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-[#2563eb] dark:border-[#60a5fa] border-t-transparent animate-spin" />
             <span>Loading activity trends...</span>
           </div>
         ) : error && chartPoints.length === 0 ? (
@@ -462,21 +462,21 @@ export default function FireActivityTrendsChart({
                     x2="0"
                     y2={PLOT_BOTTOM}
                   >
-                    <stop offset="0%" stopColor="#F16001" stopOpacity="0.26" />
-                    <stop offset="60%" stopColor="#C10801" stopOpacity="0.09" />
-                    <stop offset="100%" stopColor="#D9C3AB" stopOpacity="0" />
+                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.24" />
+                    <stop offset="60%" stopColor="#4f46e5" stopOpacity="0.09" />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
                   </linearGradient>
                 </defs>
 
                 {/* Soft Gradient Area Fill */}
                 {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
 
-                {/* Crisp Branding Orange Trend Line */}
+                {/* Crisp Blue Trend Line */}
                 {linePath && (
                   <path
                     d={linePath}
                     fill="none"
-                    stroke="#E85002"
+                    stroke="#2563eb"
                     strokeWidth="2.25"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -491,7 +491,7 @@ export default function FireActivityTrendsChart({
                     y1={activePoint.y}
                     x2={activePoint.x}
                     y2={PLOT_BOTTOM}
-                    stroke="#E85002"
+                    stroke="#2563eb"
                     strokeWidth="1.25"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -506,7 +506,7 @@ export default function FireActivityTrendsChart({
                     left: `${markerPosition.xPct}%`,
                     top: `${markerPosition.yPct}%`,
                   }}
-                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#E85002] shadow-xs z-10"
+                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#2563eb] shadow-xs z-10"
                 />
               )}
 
@@ -514,7 +514,7 @@ export default function FireActivityTrendsChart({
               {activePoint && markerPosition && (
                 <div
                   style={markerPosition.calloutStyle}
-                  className="pointer-events-none absolute z-20 rounded-2xl px-3.5 py-2 bg-[#F9F9F9]/80 dark:bg-[#191919]/80 border border-[#A7A7A7]/30 dark:border-[#646464]/35 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(0,0,0,0.55)]"
+                  className="pointer-events-none absolute z-20 rounded-2xl px-3.5 py-2 bg-white/85 dark:bg-slate-900/85 border border-slate-200/70 dark:border-slate-700/50 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(15,23,42,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(2,6,18,0.55)]"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base font-semibold leading-none tracking-tight glass-heading tabular-nums">
@@ -523,8 +523,8 @@ export default function FireActivityTrendsChart({
                     <span
                       className={`px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums leading-none ${
                         activeDelta.positive
-                          ? 'bg-[#E85002]/14 text-[#E85002] dark:bg-[#E85002]/24 dark:text-[#F16001]'
-                          : 'bg-[#646464]/14 text-[#646464] dark:bg-[#A7A7A7]/18 dark:text-[#D9C3AB]'
+                          ? 'bg-[#2563eb]/14 text-[#1d4ed8] dark:bg-blue-500/20 dark:text-blue-300'
+                          : 'bg-rose-500/14 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300'
                       }`}
                     >
                       {activeDelta.label}

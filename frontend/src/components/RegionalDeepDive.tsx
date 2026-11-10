@@ -160,8 +160,8 @@ export default function RegionalDeepDive() {
         </div>
         <div className="mt-4 space-y-3">
           {([
-            ['MODIS', regionData.modis_fire_detections, 'bg-[#646464] dark:bg-[#D9C3AB]'],
-            ['VIIRS', regionData.viirs_fire_detections, 'bg-[#E85002]'],
+            ['MODIS', regionData.modis_fire_detections, 'bg-sky-500'],
+            ['VIIRS', regionData.viirs_fire_detections, 'bg-[#2563eb] dark:bg-[#60a5fa]'],
           ] as const).map(([sensor, count, color]) => {
             const total = regionData!.modis_fire_detections + regionData!.viirs_fire_detections;
             const width = total > 0 ? (count / total) * 100 : 0;
@@ -242,7 +242,7 @@ export default function RegionalDeepDive() {
                   id="h3-cell-select"
                   value={selectedH3Cell ?? ''}
                   onChange={(event) => selectCell(event.target.value)}
-                  className="w-full glass-control rounded-xl py-2 px-3 pr-9 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-[#E85002]/40 appearance-none cursor-pointer"
+                  className="w-full glass-control rounded-xl py-2 px-3 pr-9 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 appearance-none cursor-pointer"
                 >
                   <option value="">No H3 cell selected</option>
                   {selectedH3Cell && !mapRecords.some((record) => record.h3_cell === selectedH3Cell) && (
