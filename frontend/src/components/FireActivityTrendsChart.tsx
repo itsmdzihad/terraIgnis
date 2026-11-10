@@ -507,6 +507,7 @@ export default function FireActivityTrendsChart({
                     top: `${markerPosition.yPct}%`,
                   }}
                   className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#2563eb] shadow-xs z-10"
+                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#E85002] shadow-xs z-10"
                 />
               )}
 
@@ -515,6 +516,7 @@ export default function FireActivityTrendsChart({
                 <div
                   style={markerPosition.calloutStyle}
                   className="pointer-events-none absolute z-20 rounded-2xl px-3.5 py-2 bg-white/85 dark:bg-slate-900/85 border border-slate-200/70 dark:border-slate-700/50 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(15,23,42,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(2,6,18,0.55)]"
+                  className="pointer-events-none absolute z-20 rounded-2xl px-3.5 py-2 bg-[#F9F9F9]/80 dark:bg-[#191919]/80 border border-[#A7A7A7]/30 dark:border-[#646464]/35 backdrop-blur-md shadow-[0_4px_14px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_6px_18px_-4px_rgba(0,0,0,0.55)]"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base font-semibold leading-none tracking-tight glass-heading tabular-nums">
