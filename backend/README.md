@@ -152,6 +152,7 @@ The system:
 - Parquet-based analytical storage
 - DuckDB/Polars analytical processing
 - FastAPI data-serving layer
+- Ignish chat assistant grounded in processed fire data
 - Next.js frontend integration
 
 ---
@@ -1916,6 +1917,70 @@ Important semantics:
 - Invalid H3 identifiers or wrong-resolution H3 cells return HTTP 422.
 - A valid H3 cell with no matching observations returns HTTP 404.
 - Reversed date ranges return HTTP 422.
+
+---
+
+## Data Pipeline
+
+### `POST /api/pipeline/uploads/batch`
+
+Accepts one multipart request containing multiple FIRMS `.txt` or `.csv`
+files and a `sensor` field (`MODIS` or `VIIRS`). Every file is checked
+against the selected sensor before the batch is saved. Batches are limited
+to 1 GB total and 512 MB per file; exact duplicate files are skipped.
+
+### `GET /api/pipeline/status`
+
+Returns the raw-file inventory and current generation job status, stage,
+and logs.
+
+### `POST /api/pipeline/generate`
+
+Queues the six README pipeline stages in order and returns a job ID. The
+status endpoint can be polled until the job succeeds or fails. On failure,
+the API restores the previous processed outputs where possible.
+
+---
+
+## Ignish Chat
+
+### `POST /api/chat`
+
+Sends a chat turn to Ignish and returns a grounded assistant reply. The
+request contains a short conversation history:
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "Summarize the fire data in Bangladesh"}
+  ]
+}
+```
+
+The response shape is:
+
+```json
+{
+  "agent": "Ignish",
+  "reply": "..."
+}
+```
+
+Ignish queries the processed Parquet datasets through read-only database
+tools before giving fire-data answers. It supports global and country-specific
+summaries, date filters, sensor breakdowns, Burn Index, anomaly counts, daily
+activity, and H3-cell summaries. Country selection uses bundled Natural Earth
+1:50m boundaries (`backend/app/data/world-countries.geojson` for chat and
+`frontend/public/world-countries.geojson` for the UI).
+Raw fire points are matched by their coordinates; processed H3 analytics use
+the H3 cell center, so results can differ slightly at country borders. The
+Natural Earth boundary data is public domain; see [Natural Earth](https://www.naturalearthdata.com/downloads/50m-cultural-vectors/).
+
+Configure the key in `backend/.env` using `OPEN_API` (supported for the
+existing project key) or `OPENAI_API_KEY`. The model defaults to
+`gpt-6-astra`; `OPENAI_MODEL` can override it. The key stays on the backend
+and is never sent to browser code. User chat messages and the query results
+needed to answer them are sent to the OpenAI API.
 
 ---
 

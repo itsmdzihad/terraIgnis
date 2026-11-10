@@ -5,6 +5,8 @@ import { useCellAnomalyHistory } from '../hooks/useCellAnomalyHistory';
 import { useDashboard } from '../context/DashboardContext';
 import { useFires } from '../hooks/useFires';
 import { useRegion } from '../hooks/useRegion';
+import { useCountries } from '../hooks/useCountries';
+import { useCountryFires } from '../hooks/useCountryFires';
 import type { FireRecord } from '../types/fire';
 import AnomalyHistoryChart from './AnomalyHistoryChart';
 import TerraIgnisMap from './TerraIgnisMap';
@@ -46,18 +48,25 @@ export default function RegionalDeepDive() {
   const {
     selectedDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
     setSelectedH3Cell,
+    setSelectedCountry,
   } = useDashboard();
-  const fires = useFires({
+  const fireFilters = {
     date: selectedDate ?? undefined,
     sensor: selectedSensor ?? undefined,
     min_burn_index: minBurnIndex ?? undefined,
     max_burn_index: maxBurnIndex ?? undefined,
-    limit: 5000,
-  });
+  };
+  const fires = useFires({ ...fireFilters, limit: 5000 });
+  const countryFires = useCountryFires(fireFilters, selectedCountry);
+  const { countries, error: countriesError } = useCountries();
+  const fireLoading = selectedCountry ? countryFires.loading : fires.loading;
+  const fireError = selectedCountry ? countryFires.error : fires.error;
+  const fireRecords = selectedCountry ? countryFires.records : fires.data?.data ?? [];
   const region = useRegion(selectedH3Cell);
   const history = useCellAnomalyHistory(selectedH3Cell);
   const regionData = region.data?.h3_cell === selectedH3Cell ? region.data : null;
@@ -65,11 +74,11 @@ export default function RegionalDeepDive() {
 
   const mapRecords = useMemo(() => {
     const uniqueRecords = new Map<string, FireRecord>();
-    for (const record of fires.data?.data ?? []) {
+    for (const record of fireRecords) {
       if (!uniqueRecords.has(record.h3_cell)) uniqueRecords.set(record.h3_cell, record);
     }
     return [...uniqueRecords.values()];
-  }, [fires.data]);
+  }, [fireRecords]);
 
   const mapFireData = useMemo(() => mapRecords.map((record) => ({
     h3Index: record.h3_cell,
@@ -191,6 +200,28 @@ export default function RegionalDeepDive() {
           <p className="text-xs text-cyan-300 mt-0.5">Inspect observed fire activity by H3 cell</p>
         </div>
         <div className="flex flex-col sm:items-end gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <label htmlFor="cell-country-select" className="text-[11px] font-medium text-slate-500">
+            Country filter
+            <div className="relative min-w-[180px] mt-1">
+              <select
+                id="cell-country-select"
+                value={selectedCountry ?? ''}
+                onChange={(event) => setSelectedCountry(event.target.value || null)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-10 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none cursor-pointer"
+              >
+                <option value="">All countries</option>
+                {countries.map((country) => {
+                  const name = String(country.properties.ADMIN ?? country.properties.NAME_EN ?? country.properties.NAME);
+                  return <option key={`${name}-${country.properties.ADM0_A3 ?? ''}`} value={name}>{name}</option>;
+                })}
+              </select>
+              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+              <span className="block mt-1 text-[10px] text-slate-500">Matches H3 cell centers.</span>
+              {countriesError && <span className="block mt-1 text-[10px] text-red-300">Country list unavailable.</span>}
+            </div>
+          </label>
+          <div>
           <label htmlFor="h3-cell-select" className="text-[11px] font-medium text-slate-500">Choose an observed cell</label>
           <div className="relative min-w-[260px]">
             <select
@@ -205,7 +236,9 @@ export default function RegionalDeepDive() {
             </select>
             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
-          {fires.loading ? <span className="text-[10px] font-medium text-amber-300">Loading fire cells...</span> : fires.error ? <span className="text-[10px] text-red-300">Cell list unavailable · <button onClick={fires.refetch} className="underline">Retry</button></span> : <span className="text-[10px] text-slate-500">{formatCount(mapRecords.length)} loaded H3 cells · click a cell on map</span>}
+          {fireLoading ? <span className="text-[10px] font-medium text-amber-300">Loading fire cells...</span> : fireError ? <span className="text-[10px] text-red-300">Cell list unavailable · <button onClick={selectedCountry ? countryFires.refetch : fires.refetch} className="underline">Retry</button></span> : <span className="text-[10px] text-slate-500">{formatCount(mapRecords.length)} {selectedCountry ? `${selectedCountry} ` : ''}loaded H3 cells · click a cell on map</span>}
+          </div>
+          </div>
         </div>
       </header>
 
@@ -229,7 +262,7 @@ export default function RegionalDeepDive() {
               onH3CellClick={selectCell}
             />
           </div>
-          <p className="text-[10px] text-slate-500">{fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.</p>
+          <p className="text-[10px] text-slate-500">{fireError ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.</p>
         </section>
 
         <section className="xl:col-span-7 overflow-y-auto pr-1 min-h-0">

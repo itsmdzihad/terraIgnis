@@ -21,6 +21,8 @@ import type { FireSensor } from "../types/fire";
 import { useDashboard } from "../context/DashboardContext";
 import { useAnomalies } from "../hooks/useAnomalies";
 import { useStats } from "../hooks/useStats";
+import { useCountries } from "../hooks/useCountries";
+import { useCountryFires } from "../hooks/useCountryFires";
 
 function formatCount(value: number | null | undefined): string {
   if (value == null) return "—";
@@ -58,11 +60,13 @@ export default function GlobalFirePulse() {
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
     setSelectedDate,
     setSelectedH3Cell,
+    setSelectedCountry,
     setSelectedSensor,
     setBurnIndexRange,
     clearFilters,
@@ -82,16 +86,29 @@ export default function GlobalFirePulse() {
     offset,
   });
 
-  const records = data?.data ?? [];
+  const { countries, error: countriesError } = useCountries();
+  const countryQuery = {
+    date: selectedDate || undefined,
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
+    sensor: selectedSensor || undefined,
+    min_burn_index: minBurnIndex ?? undefined,
+    max_burn_index: maxBurnIndex ?? undefined,
+  };
+  const countryFires = useCountryFires(countryQuery, selectedCountry);
+
+  const records = selectedCountry ? countryFires.records : data?.data ?? [];
+  const mapLoading = selectedCountry ? countryFires.loading : loading;
+  const mapError = selectedCountry ? countryFires.error : error;
   const mapFireData = useMemo(
     () =>
-      loading
+      mapLoading
         ? []
         : records.map((record) => ({
             h3Index: record.h3_cell,
             burnIndex: record.burn_index,
           })),
-    [loading, records]
+    [mapLoading, records]
   );
 
   const mapOverview = useMemo(() => {
@@ -192,8 +209,9 @@ export default function GlobalFirePulse() {
     if (minBurnIndex != null) count++;
     if (maxBurnIndex != null) count++;
     if (selectedH3Cell) count++;
+    if (selectedCountry) count++;
     return count;
-  }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell]);
+  }, [selectedDate, selectedSensor, minBurnIndex, maxBurnIndex, selectedH3Cell, selectedCountry]);
 
   const monthlyTrendPath = useMemo(() => {
     const max = Math.max(1, ...monthlyAnomalyCounts);
@@ -319,6 +337,26 @@ export default function GlobalFirePulse() {
             </label>
 
             <label className="text-[11px] font-medium text-slate-500">
+              Country
+              <select
+                value={selectedCountry ?? ""}
+                onChange={(event) => {
+                  setSelectedCountry(event.target.value || null);
+                  setOffset(0);
+                }}
+                className="mt-1 block w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 shadow-xs focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">All countries</option>
+                {countries.map((country) => {
+                  const name = String(country.properties.ADMIN ?? country.properties.NAME_EN ?? country.properties.NAME);
+                  return <option key={`${name}-${country.properties.ADM0_A3 ?? ""}`} value={name}>{name}</option>;
+                })}
+              </select>
+              <span className="block mt-1 text-[10px] text-slate-400">Matches H3 cell centers.</span>
+              {countriesError && <span className="block mt-1 text-[10px] text-rose-500">Country list unavailable.</span>}
+            </label>
+
+            <label className="text-[11px] font-medium text-slate-500">
               Sensor Type
               <select
                 value={selectedSensor ?? ""}
@@ -392,11 +430,13 @@ export default function GlobalFirePulse() {
               </select>
             </label>
 
-            <form onSubmit={handleCoordinateSubmit} className="flex flex-col justify-end">
-              <span className="text-[11px] font-medium text-slate-500 block mb-1">
-                Lat / Lon Jump
-              </span>
-              <div className="flex gap-1.5">
+          </div>
+
+          <div className="flex justify-end mt-3">
+            <form onSubmit={handleCoordinateSubmit} className="flex flex-wrap items-end gap-2.5">
+              <span className="text-[11px] font-medium text-slate-500 pb-2">Lat / Lon Jump</span>
+              <label className="text-[10px] font-medium text-slate-500">
+                Latitude
                 <input
                   aria-label="Latitude"
                   type="number"
@@ -406,8 +446,11 @@ export default function GlobalFirePulse() {
                   value={latitudeInput}
                   onChange={(event) => setLatitudeInput(event.target.value)}
                   placeholder="Lat"
-                  className="w-1/2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
+                  className="mt-1 block w-36 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
                 />
+              </label>
+              <label className="text-[10px] font-medium text-slate-500">
+                Longitude
                 <input
                   aria-label="Longitude"
                   type="number"
@@ -417,43 +460,49 @@ export default function GlobalFirePulse() {
                   value={longitudeInput}
                   onChange={(event) => setLongitudeInput(event.target.value)}
                   placeholder="Lon"
-                  className="w-1/2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
+                  className="mt-1 block w-36 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
                 />
-                <button
-                  type="submit"
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
-                >
-                  Go
-                </button>
-              </div>
+              </label>
+              <button
+                type="submit"
+                className="h-[34px] px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
+              >
+                Go
+              </button>
               {coordinateError && (
-                <span className="text-[10px] text-rose-500 mt-1">{coordinateError}</span>
+                <span className="basis-full text-right text-[10px] text-rose-500">{coordinateError}</span>
               )}
             </form>
           </div>
 
           <div className="flex items-center justify-between border-t border-slate-100 mt-3 pt-2.5">
             <span className="text-xs text-slate-500">
-              Showing page {Math.floor(offset / pageSize) + 1} ({records.length} records)
+              {selectedCountry
+                ? mapLoading
+                  ? `Loading ${selectedCountry} observations…`
+                  : `${selectedCountry}: ${formatCount(records.length)} cell-date records`
+                : `Showing page ${Math.floor(offset / pageSize) + 1} (${data?.count ?? 0} records)`}
             </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={offset === 0 || loading}
-                onClick={() => setOffset(Math.max(0, offset - pageSize))}
-                className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={!data?.has_more || loading}
-                onClick={() => setOffset(offset + pageSize)}
-                className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-              >
-                Next
-              </button>
-            </div>
+            {!selectedCountry && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={offset === 0 || loading}
+                  onClick={() => setOffset(Math.max(0, offset - pageSize))}
+                  className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!data?.has_more || loading}
+                  onClick={() => setOffset(offset + pageSize)}
+                  className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -779,7 +828,11 @@ export default function GlobalFirePulse() {
           {/* Top Left Floating Pill: Record Count Summary */}
           <div className="absolute top-4 left-4 z-10 bg-white/95 border border-slate-200/90 rounded-xl px-3.5 py-2 shadow-md backdrop-blur-md max-w-sm pointer-events-none">
             <span className="text-xs font-semibold text-slate-800 block">
-              {data?.total == null
+              {selectedCountry
+                ? mapLoading
+                  ? `Loading ${selectedCountry} fire cells`
+                  : `${selectedCountry} · ${formatCount(records.length)} cell-date records`
+                : data?.total == null
                 ? "Detections by H3 cell"
                 : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
             </span>
@@ -798,22 +851,22 @@ export default function GlobalFirePulse() {
             />
 
             {/* Loading / Error States Overlay */}
-            {(loading || error || (!loading && data?.count === 0)) && (
+            {(mapLoading || mapError || (!mapLoading && (selectedCountry ? records.length === 0 : data?.count === 0))) && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-xs p-4">
-                {loading ? (
+                {mapLoading ? (
                   <div className="bg-white border border-slate-200 shadow-xl px-5 py-4 rounded-xl text-center">
                     <span className="block text-xs font-semibold text-slate-700">
                       Loading detections...
                     </span>
                   </div>
-                ) : error ? (
+                ) : mapError ? (
                   <div className="max-w-sm bg-white border border-rose-200 shadow-xl px-5 py-4 rounded-xl text-center">
                     <span className="block text-xs font-semibold text-rose-600">
                       Unable to load fire detections.
                     </span>
                     <button
                       type="button"
-                      onClick={refetch}
+                      onClick={selectedCountry ? countryFires.refetch : refetch}
                       className="mt-3 px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
                     >
                       Retry
@@ -825,7 +878,9 @@ export default function GlobalFirePulse() {
                       No matching records
                     </span>
                     <span className="block mt-1 text-xs text-slate-500">
-                      No detections match the selected parameters.
+                      {selectedCountry
+                        ? `No detections for ${selectedCountry} match the selected filters.`
+                        : "No detections match the selected parameters."}
                     </span>
                   </div>
                 )}
