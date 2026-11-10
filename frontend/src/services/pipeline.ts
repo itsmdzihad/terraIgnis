@@ -12,6 +12,14 @@ export interface RawUploadResult {
   sensor: 'MODIS' | 'VIIRS';
   bytes: number;
   duplicate: boolean;
+}
+
+export interface BatchUploadResult {
+  sensor: 'MODIS' | 'VIIRS';
+  total_files: number;
+  uploaded_files: number;
+  duplicate_files: number;
+  files: RawUploadResult[];
   raw_files: RawFileInventory;
 }
 
@@ -50,17 +58,18 @@ async function readResponse<T>(response: Response): Promise<T> {
   return await response.json() as T;
 }
 
-export async function uploadRawFile(file: File, signal?: AbortSignal): Promise<RawUploadResult> {
-  const response = await fetch(buildApiUrl('/api/pipeline/uploads'), {
+export async function uploadRawFiles(files: File[], sensor: 'MODIS' | 'VIIRS', signal?: AbortSignal): Promise<BatchUploadResult> {
+  const formData = new FormData();
+  formData.set('sensor', sensor);
+  for (const file of files) formData.append('files', file, file.name);
+
+  const response = await fetch(buildApiUrl('/api/pipeline/uploads/batch'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/octet-stream',
-      'X-Filename': encodeURIComponent(file.name),
-    },
-    body: file,
+    headers: { Accept: 'application/json' },
+    body: formData,
     signal,
   });
-  return readResponse<RawUploadResult>(response);
+  return readResponse<BatchUploadResult>(response);
 }
 
 export async function fetchPipelineStatus(signal?: AbortSignal): Promise<PipelineStatus> {

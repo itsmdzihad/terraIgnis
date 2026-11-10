@@ -910,5 +910,12 @@ main { min-height: 0; }
   --ah-divider: rgba(203, 213, 225, .12);
   --ah-legend: #a0aec3;
 }
+.app-shell[data-theme="dark"] .pipeline-view [class~="text-slate-600"] { color: #c0b9ad !important; }
+.app-shell[data-theme="dark"] .pipeline-view [class~="text-slate-500"] { color: #a59e92 !important; }
+.app-shell[data-theme="dark"] .pipeline-view [class~="text-slate-400"] { color: #938d82 !important; }
+.app-shell[data-theme="dark"] .pipeline-view [class~="text-slate-700"] { color: #e6dfd3 !important; }
+.app-shell[data-theme="dark"] .pipeline-view [class~="text-orange-400"] { color: #f3a06c !important; }
+.app-shell .pipeline-view .pipeline-action-button,
+.app-shell[data-theme="dark"] .pipeline-view .pipeline-action-button { color: #fffefa !important; }
 .app-shell[data-theme="dark"] :focus-visible { outline-color: #8b83ff; }
 

@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
+from starlette.datastructures import UploadFile
 
 from app.services.fire_ingestion import MODIS_REQUIRED, VIIRS_REQUIRED
 
@@ -28,6 +29,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 RAW_ROOT = BACKEND_ROOT / "data" / "raw"
 UPLOAD_STAGING = BACKEND_ROOT / "data" / ".incoming"
 MAX_FILE_BYTES = 512 * 1024 * 1024
+MAX_BATCH_BYTES = 1024 * 1024 * 1024
 
 PIPELINE_STAGES = (
     ("Ingest and standardize FIRMS files", "scripts/ingest.py"),
@@ -263,6 +265,124 @@ async def upload_raw_file(
         }
     finally:
         temporary_path.unlink(missing_ok=True)
+        with _LOCK:
+            _ACTIVE_UPLOADS -= 1
+
+
+@router.post("/uploads/batch", status_code=status.HTTP_201_CREATED)
+async def upload_raw_files(request: Request) -> dict[str, object]:
+    """Validate and save multiple FIRMS files in one request for one sensor."""
+    global _ACTIVE_UPLOADS
+    with _LOCK:
+        if _is_pipeline_running():
+            raise HTTPException(status_code=409, detail="Wait for the current pipeline run to finish before uploading.")
+        _ACTIVE_UPLOADS += 1
+
+    temporary_paths: list[Path] = []
+    promoted_paths: list[Path] = []
+    uploads: list[UploadFile] = []
+    form = None
+    try:
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit() and int(content_length) > MAX_BATCH_BYTES + 1024 * 1024:
+            raise HTTPException(status_code=413, detail="The total batch must be 1 GB or smaller.")
+
+        UPLOAD_STAGING.mkdir(parents=True, exist_ok=True)
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Send files as multipart form data.") from exc
+
+        selected_sensor = str(form.get("sensor", "")).strip().upper()
+        if selected_sensor not in {"MODIS", "VIIRS"}:
+            raise HTTPException(status_code=422, detail="Choose MODIS or VIIRS as the data source.")
+
+        form_files = form.getlist("files")
+        if not form_files or any(not isinstance(item, UploadFile) for item in form_files):
+            raise HTTPException(status_code=422, detail="Select one or more FIRMS .txt or .csv files.")
+        uploads = form_files
+
+        prepared: list[dict[str, object]] = []
+        batch_size = 0
+        for upload in uploads:
+            filename = (upload.filename or "").strip()
+            basename = filename.replace("\\", "/").split("/")[-1]
+            if not basename or Path(basename).suffix.lower() not in {".txt", ".csv"}:
+                raise HTTPException(status_code=422, detail=f"{filename or 'A selected file'} is not a .txt or .csv file.")
+
+            temporary_path = UPLOAD_STAGING / f"{uuid.uuid4().hex}.upload"
+            temporary_paths.append(temporary_path)
+            digest = hashlib.sha256()
+            size = 0
+            with temporary_path.open("wb") as destination:
+                while chunk := await upload.read(1024 * 1024):
+                    size += len(chunk)
+                    batch_size += len(chunk)
+                    if size > MAX_FILE_BYTES:
+                        raise HTTPException(status_code=413, detail=f"{basename} exceeds the 512 MB per-file limit.")
+                    if batch_size > MAX_BATCH_BYTES:
+                        raise HTTPException(status_code=413, detail="The total batch must be 1 GB or smaller.")
+                    digest.update(chunk)
+                    destination.write(chunk)
+            if size == 0:
+                raise HTTPException(status_code=422, detail=f"{basename} is empty.")
+
+            detected_sensor = _detect_sensor(temporary_path)
+            if detected_sensor != selected_sensor:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{basename} contains {detected_sensor} data, but {selected_sensor} was selected. No files were saved.",
+                )
+
+            file_hash = digest.hexdigest()
+            target = RAW_ROOT / selected_sensor.lower() / f"{_safe_file_stem(basename)}-{file_hash[:12]}.txt"
+            prepared.append({
+                "filename": basename,
+                "stored_filename": target.name,
+                "sensor": selected_sensor,
+                "bytes": size,
+                "duplicate": False,
+                "temporary_path": temporary_path,
+                "target": target,
+            })
+
+        with _LOCK:
+            if _is_pipeline_running():
+                raise HTTPException(status_code=409, detail="A data-generation job started while the files were uploading.")
+            for item in prepared:
+                target = item["target"]
+                temporary_path = item["temporary_path"]
+                assert isinstance(target, Path) and isinstance(temporary_path, Path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.is_file():
+                    item["duplicate"] = True
+                else:
+                    temporary_path.replace(target)
+                    promoted_paths.append(target)
+
+        result_files = [
+            {key: value for key, value in item.items() if key not in {"temporary_path", "target"}}
+            for item in prepared
+        ]
+        return {
+            "sensor": selected_sensor,
+            "total_files": len(result_files),
+            "uploaded_files": sum(not item["duplicate"] for item in result_files),
+            "duplicate_files": sum(item["duplicate"] for item in result_files),
+            "files": result_files,
+            "raw_files": _raw_file_counts(),
+        }
+    except Exception:
+        if promoted_paths:
+            with _LOCK:
+                for path in promoted_paths:
+                    path.unlink(missing_ok=True)
+        raise
+    finally:
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
+        if form is not None:
+            await form.close()
         with _LOCK:
             _ACTIVE_UPLOADS -= 1
 

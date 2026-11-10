@@ -14,9 +14,9 @@ import {
 import {
   fetchPipelineStatus,
   startPipeline,
-  uploadRawFile,
+  uploadRawFiles,
+  type BatchUploadResult,
   type PipelineStatus,
-  type RawUploadResult,
 } from '../services/pipeline';
 
 function formatBytes(bytes: number): string {
@@ -35,10 +35,10 @@ function stageIcon(stageStatus: string) {
 export default function DataPipeline() {
   const [status, setStatus] = useState<PipelineStatus | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploads, setUploads] = useState<RawUploadResult[]>([]);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [selectedSensor, setSelectedSensor] = useState<'MODIS' | 'VIIRS' | ''>('');
+  const [uploadResult, setUploadResult] = useState<BatchUploadResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [starting, setStarting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -73,28 +73,29 @@ export default function DataPipeline() {
   );
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0) return;
-    setUploading(true);
-    setUploadProgress(0);
-    setUploads([]);
-    setUploadErrors([]);
-
-    const successfulUploads: RawUploadResult[] = [];
-    const failures: string[] = [];
-    for (const [index, file] of selectedFiles.entries()) {
-      try {
-        successfulUploads.push(await uploadRawFile(file));
-      } catch (error) {
-        failures.push(`${file.name}: ${error instanceof Error ? error.message : 'Upload failed.'}`);
-      }
-      setUploadProgress(index + 1);
+    if (!selectedSensor) {
+      setUploadError('Select MODIS or VIIRS as the data source before uploading.');
+      setUploadResult(null);
+      return;
     }
-
-    setUploads(successfulUploads);
-    setUploadErrors(failures);
-    setSelectedFiles([]);
-    setUploading(false);
-    await refreshStatus();
+    if (selectedFiles.length === 0) {
+      setUploadError('Choose at least one FIRMS file to upload.');
+      setUploadResult(null);
+      return;
+    }
+    setUploading(true);
+    setUploadResult(null);
+    setUploadError(null);
+    try {
+      const result = await uploadRawFiles(selectedFiles, selectedSensor);
+      setUploadResult(result);
+      setSelectedFiles([]);
+      await refreshStatus();
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Batch upload failed. No files were saved.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -117,7 +118,7 @@ export default function DataPipeline() {
       <div className="mx-auto flex max-w-5xl flex-col gap-5 pb-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.16em] text-indigo-600">NASA FIRMS · MODIS + VIIRS</p>
+            <p className="text-xs font-semibold uppercase tracking-[.16em] text-orange-400">NASA FIRMS · MODIS + VIIRS</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Data pipeline</h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-600">
               Download active-fire text or CSV files from NASA FIRMS, upload them here, then regenerate the datasets used by the dashboard API.
@@ -148,12 +149,32 @@ export default function DataPipeline() {
             <div>
               <h2 className="text-base font-semibold text-slate-900">1. Upload raw FIRMS files</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Select any number of MODIS and VIIRS <code className="rounded bg-slate-100 px-1">.txt</code> or <code className="rounded bg-slate-100 px-1">.csv</code> downloads. Sensor type is detected from each file’s NASA header.
+                Choose the source, select all files for that sensor, then send them together in one upload.
               </p>
             </div>
           </div>
 
-          <label className="mt-5 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <label htmlFor="pipeline-sensor" className="text-sm font-semibold text-slate-700">Data source</label>
+            <select
+              id="pipeline-sensor"
+              value={selectedSensor}
+              onChange={(event) => {
+                setSelectedSensor(event.currentTarget.value as 'MODIS' | 'VIIRS' | '');
+                setUploadError(null);
+              }}
+              disabled={uploading || running}
+              aria-invalid={!selectedSensor && Boolean(uploadError)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+            >
+              <option value="" disabled>Select sensor</option>
+              <option value="MODIS">MODIS</option>
+              <option value="VIIRS">VIIRS</option>
+            </select>
+            <span className="text-xs text-slate-500">Upload one sensor type per batch; mixed batches are rejected.</span>
+          </div>
+
+          <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
             <UploadCloud size={24} className="text-slate-500" />
             <span className="mt-2 text-sm font-semibold text-slate-800">Choose NASA FIRMS files</span>
             <span className="mt-1 text-xs text-slate-500">TXT or CSV · up to 512 MB per file</span>
@@ -163,24 +184,34 @@ export default function DataPipeline() {
               accept=".txt,.csv,text/plain,text/csv"
               className="sr-only"
               disabled={uploading || running}
-              onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
+              onChange={(event) => {
+                setSelectedFiles(Array.from(event.currentTarget.files ?? []));
+                setUploadError(null);
+                event.currentTarget.value = '';
+              }}
             />
           </label>
 
           {selectedFiles.length > 0 && (
             <div className="mt-4 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
-                <span>{selectedFiles.length} file{selectedFiles.length === 1 ? '' : 's'} selected</span>
+                <span>
+                  {selectedFiles.length} {selectedSensor} file{selectedFiles.length === 1 ? '' : 's'} ·{' '}
+                  {formatBytes(selectedFiles.reduce((sum, file) => sum + file.size, 0))} total
+                </span>
                 <button type="button" onClick={() => setSelectedFiles([])} className="text-slate-500 hover:text-slate-900" disabled={uploading}>Clear</button>
               </div>
-              <ul className="max-h-40 divide-y divide-slate-100 overflow-y-auto px-3">
-                {selectedFiles.map((file) => (
-                  <li key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between gap-3 py-2 text-xs">
-                    <span className="flex min-w-0 items-center gap-2 text-slate-700"><FileText size={14} className="shrink-0 text-slate-400" /><span className="truncate">{file.name}</span></span>
-                    <span className="shrink-0 tabular-nums text-slate-500">{formatBytes(file.size)}</span>
-                  </li>
-                ))}
-              </ul>
+              <details className="px-3 py-2">
+                <summary className="cursor-pointer text-xs text-slate-500">Review selected files</summary>
+                <ul className="mt-2 max-h-40 divide-y divide-slate-100 overflow-y-auto">
+                  {selectedFiles.map((file) => (
+                    <li key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between gap-3 py-2 text-xs">
+                      <span className="flex min-w-0 items-center gap-2 text-slate-700"><FileText size={14} className="shrink-0 text-slate-400" /><span className="truncate">{file.name}</span></span>
+                      <span className="shrink-0 tabular-nums text-slate-500">{formatBytes(file.size)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
 
@@ -188,30 +219,23 @@ export default function DataPipeline() {
             <button
               type="button"
               onClick={() => void handleUpload()}
-              disabled={selectedFiles.length === 0 || uploading || running}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={uploading || running}
+              className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {uploading ? <LoaderCircle size={16} className="animate-spin" /> : <UploadCloud size={16} />}
-              {uploading ? `Uploading ${uploadProgress}/${selectedFiles.length}…` : 'Upload selected files'}
+              {uploading ? `Uploading ${selectedFiles.length} files…` : `Upload ${selectedFiles.length || ''} files together`}
             </button>
             <span className="text-xs text-slate-500">
               Existing raw files are kept. Identical re-uploads are skipped.
             </span>
           </div>
 
-          {(uploads.length > 0 || uploadErrors.length > 0) && (
-            <div className="mt-4 space-y-2" aria-live="polite">
-              {uploads.map((upload) => (
-                <div key={upload.stored_filename} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  <span>{upload.duplicate ? 'Already present' : 'Saved'} · {upload.filename} · {upload.sensor}</span>
-                  <span className="tabular-nums">{formatBytes(upload.bytes)}</span>
-                </div>
-              ))}
-              {uploadErrors.map((error) => (
-                <p key={error} className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
-              ))}
+          {uploadResult && (
+            <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800" aria-live="polite">
+              Uploaded batch: {uploadResult.total_files} {uploadResult.sensor} files · {uploadResult.uploaded_files} new · {uploadResult.duplicate_files} already present.
             </div>
           )}
+          {uploadError && <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{uploadError}</p>}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -231,7 +255,7 @@ export default function DataPipeline() {
               type="button"
               onClick={() => void handleGenerate()}
               disabled={!canGenerate}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+              className="pipeline-action-button inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {running || starting ? <LoaderCircle size={16} className="animate-spin" /> : status?.status === 'succeeded' ? <RotateCw size={16} /> : <Play size={16} />}
               {running ? 'Generating…' : starting ? 'Starting…' : status?.status === 'succeeded' ? 'Generate again' : 'Generate datasets'}
