@@ -343,7 +343,7 @@ scripts/profile_fires.py
 ### Output
 
 ```text
-data/processed/fire_profile.json
+data/reports/fire_profile.json
 ```
 
 The profiling stage examines:
@@ -1206,7 +1206,7 @@ data/processed/standardized_fires.parquet
 Output:
 
 ```text
-data/processed/fire_profile.json
+data/reports/fire_profile.json
 ```
 
 ---

@@ -1,4 +1,4 @@
-# Project Rules & Constraints
+<!-- # Project Rules & Constraints
 
 You must strictly adhere to the following rules when working on this project:
 
@@ -12,4 +12,4 @@ You must strictly adhere to the following rules when working on this project:
 
 3. **Do not change the map visual and its functionality**
    - Do not modify the map component (`frontend/src/components/TerraIgnisMap.tsx`), its styling, visual representation, layers, tile layers, heatmaps, markers, projections, or controls.
-   - Keep all map interactions, zoom/pan behavior, events, click handlers, filters, and existing functionality intact without changes.
+   - Keep all map interactions, zoom/pan behavior, events, click handlers, filters, and existing functionality intact without changes. -->
