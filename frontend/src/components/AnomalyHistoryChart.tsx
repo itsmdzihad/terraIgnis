@@ -14,32 +14,32 @@ const WINDOW_OPTIONS: { id: TimeWindow; label: string; days: number | null }[] =
 const LEVEL_META: Record<AnomalyLevel, { label: string; dotColor: string; pillBg: string; pillTextVar: string }> = {
   extreme_low: {
     label: 'Extreme low',
-    dotColor: '#A7A7A7',
-    pillBg: 'rgba(167, 167, 167, 0.20)',
+    dotColor: '#0284c7',
+    pillBg: 'rgba(2, 132, 199, 0.14)',
     pillTextVar: 'var(--ah-lvl-extreme-low)',
   },
   low: {
     label: 'Low',
-    dotColor: '#646464',
-    pillBg: 'rgba(100, 100, 100, 0.16)',
+    dotColor: '#06b6d4',
+    pillBg: 'rgba(6, 182, 212, 0.15)',
     pillTextVar: 'var(--ah-lvl-low)',
   },
   normal: {
     label: 'Normal',
     dotColor: 'var(--ah-dot-normal)',
-    pillBg: 'rgba(217, 195, 171, 0.24)',
+    pillBg: 'rgba(59, 130, 246, 0.14)',
     pillTextVar: 'var(--ah-lvl-normal)',
   },
   high: {
     label: 'High',
-    dotColor: '#E85002',
-    pillBg: 'rgba(232, 80, 2, 0.16)',
+    dotColor: '#f97316',
+    pillBg: 'rgba(249, 115, 22, 0.15)',
     pillTextVar: 'var(--ah-lvl-high)',
   },
   extreme_high: {
     label: 'Extreme high',
-    dotColor: '#C10801',
-    pillBg: 'rgba(193, 8, 1, 0.16)',
+    dotColor: '#ef4444',
+    pillBg: 'rgba(239, 68, 68, 0.15)',
     pillTextVar: 'var(--ah-lvl-extreme-high)',
   },
 };
@@ -371,7 +371,7 @@ export default function AnomalyHistoryChart({
                     }`}
                   >
                     <span>{option.label}</span>
-                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#E85002]" />}
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] dark:bg-[#60a5fa]" />}
                   </button>
                 );
               })}
