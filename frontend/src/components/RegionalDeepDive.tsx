@@ -213,19 +213,40 @@ export default function RegionalDeepDive() {
               )}
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="cell-country-select" className="text-[11px] font-medium glass-muted">
+                  Country
+                </label>
+                <select
+                  id="cell-country-select"
+                  value={selectedCountry ?? ''}
+                  onChange={(event) => setSelectedCountry(event.target.value || null)}
+                  className="mt-1 w-full glass-control rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
+                >
+                  <option value="">All countries</option>
+                  {countries.map((country) => {
+                    const name = String(country.properties.ADMIN ?? country.properties.NAME_EN ?? country.properties.NAME);
+                    return <option key={`${name}-${country.properties.ADM0_A3 ?? ''}`} value={name}>{name}</option>;
+                  })}
+                </select>
+                <span className="block mt-1 text-[10px] glass-subtle">Matches H3 cell centers.</span>
+                {countriesError && <span className="block mt-1 text-[10px] tone-rose">Country list unavailable.</span>}
+              </div>
+
+              <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor="h3-cell-select" className="text-[11px] font-medium glass-muted">
                   Choose an observed cell
                 </label>
-                {fires.loading ? (
+                {fireLoading ? (
                   <span className="text-[10px] font-medium tone-amber">Loading fire cells...</span>
-                ) : fires.error ? (
+                ) : fireError ? (
                   <span className="text-[10px] tone-rose">
                     Cell list unavailable ·{' '}
                     <button
                       type="button"
-                      onClick={fires.refetch}
+                      onClick={selectedCountry ? countryFires.refetch : fires.refetch}
                       className="glass-btn px-2 py-0.5 rounded-full text-[10px] font-semibold"
                     >
                       Retry
@@ -233,7 +254,7 @@ export default function RegionalDeepDive() {
                   </span>
                 ) : (
                   <span className="text-[10px] glass-muted">
-                    {formatCount(mapRecords.length)} loaded H3 cells · click map
+                    {formatCount(mapRecords.length)} {selectedCountry ? `${selectedCountry} ` : ''}loaded H3 cells · click map
                   </span>
                 )}
               </div>
@@ -256,6 +277,7 @@ export default function RegionalDeepDive() {
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 glass-muted pointer-events-none" />
               </div>
+              </div>
             </div>
           </div>
 
@@ -271,7 +293,7 @@ export default function RegionalDeepDive() {
             />
           </div>
           <p className="text-[10px] glass-muted shrink-0">
-            {fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.
+            {fireError ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.
           </p>
         </section>
 
