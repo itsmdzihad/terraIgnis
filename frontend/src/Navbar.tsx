@@ -1,4 +1,4 @@
-import { CalendarDays, Globe2, MapPinned, Moon, Sun } from 'lucide-react';
+import { CalendarDays, Database, Globe2, MapPinned, Moon, Sun } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link, NavLink } from 'react-router-dom';
 import TerraIgnisLogo from './components/TerraIgnisLogo';
@@ -12,6 +12,7 @@ const navItems = [
   { id: 'global', label: 'Fire overview', path: '/', icon: Globe2 },
   { id: 'regional', label: 'Cell explorer', path: '/cells', icon: MapPinned },
   { id: 'calendar', label: 'Daily activity', path: '/activity', icon: CalendarDays },
+  { id: 'pipeline', label: 'Data pipeline', path: '/pipeline', icon: Database },
 ];
 
 export default function Navbar({ theme, onThemeToggle }: NavbarProps) {

@@ -25,7 +25,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="TerraIgnis API",
-    description="Read-only API for processed TerraIgnis wildfire analytics.",
+    description="TerraIgnis wildfire analytics and controlled NASA FIRMS data pipeline.",
     version="0.1.0",
     docs_url=None if settings.app_env == "production" else "/docs",
     redoc_url=None if settings.app_env == "production" else "/redoc",
@@ -36,8 +36,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Filename"],
 )
 app.include_router(api_router, prefix="/api")
 

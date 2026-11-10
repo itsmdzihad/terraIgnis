@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, MotionConfig } from 'motion/react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Navbar from './Navbar';
+import DataPipeline from './components/DataPipeline';
 import GlobalFirePulse from './components/GlobalFirePulse';
 import RegionalDeepDive from './components/RegionalDeepDive';
 import FireActivityCalendar from './components/FireActivityCalendar';
 import { DashboardProvider } from './context/DashboardContext';
 
-type TabId = 'global' | 'regional' | 'calendar';
-const TABS: readonly TabId[] = ['global', 'regional', 'calendar'];
+type TabId = 'global' | 'regional' | 'calendar' | 'pipeline';
+const TABS: readonly TabId[] = ['global', 'regional', 'calendar', 'pipeline'];
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/" element={<DashboardView activeTab="global" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/cells" element={<DashboardView activeTab="regional" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/activity" element={<DashboardView activeTab="calendar" theme={theme} onThemeToggle={toggleTheme} />} />
+          <Route path="/pipeline" element={<DashboardView activeTab="pipeline" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </DashboardProvider>
@@ -117,6 +119,7 @@ function DashboardView({
               {tabId === 'global' && <GlobalFirePulse />}
               {tabId === 'regional' && <RegionalDeepDive />}
               {tabId === 'calendar' && <FireActivityCalendar />}
+              {tabId === 'pipeline' && <DataPipeline />}
             </motion.div>
           );
         })}
