@@ -102,7 +102,7 @@ class FiresApiTests(unittest.TestCase):
         self.assertEqual(second["count"], 3)
         self.assertEqual(first["total"], second["total"])
         self.assertNotEqual(first["data"][0]["h3_cell"], second["data"][0]["h3_cell"])
-        self.assertEqual(self.request("/api/fires?limit=5001").status_code, 422)
+        self.assertEqual(self.request("/api/fires?limit=50001").status_code, 422)
         self.assertEqual(self.request("/api/fires?offset=-1").status_code, 422)
 
     def test_response_matches_pydantic_schema_and_selects_expected_fields(self) -> None:

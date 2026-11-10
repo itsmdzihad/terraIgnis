@@ -45,8 +45,14 @@ Thumbs.db
 # ==============================
 data/reports/*
 data/raw/*
+data/processed
 data/processed/*
 data/parquet/*
+data/state/
+data/.generations/
+data/.incoming/
+data/.staging/
+data/.processed-*.link
 
 # Keep directory structure
 !data/raw/.gitkeep

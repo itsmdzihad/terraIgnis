@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -21,8 +22,9 @@ from app.services.burn_index import (
 )
 
 logger = logging.getLogger(__name__)
-INPUT_PATH = BACKEND_ROOT / "data" / "processed" / "harmonized_fire.parquet"
-OUTPUT_PATH = BACKEND_ROOT / "data" / "processed" / "burn_index.parquet"
+DATA_ROOT = Path(os.environ.get("TERRAIGNIS_DATA_ROOT", BACKEND_ROOT / "data")).expanduser().resolve()
+INPUT_PATH = DATA_ROOT / "processed" / "harmonized_fire.parquet"
+OUTPUT_PATH = DATA_ROOT / "processed" / "burn_index.parquet"
 
 
 def build_burn_index(

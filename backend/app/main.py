@@ -13,14 +13,20 @@ from fastapi.responses import JSONResponse
 from app.api import api_router
 from app.core.config import settings
 from app.core.database import DataAccessError, DatasetUnavailableError
+from app.services.firms_ingestion import firms_ingestion
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Keep startup lightweight; data files are checked when queried."""
-    yield
+    """Start opt-in FIRMS polling and resume persisted historical jobs."""
+    firms_ingestion.recover_interrupted_jobs()
+    firms_ingestion.start_scheduler()
+    try:
+        yield
+    finally:
+        firms_ingestion.stop_scheduler()
 
 
 app = FastAPI(

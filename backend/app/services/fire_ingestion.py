@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -77,15 +78,18 @@ class IngestionResult:
 
 def _default_data_root() -> Path:
     """Return the backend data directory, independent of the caller's cwd."""
+    configured_root = os.environ.get("TERRAIGNIS_DATA_ROOT")
+    if configured_root:
+        return Path(configured_root).expanduser().resolve()
     return Path(__file__).resolve().parents[2] / "data"
 
 
 def discover_files(data_root: str | Path | None = None) -> dict[Sensor, list[Path]]:
-    """Find all raw MODIS and VIIRS .txt files under the given data root."""
+    """Find raw MODIS and VIIRS text/CSV files, including automated subfolders."""
     root = Path(data_root) if data_root is not None else _default_data_root()
     return {
-        "MODIS": sorted((root / "raw" / "modis").glob("*.txt")),
-        "VIIRS": sorted((root / "raw" / "viirs").glob("*.txt")),
+        "MODIS": sorted(path for folder in (root / "raw" / "modis",) if folder.exists() for path in folder.rglob("*") if path.is_file() and path.suffix.lower() in {".txt", ".csv"}),
+        "VIIRS": sorted(path for folder in (root / "raw" / "viirs",) if folder.exists() for path in folder.rglob("*") if path.is_file() and path.suffix.lower() in {".txt", ".csv"}),
     }
 
 
@@ -147,10 +151,23 @@ def _normalize(frame: pl.DataFrame, sensor: Sensor, path: str | Path) -> pl.Data
         brightness, longwave = "bright_ti4", "bright_ti5"
 
     frame = frame.with_row_index("_row_position")
-    result = frame.select(
-        pl.col("_row_position").map_elements(
+    if path.name.startswith("FIRMS__"):
+        # Automated NRT/SP products overlap. Fingerprint observation identity
+        # without the changing product version so re-polls remain idempotent.
+        identity_columns = ["satellite", "latitude", "longitude", "acq_date", "acq_time", "scan", "track"]
+        identities = frame.select(identity_columns).iter_rows()
+        record_ids = [
+            hashlib.sha256((sensor + "\x1f" + "\x1f".join("" if value is None else str(value).strip() for value in row)).encode("utf-8")).hexdigest()
+            for row in identities
+        ]
+        frame = frame.with_columns(pl.Series("_automated_record_id", record_ids, dtype=pl.String))
+        id_expr = pl.col("_automated_record_id").alias("record_id")
+    else:
+        id_expr = pl.col("_row_position").map_elements(
             lambda i: _record_id(sensor, path, int(i)), return_dtype=pl.String
-        ).alias("record_id"),
+        ).alias("record_id")
+    result = frame.select(
+        id_expr,
         pl.lit(sensor).alias("sensor"),
         pl.col("satellite").cast(pl.String).alias("satellite"),
         pl.col("latitude").cast(pl.Float64, strict=False).alias("latitude"),
@@ -258,6 +275,25 @@ def ingest_fire_data(
 
     all_frames = frames["MODIS"] + frames["VIIRS"]
     combined = pl.concat(all_frames, how="vertical") if all_frames else pl.DataFrame(schema=STANDARD_SCHEMA)
+    # Keep manually supplied records unchanged. For FIRMS API files, resolve an
+    # NRT/SP duplicate to Standard Processing while retaining every raw file.
+    if combined.height and combined.filter(pl.col("source_file").str.starts_with("FIRMS__")).height:
+        automated = combined.filter(pl.col("source_file").str.starts_with("FIRMS__"))
+        manual = combined.filter(~pl.col("source_file").str.starts_with("FIRMS__"))
+        automated = (
+            automated.with_columns(
+                pl.when(pl.col("source_file").str.contains("_SP__"))
+                .then(2)
+                .otherwise(1)
+                .alias("_processing_priority")
+            )
+            .sort(["record_id", "_processing_priority", "source_file"])
+            .unique(subset=["record_id"], keep="last", maintain_order=True)
+            .drop("_processing_priority")
+        )
+        combined = pl.concat([manual, automated], how="vertical").sort(
+            ["acq_date", "acq_time", "sensor"], nulls_last=True
+        )
     combined = _cast_standard_schema(combined).sort(["acq_date", "acq_time", "sensor"], nulls_last=True)
     validation = validate_fire_data(combined)
     target = Path(output_file) if output_file is not None else root / "processed" / "standardized_fires.parquet"

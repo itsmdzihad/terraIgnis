@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { cellToLatLng, latLngToCell } from "h3-js";
 import {
   Camera,
@@ -8,6 +8,8 @@ import {
   ChevronDown,
   TrendingDown,
   TrendingUp,
+  ChevronLeft,
+  ChevronRight,
   RotateCw,
   X,
   Search,
@@ -83,12 +85,42 @@ export default function GlobalFirePulse() {
   const [latitudeInput, setLatitudeInput] = useState("");
   const [longitudeInput, setLongitudeInput] = useState("");
   const [coordinateError, setCoordinateError] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(5000);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [isLegendCollapsed, setIsLegendCollapsed] = useState(false);
+  const filtersPanelRef = useRef<HTMLElement>(null);
+  const filtersToggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isFiltersOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        filtersPanelRef.current?.contains(target) ||
+        filtersToggleRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsFiltersOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsFiltersOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFiltersOpen]);
 
   const {
     selectedDate,
+    calendarYear,
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
@@ -97,6 +129,8 @@ export default function GlobalFirePulse() {
     minBurnIndex,
     maxBurnIndex,
     setSelectedDate,
+    setDateRange,
+    setSelectedYear,
     setSelectedH3Cell,
     setSelectedCountry,
     setSelectedSensor,
@@ -105,8 +139,6 @@ export default function GlobalFirePulse() {
   } = useDashboard();
 
   const selectedYear = Number(selectedStartDate.slice(0, 4));
-  const pageSize = 5000;
-
   const { data, loading, error, refetch } = useFires({
     date: selectedDate || undefined,
     start_date: selectedStartDate,
@@ -129,7 +161,14 @@ export default function GlobalFirePulse() {
   };
   const countryFires = useCountryFires(countryQuery, selectedCountry);
 
-  const records = selectedCountry ? countryFires.records : data?.data ?? [];
+  const allRecords = selectedCountry ? countryFires.records : data?.data ?? [];
+  const totalRecords = selectedCountry ? countryFires.records.length : data?.total ?? 0;
+  const records = selectedCountry
+    ? allRecords.slice(offset, offset + pageSize)
+    : allRecords;
+  const pageCount = Math.ceil(totalRecords / pageSize);
+  const currentPage = totalRecords > 0 ? Math.min(Math.floor(offset / pageSize) + 1, pageCount) : 0;
+  const recordsRemaining = Math.max(0, totalRecords - (offset + records.length));
   const mapLoading = selectedCountry ? countryFires.loading : loading;
   const mapError = selectedCountry ? countryFires.error : error;
   const mapFireData = useMemo(
@@ -197,6 +236,15 @@ export default function GlobalFirePulse() {
     error: statsError,
     refetch: refetchStats,
   } = useStats();
+  const allYearsStart = stats?.coverage.start_date;
+  const allYearsEnd = stats?.coverage.end_date;
+  const isAllYearsSelected = Boolean(
+    allYearsStart &&
+      allYearsEnd &&
+      selectedStartDate === allYearsStart &&
+      selectedEndDate === allYearsEnd &&
+      !selectedDate
+  );
 
   const {
     data: calendarData,
@@ -732,20 +780,42 @@ export default function GlobalFirePulse() {
         <div className="order-1 flex-1 min-w-0 min-h-[360px] sm:min-h-[420px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
           {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
           <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-            <div className="pointer-events-auto glass-panel-strong rounded-full px-4 py-1.5 flex items-center gap-2.5 max-w-full">
+            <div className="pointer-events-auto glass-panel-strong rounded-full pl-4 pr-1.5 py-1.5 flex items-center gap-2.5 max-w-full min-w-0">
               <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
                 Fire Overview
               </h1>
               <span className="h-3.5 w-px bg-slate-400/35 shrink-0" />
-              <span className="text-xs font-medium glass-muted truncate tabular-nums">
-                {selectedCountry
-                  ? mapLoading
+              <div className="flex min-w-0 items-center gap-2 text-[10px] font-medium glass-muted tabular-nums sm:text-xs">
+                <span className="truncate">
+                  {selectedCountry && mapLoading
                     ? `Loading ${selectedCountry}…`
-                    : `${selectedCountry}: ${formatCount(records.length)} cell-date records`
-                  : data?.total == null
-                  ? "Detections by H3 cell"
-                  : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
-              </span>
+                    : `Showing ${formatCount(records.length)} of ${formatCount(totalRecords)} cell-date records`}
+                </span>
+                <span className="hidden h-3.5 w-px bg-slate-400/35 shrink-0 sm:block" />
+                <button
+                  type="button"
+                  onClick={() => setOffset(Math.max(0, offset - pageSize))}
+                  disabled={currentPage <= 1 || mapLoading}
+                  aria-label="Previous map page"
+                  title="Previous map page"
+                  className="glass-btn rounded-full p-1 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <span className="whitespace-nowrap text-[9px] sm:text-[10px]">
+                  {currentPage || 0}/{pageCount} · {formatCount(recordsRemaining)} left
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOffset(offset + pageSize)}
+                  disabled={currentPage >= pageCount || mapLoading}
+                  aria-label="Next map page"
+                  title="Next map page"
+                  className="glass-btn rounded-full p-1 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
             </div>
 
             <div className="pointer-events-auto glass-panel-strong rounded-full p-1 flex items-center gap-1.5">
@@ -762,6 +832,9 @@ export default function GlobalFirePulse() {
               {/* Filters Toggle Button */}
               <button
                 type="button"
+                ref={filtersToggleRef}
+                aria-expanded={isFiltersOpen}
+                aria-controls="fire-filter-controls"
                 onClick={() => setIsFiltersOpen(!isFiltersOpen)}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
                   isFiltersOpen || activeFiltersCount > 0 ? "glass-btn-active" : "glass-btn"
@@ -801,6 +874,8 @@ export default function GlobalFirePulse() {
           {/* COLLAPSIBLE FLOATING FILTER DRAWER / POPOVER */}
           {isFiltersOpen && (
             <section
+              id="fire-filter-controls"
+              ref={filtersPanelRef}
               aria-label="Fire API filters"
               className="absolute top-16 left-3.5 right-3.5 z-30 glass-panel-strong rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
             >
@@ -836,6 +911,28 @@ export default function GlobalFirePulse() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <label className="text-[11px] font-medium glass-muted">
+                  Observation Period
+                  <select
+                    value={isAllYearsSelected ? "all" : "year"}
+                    onChange={(event) => {
+                      setSelectedDate(null);
+                      if (event.target.value === "all" && allYearsStart && allYearsEnd) {
+                        setDateRange(allYearsStart, allYearsEnd);
+                      } else {
+                        setSelectedYear(calendarYear);
+                      }
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                  >
+                    <option value="year">Selected year ({calendarYear})</option>
+                    <option value="all" disabled={!allYearsStart || !allYearsEnd}>
+                      All years ({allYearsStart?.slice(0, 4) ?? "…"}–{allYearsEnd?.slice(0, 4) ?? "…"})
+                    </option>
+                  </select>
+                </label>
+
                 <label className="text-[11px] font-medium glass-muted">
                   Observation Date
                   <input
@@ -888,6 +985,28 @@ export default function GlobalFirePulse() {
                     <option value="VIIRS">VIIRS</option>
                     <option value="BOTH">Both sensors</option>
                   </select>
+                </label>
+
+                <label className="text-[11px] font-medium glass-muted">
+                  Records per map page
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setOffset(0);
+                    }}
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                  >
+                    <option value={1000}>1,000</option>
+                    <option value={2500}>2,500</option>
+                    <option value={5000}>5,000</option>
+                    <option value={10000}>10,000</option>
+                    <option value={25000}>25,000</option>
+                    <option value={50000}>50,000</option>
+                  </select>
+                  <span className="mt-1 block text-[10px] glass-subtle">
+                    Controls the number of cell-date records shown per map page.
+                  </span>
                 </label>
 
                 <label className="text-[11px] font-medium glass-muted">
@@ -987,35 +1106,6 @@ export default function GlobalFirePulse() {
                 </form>
               </div>
 
-              <div className="flex items-center justify-between glass-divider-t mt-3 pt-2.5">
-                <span className="text-xs glass-muted">
-                  {selectedCountry
-                    ? mapLoading
-                      ? `Loading ${selectedCountry} observations…`
-                      : `${selectedCountry}: ${formatCount(records.length)} cell-date records`
-                    : `Showing page ${Math.floor(offset / pageSize) + 1} (${records.length} records)`}
-                </span>
-                {!selectedCountry && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={offset === 0 || loading}
-                      onClick={() => setOffset(Math.max(0, offset - pageSize))}
-                      className="px-3.5 py-1 rounded-full glass-btn text-xs font-semibold disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!data?.has_more || loading}
-                      onClick={() => setOffset(offset + pageSize)}
-                      className="px-3.5 py-1 rounded-full glass-btn text-xs font-semibold disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
             </section>
           )}
 

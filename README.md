@@ -36,6 +36,7 @@
 - [API Architecture](#api-architecture)
 - [API Endpoints](#api-endpoints)
 - [Postman Collection](#postman-collection)
+- [Frontend Dashboard](#frontend-dashboard)
 - [Data Quality & Validation](#data-quality--validation)
 - [Important Limitations](#important-limitations)
 - [Development Workflow](#development-workflow)
@@ -79,7 +80,7 @@ Anomaly Detection
     ↓
 FastAPI
     ↓
-Next.js Frontend
+React/Vite Frontend
 
 The goal is to provide a consistent spatial and temporal representation of fire activity that can be visualized and explored through an interactive application.
 
@@ -133,13 +134,14 @@ The system:
 7.  Produces a unified relative Burn Index.
 8.  Detects statistically unusual fire activity.
 9.  Exposes processed information through an API.
-10. Provides the foundation for interactive frontend visualization.
+10. Serves interactive dashboards through the React/Vite frontend.
 
 ---
 
 # Key Features
 
 - NASA FIRMS MODIS and VIIRS ingestion
+- Optional NASA FIRMS NRT polling and resumable historical backfills
 - Common fire-observation schema
 - Automated data-quality validation
 - H3 spatial aggregation
@@ -153,7 +155,7 @@ The system:
 - DuckDB/Polars analytical processing
 - FastAPI data-serving layer
 - Ignish chat assistant grounded in processed fire data
-- Next.js frontend integration
+- React/Vite dashboard with Fire Overview, Cell Explorer, Daily Activity, and Data Pipeline routes
 
 ---
 
@@ -221,7 +223,7 @@ The system:
                        FastAPI
                            │
                            ▼
-                     Next.js UI
+                     React/Vite UI
 ```
 
 ---
@@ -259,7 +261,7 @@ anomalies.parquet
    ↓
 FastAPI
    ↓
-Next.js
+React/Vite
 ```
 
 ---
@@ -318,6 +320,11 @@ Sensor-specific measurements are mapped into common fields while
 preserving their original meaning.
 
 ### Current Dataset
+
+The figures in this section describe the original sample dataset documented
+when the pipeline was first built. They are not live counts; the active
+dataset changes as files are uploaded or ingested. Query `/api/stats` for
+current counts and date coverage.
 
 ```text
 MODIS observations: 3,295
@@ -931,6 +938,9 @@ It does not claim:
 
 ---
 
+The row counts below are the original sample dataset snapshot and may differ
+from the active generated datasets. Use `/api/stats` for current totals.
+
 Dataset Rows Purpose
 
 ---
@@ -950,6 +960,10 @@ Dataset Rows Purpose
 ---
 
 # Current Dataset Coverage
+
+The following is the original sample dataset snapshot, not a live inventory.
+The date range and counts for the active generation are returned by
+`/api/stats`.
 
 ```text
 Temporal coverage:
@@ -1624,7 +1638,7 @@ responses through Pydantic schemas.
 
 The analytical API layer is implemented with FastAPI.
 
-The API sits between the processed Parquet datasets and the Next.js
+The API sits between the processed Parquet datasets and the React/Vite
 frontend:
 
 ```text
@@ -1637,7 +1651,7 @@ Processed Parquet
     FastAPI
        │
        ▼
-    Next.js
+    React/Vite
 ```
 
 The API queries processed analytical datasets instead of recalculating
@@ -1658,7 +1672,7 @@ FastAPI
     ↓
 JSON API Responses
     ↓
-Next.js Frontend
+React/Vite Frontend
 ```
 
 The API layer is read-only with respect to the analytical Parquet
@@ -1709,6 +1723,10 @@ Example:
 ```text
 GET /api/fires?date=2026-09-02&limit=100
 ```
+
+`limit` defaults to 500 and accepts values from 1 to 50,000; `offset` selects
+the page start. The Fire Overview map uses 5,000 by default and lets users
+change its page size in the filter controls.
 
 Sensor values supported by the current dataset/API include:
 
@@ -1942,6 +1960,36 @@ the API restores the previous processed outputs where possible.
 
 ---
 
+# Frontend Dashboard
+
+The React/Vite app in `frontend/` provides these routes:
+
+- `/` — Fire Overview map, statistics, filters, and Ignish chat
+- `/cells` — Cell Explorer
+- `/activity` — Daily Activity calendar and yearly analysis
+- `/pipeline` — raw FIRMS upload, dataset generation, NRT status, and historical backfill controls
+
+Daily Activity year choices come from the processed dataset's first and last
+observation dates. Selecting a year also scopes Fire Overview. To view the
+entire processed date range on the overview map, open **Filters → Observation
+Period → All years**; the calendar keeps its own selected year.
+
+Fire Overview and Cell Explorer include a country selector that filters
+observations against country boundaries. Ignish can answer country-specific
+questions from the processed dashboard data.
+
+The map paginates fire records and provides previous/next controls with the
+current page and remaining-record count. **Filters → Records per map page**
+lets users choose 1,000–50,000 records per page; the map defaults to 5,000.
+The API enforces a maximum page size of 50,000.
+
+The Data Pipeline route uploads a batch of same-sensor MODIS or VIIRS files,
+then starts the six-stage generation workflow. Its automated ingestion panel
+can run NRT polls and start, resume, or cancel historical SP backfills.
+Cancelled jobs retain already downloaded raw files and completed chunks.
+
+---
+
 ## Ignish Chat
 
 ### `POST /api/chat`
@@ -2096,9 +2144,10 @@ Example date:
 2026-09-02
 ```
 
-The collection is intended to provide a convenient way to manually
-inspect and validate all current API endpoints before frontend
-integration.
+The collection provides requests for analytical API routes, manual pipeline
+upload and generation, and NASA FIRMS NRT and historical ingestion. Set
+`base_url` to the backend URL; configure `ingestion_token` when operator
+authorization is enabled.
 
 # Data Quality & Validation
 
@@ -2272,10 +2321,7 @@ responses through Pydantic schemas.
 
 # API Architecture
 
-The next application layer is FastAPI.
-
-The API will sit between the processed Parquet datasets and the Next.js
-frontend.
+FastAPI serves the processed Parquet datasets to the React/Vite frontend.
 
 ```text
 Processed Parquet
@@ -2287,11 +2333,11 @@ Processed Parquet
     FastAPI
        │
        ▼
-    Next.js
+    React/Vite
 ```
 
-The API should query processed analytical datasets instead of
-recalculating the entire pipeline for every request.
+The API queries processed analytical datasets instead of recalculating the
+entire pipeline for every request.
 
 ---
 
@@ -2594,25 +2640,11 @@ stages in order.
 
 # Future Work
 
-## Frontend Integration
+## Application Improvements
 
-The backend API layer is now complete. The next major application stage
-is the Next.js frontend.
-
-The frontend will use the API to provide:
-
-- interactive wildfire maps
-- H3 cell visualization
-- Burn Index visualization
-- anomaly visualization
-- temporal fire calendars
-- fire statistics
-- H3 spatial summaries
-- sensor information
-- API-driven filtering
-
-The frontend should consume the existing API rather than reimplementing
-analytical calculations.
+The React/Vite dashboard is integrated with the FastAPI service. Further
+application work can improve map rendering and point sampling for very large
+datasets, while the existing API remains the source for processed analytics.
 
 ---
 
@@ -2648,9 +2680,11 @@ FastAPI foundation ✅ Complete
 `/api/anomalies/{h3_cell}` ✅ Complete
 `/api/stats` ✅ Complete
 `/api/regions/{h3_cell}` ✅ Complete
+`/api/pipeline/*` ✅ Complete
+`/api/ingestion/*` ✅ Complete
 Postman collection ✅ Added
-Backend tests ✅ 131 passing
-Frontend integration ⏳ Next
+Backend tests ✅ Unit and API coverage present
+React/Vite dashboard ✅ Integrated
 
 # Pipeline Summary
 
@@ -2729,7 +2763,7 @@ The current TerraIgnis analytical pipeline is:
                │
                ▼
 ┌──────────────────────────────┐
-│       Next.js Frontend       │
+│       React/Vite Frontend       │
 └──────────────────────────────┘
 ```
 
@@ -2757,21 +2791,8 @@ Burn Index
 Anomaly detection
 ```
 
-The current analytical dataset contains:
-
-```text
-35,315
-raw fire observations
-
-23,244
-H3 cell/date observations
-
-8,832
-unique H3 cells
-
-61
-dates
-```
+Dataset counts change as FIRMS files are uploaded or ingested. Query `/api/stats`
+for the active generation's current observation counts and date coverage.
 
 The current outputs are:
 
@@ -2783,15 +2804,13 @@ burn_index.parquet
 anomalies.parquet
 ```
 
-All major analytical stages and API endpoints have been validated
-through automated tests, with the current backend test suite containing:
+The backend can also poll FIRMS NRT products and backfill historical
+Standard Processing products. See [backend/README.md](backend/README.md#nasa-firms-automated-ingestion)
+for configuration, checkpoints, API routes, and backfill instructions.
 
-```text
-131 passing tests
-```
-
-The FastAPI backend is now complete. The next major stage is to
-integrate the API with the TerraIgnis Next.js frontend.
+The backend README documents the API, automated FIRMS ingestion settings,
+and its unit and API test commands. The React/Vite frontend is integrated
+with these endpoints.
 
 ---
 

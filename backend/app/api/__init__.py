@@ -6,6 +6,7 @@ from app.api.anomaly import router as anomalies_router
 from app.api.calendar import router as calendar_router
 from app.api.chat import router as chat_router
 from app.api.fires import router as fires_router
+from app.api.ingestion import router as ingestion_router
 from app.api.pipeline import router as pipeline_router
 from app.api.regions import router as regions_router
 from app.api.stats import router as stats_router
@@ -17,4 +18,5 @@ api_router.include_router(calendar_router)
 api_router.include_router(stats_router)
 api_router.include_router(regions_router)
 api_router.include_router(pipeline_router)
+api_router.include_router(ingestion_router)
 api_router.include_router(chat_router)
