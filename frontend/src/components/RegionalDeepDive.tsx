@@ -23,20 +23,20 @@ function formatIndex(value: number | null): string {
   return value == null ? 'Unavailable' : value.toFixed(2);
 }
 
-function Metric({ label, value, tone = 'text-white' }: { label: string; value: string; tone?: string }) {
+function Metric({ label, value, tone = 'glass-heading' }: { label: string; value: string; tone?: string }) {
   return (
     <div className="min-w-0">
-      <span className="block text-[9px] font-mono tracking-wide text-slate-500">{label}</span>
-      <span className={`block mt-0.5 text-sm font-semibold font-mono break-words ${tone}`}>{value}</span>
+      <span className="block text-[10px] font-medium tracking-wider uppercase glass-muted">{label}</span>
+      <span className={`block mt-0.5 text-sm font-semibold tabular-nums break-words ${tone}`}>{value}</span>
     </div>
   );
 }
 
 function PanelState({ title, message, action }: { title: string; message: string; action?: React.ReactNode }) {
   return (
-    <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-5 text-center">
-      <p className="text-[10px] font-mono tracking-widest text-cyan-300">{title}</p>
-      <p className="text-xs text-slate-400 mt-2">{message}</p>
+    <div className="glass-panel rounded-3xl p-6 text-center">
+      <p className="text-xs font-semibold tracking-wider uppercase tone-sky">{title}</p>
+      <p className="text-xs glass-muted mt-2">{message}</p>
       {action}
     </div>
   );
@@ -121,15 +121,15 @@ export default function RegionalDeepDive() {
     <PanelState
       title="Connection error"
       message="Unable to retrieve cell analysis."
-      action={<button onClick={region.refetch} className="mt-3 border border-slate-700 rounded px-3 py-1.5 text-[10px] font-mono text-slate-200 hover:border-orange-500">Retry</button>}
+      action={<button type="button" onClick={region.refetch} className="mt-3 glass-btn rounded-full px-4 py-1.5 text-xs font-semibold">Retry</button>}
     />
   ) : regionData ? (
     <div className="space-y-4">
-      <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 pb-3">
+      <section className="glass-panel rounded-3xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 glass-divider-b pb-3">
           <div>
-            <p className="text-[11px] font-medium text-emerald-400">H3 Cell · Resolution 7</p>
-            <p className="mt-1 text-xs font-mono text-white break-all">{regionData.h3_cell}</p>
+            <p className="text-[11px] font-medium tone-emerald">H3 Cell · Resolution 7</p>
+            <p className="mt-1 text-xs font-semibold glass-heading tabular-nums break-all">{regionData.h3_cell}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4">
@@ -137,17 +137,17 @@ export default function RegionalDeepDive() {
           <Metric label="FIRST OBSERVED" value={formatDate(regionData.first_observed_date)} />
           <Metric label="LAST OBSERVED" value={formatDate(regionData.last_observed_date)} />
           <Metric label="TOTAL FIRE DETECTIONS" value={formatCount(regionData.total_fire_detections)} />
-          <Metric label="MEAN BURN INDEX" value={formatIndex(regionData.mean_burn_index)} tone="text-orange-300" />
+          <Metric label="MEAN BURN INDEX" value={formatIndex(regionData.mean_burn_index)} tone="tone-orange" />
           <Metric label="MIN BURN INDEX" value={formatIndex(regionData.min_burn_index)} />
           <Metric label="MAX BURN INDEX" value={formatIndex(regionData.max_burn_index)} />
-          <Metric label="ANOMALY COUNT" value={formatCount(regionData.anomaly_count)} tone="text-amber-300" />
-          <Metric label="EXTREME ANOMALY COUNT" value={formatCount(regionData.extreme_anomaly_count)} tone="text-red-300" />
+          <Metric label="ANOMALY COUNT" value={formatCount(regionData.anomaly_count)} tone="tone-amber" />
+          <Metric label="EXTREME ANOMALY COUNT" value={formatCount(regionData.extreme_anomaly_count)} tone="tone-rose" />
         </div>
       </section>
 
-      <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
+      <section className="glass-panel rounded-3xl p-5">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-white">Sensor Detections</h3>
+          <h3 className="text-sm font-semibold glass-heading">Sensor Detections</h3>
         </div>
         <div className="mt-4 space-y-3">
           {([
@@ -158,18 +158,18 @@ export default function RegionalDeepDive() {
             const width = total > 0 ? (count / total) * 100 : 0;
             return (
               <div key={sensor}>
-                <div className="flex justify-between text-[10px] font-mono mb-1.5">
-                  <span className="text-slate-300">{sensor} FIRE DETECTIONS</span>
-                  <span className="text-white">{formatCount(count)}</span>
+                <div className="flex justify-between text-[11px] font-medium mb-1.5">
+                  <span className="glass-muted">{sensor} FIRE DETECTIONS</span>
+                  <span className="glass-heading font-semibold tabular-nums">{formatCount(count)}</span>
                 </div>
-                <div className="h-2 bg-slate-950 rounded-full overflow-hidden">
+                <div className="h-2 glass-progress-track rounded-full overflow-hidden">
                   <div className={`h-full ${color} rounded-full`} style={{ width: `${width}%` }} />
                 </div>
               </div>
             );
           })}
         </div>
-        <p className="mt-3 text-[10px] text-slate-500">Detection counts aggregated over observed cell/dates; not a count of distinct physical fires.</p>
+        <p className="mt-3 text-[11px] glass-subtle">Detection counts aggregated over observed cell/dates; not a count of distinct physical fires.</p>
       </section>
 
       <AnomalyHistoryChart
@@ -184,41 +184,73 @@ export default function RegionalDeepDive() {
   ) : null;
 
   return (
-    <div className="regional-view flex flex-col h-full bg-slate-950 p-4 lg:p-6 gap-4 lg:gap-6 overflow-hidden">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
-        <div>
-          <h2 className="text-sm font-semibold text-white">Cell explorer</h2>
-          <p className="text-xs text-cyan-300 mt-0.5">Inspect observed fire activity by H3 cell</p>
-        </div>
-        <div className="flex flex-col sm:items-end gap-1">
-          <label htmlFor="h3-cell-select" className="text-[11px] font-medium text-slate-500">Choose an observed cell</label>
-          <div className="relative min-w-[260px]">
-            <select
-              id="h3-cell-select"
-              value={selectedH3Cell ?? ''}
-              onChange={(event) => selectCell(event.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-10 text-xs font-mono text-white focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none cursor-pointer"
-            >
-              <option value="">No H3 cell selected</option>
-              {selectedH3Cell && !mapRecords.some((record) => record.h3_cell === selectedH3Cell) && <option value={selectedH3Cell}>{selectedH3Cell} · selected</option>}
-              {mapRecords.map((record) => <option key={record.h3_cell} value={record.h3_cell}>{record.h3_cell}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
-          {fires.loading ? <span className="text-[10px] font-medium text-amber-300">Loading fire cells...</span> : fires.error ? <span className="text-[10px] text-red-300">Cell list unavailable · <button onClick={fires.refetch} className="underline">Retry</button></span> : <span className="text-[10px] text-slate-500">{formatCount(mapRecords.length)} loaded H3 cells · click a cell on map</span>}
-        </div>
-      </header>
-
-      <main className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 overflow-hidden min-h-0">
-        <section className="xl:col-span-5 min-h-[360px] xl:min-h-0 bg-slate-900/50 border border-slate-800 rounded-lg p-3 flex flex-col gap-3 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div>
-              <p className="text-xs text-slate-400">H3 fire activity cells</p>
-              <h3 className="text-sm font-semibold text-white mt-0.5">{selectedH3Cell ?? 'Select a cell'}</h3>
+    <div className="regional-view flex flex-col h-full p-3 lg:p-4 gap-3.5 lg:gap-4 overflow-hidden">
+      <main className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-3.5 lg:gap-4 overflow-hidden min-h-0">
+        <section className="xl:col-span-5 min-h-[380px] xl:min-h-0 glass-panel rounded-3xl p-4 flex flex-col gap-3 overflow-hidden">
+          <div className="flex flex-col gap-2.5 glass-divider-b pb-3 shrink-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h1 className="text-lg font-bold tracking-tight glass-heading">Cell Explorer</h1>
+                <p className="text-[11px] font-medium tone-sky mt-0.5">Inspect observed fire activity by H3 cell</p>
+              </div>
+              {selectedH3Cell && (
+                <button
+                  type="button"
+                  onClick={() => selectCell('')}
+                  className="glass-btn-ghost px-3 py-1 rounded-full text-[11px] font-medium shrink-0"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-            {selectedH3Cell && <button onClick={() => selectCell('')} className="text-[10px] font-medium text-slate-400 hover:text-white">Clear</button>}
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="h3-cell-select" className="text-[11px] font-medium glass-muted">
+                  Choose an observed cell
+                </label>
+                {fires.loading ? (
+                  <span className="text-[10px] font-medium tone-amber">Loading fire cells...</span>
+                ) : fires.error ? (
+                  <span className="text-[10px] tone-rose">
+                    Cell list unavailable ·{' '}
+                    <button
+                      type="button"
+                      onClick={fires.refetch}
+                      className="glass-btn px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                    >
+                      Retry
+                    </button>
+                  </span>
+                ) : (
+                  <span className="text-[10px] glass-muted">
+                    {formatCount(mapRecords.length)} loaded H3 cells · click map
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <select
+                  id="h3-cell-select"
+                  value={selectedH3Cell ?? ''}
+                  onChange={(event) => selectCell(event.target.value)}
+                  className="w-full glass-control rounded-xl py-2 px-3 pr-9 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/40 appearance-none cursor-pointer"
+                >
+                  <option value="">No H3 cell selected</option>
+                  {selectedH3Cell && !mapRecords.some((record) => record.h3_cell === selectedH3Cell) && (
+                    <option value={selectedH3Cell}>{selectedH3Cell} · selected</option>
+                  )}
+                  {mapRecords.map((record) => (
+                    <option key={record.h3_cell} value={record.h3_cell}>
+                      {record.h3_cell}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 glass-muted pointer-events-none" />
+              </div>
+            </div>
           </div>
-          <div className="flex-1 min-h-0">
+
+          <div className="flex-1 min-h-0 rounded-2xl overflow-hidden">
             <TerraIgnisMap
               latitude={mapCenter.latitude}
               longitude={mapCenter.longitude}
@@ -229,12 +261,14 @@ export default function RegionalDeepDive() {
               onH3CellClick={selectCell}
             />
           </div>
-          <p className="text-[10px] text-slate-500">{fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.</p>
+          <p className="text-[10px] glass-muted shrink-0">
+            {fires.error ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.
+          </p>
         </section>
 
         <section className="xl:col-span-7 overflow-y-auto pr-1 min-h-0">
           {regionContent}
-          <p className="mt-4 mb-2 text-xs leading-relaxed text-slate-500">
+          <p className="mt-4 mb-2 text-xs leading-relaxed glass-muted">
             Burn Index is a relative activity score. Cell history shows observed dates only; gaps do not imply zero activity.
           </p>
         </section>

@@ -854,283 +854,307 @@ export default function FireActivityCalendar() {
     return { cx, cy, maxR, points, polygonPoints };
   }, [radarMetrics]);
 
-  return (
-    <div className="activity-dashboard flex flex-col w-full h-full min-h-0 p-4 sm:p-6 lg:p-8 gap-6 overflow-y-auto overscroll-contain">
-      {/* 1. TOP HEADER BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
-            Daily Activity Center
-          </h1>
-
-          {/* Statistic Year Pill Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
-              className="activity-surface-control flex items-center gap-2 px-3.5 py-1.5 border rounded-full text-xs font-semibold shadow-2xs transition-colors"
-            >
-              <span className="activity-on-accent w-4 h-4 rounded-md bg-[#524ad3] flex items-center justify-center text-[10px] font-bold">
-                Σ
-              </span>
-              <span className="activity-muted font-normal">Year</span>
-              <span className="font-bold">{selectedYear}</span>
-              <ChevronDown size={13} className="activity-muted" />
-            </button>
-
-            {isYearDropdownOpen && (
-              <div className="activity-surface-control absolute left-0 mt-2 w-44 rounded-2xl shadow-xl border p-2 z-30 space-y-1">
-                {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
-                  <button
-                    key={yr}
-                    type="button"
-                    onClick={() => {
-                      setSelectedYear(yr);
-                      setIsYearDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                      selectedYear === yr
-                        ? "bg-indigo-500/15 font-bold"
-                        : "activity-muted hover:bg-indigo-500/5"
-                    }`}
-                    style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
-                  >
-                    {yr}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Segmented Switcher: Fire Count | Burn Index */}
-          <div className="activity-pill-track flex items-center p-1 rounded-full border">
-            <button
-              type="button"
-              onClick={() => setMetricMode("fire_count")}
-              className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
-                metricMode === "fire_count"
-                  ? "activity-pill-active shadow-xs font-semibold"
-                  : "activity-pill-inactive"
-              }`}
-            >
-              Fire Count
-            </button>
-            <button
-              type="button"
-              onClick={() => setMetricMode("burn_index")}
-              className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
-                metricMode === "burn_index"
-                  ? "activity-pill-active shadow-xs font-semibold"
-                  : "activity-pill-inactive"
-              }`}
-            >
-              Burn Index
-            </button>
-          </div>
-        </div>
-
-        {/* Right Header Counter */}
-        <div className="text-left sm:text-right">
-          <span className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
-            {stats.activeDaysCount} active days
+  const yearAndMetricControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Statistic Year Pill Dropdown */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+          className="activity-surface-control flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+        >
+          <span className="activity-on-accent w-4 h-4 rounded-full bg-[#4f46e5] flex items-center justify-center text-[10px] font-bold">
+            Σ
           </span>
-        </div>
+          <span className="activity-muted font-normal">Year</span>
+          <span className="font-bold">{selectedYear}</span>
+          <ChevronDown size={13} className="activity-muted" />
+        </button>
+
+        {isYearDropdownOpen && (
+          <div className="activity-surface-popover absolute left-0 mt-2 w-44 rounded-3xl p-2 z-30 space-y-1">
+            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
+              <button
+                key={yr}
+                type="button"
+                onClick={() => {
+                  setSelectedYear(yr);
+                  setIsYearDropdownOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  selectedYear === yr
+                    ? "bg-indigo-500/20 font-bold"
+                    : "activity-muted hover:bg-indigo-500/10"
+                }`}
+                style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
+              >
+                {yr}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Segmented Switcher: Fire Count | Burn Index */}
+      <div className="activity-pill-track flex items-center p-1 rounded-full">
+        <button
+          type="button"
+          onClick={() => setMetricMode("fire_count")}
+          className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+            metricMode === "fire_count"
+              ? "activity-pill-active font-semibold"
+              : "activity-pill-inactive"
+          }`}
+        >
+          Fire Count
+        </button>
+        <button
+          type="button"
+          onClick={() => setMetricMode("burn_index")}
+          className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+            metricMode === "burn_index"
+              ? "activity-pill-active font-semibold"
+              : "activity-pill-inactive"
+          }`}
+        >
+          Burn Index
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="activity-dashboard flex flex-col w-full h-full min-h-0 p-3 sm:p-4 lg:p-5 gap-5 overflow-y-auto overscroll-contain">
       {/* Loading or Error */}
       {loading ? (
-        <div className="activity-card p-12 text-center flex flex-col items-center justify-center">
-          <div className="w-8 h-8 border-3 border-[#524ad3] border-t-transparent rounded-full animate-spin mb-3" />
-          <span className="text-xs font-semibold text-[#524ad3] dark:text-indigo-400 tracking-wide">
-            Loading daily activity...
-          </span>
+        <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5" style={{ color: "var(--cal-accent)" }} />
+              <h1 className="activity-card-title text-lg font-bold tracking-tight">
+                Daily Activity Center
+              </h1>
+            </div>
+            {yearAndMetricControls}
+          </div>
+          <div className="py-10 text-center flex flex-col items-center justify-center">
+            <div
+              className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin mb-3"
+              style={{ borderColor: "var(--cal-accent)", borderTopColor: "transparent" }}
+            />
+            <span
+              className="text-xs font-semibold tracking-wide"
+              style={{ color: "var(--cal-accent)" }}
+            >
+              Loading daily activity...
+            </span>
+          </div>
         </div>
       ) : error ? (
-        <div className="activity-card p-6 text-center border-rose-300 dark:border-rose-900">
-          <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-2" />
-          <span className="text-sm font-semibold text-rose-600">Unable to load daily activity</span>
-          <button
-            onClick={refetch}
-            className="activity-on-accent mt-3 px-4 py-1.5 bg-rose-600 text-xs font-semibold rounded-xl"
-          >
-            Retry
-          </button>
+        <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5" style={{ color: "var(--cal-accent)" }} />
+              <h1 className="activity-card-title text-lg font-bold tracking-tight">
+                Daily Activity Center
+              </h1>
+            </div>
+            {yearAndMetricControls}
+          </div>
+          <div className="py-6 text-center">
+            <AlertTriangle className="w-6 h-6 tone-rose mx-auto mb-2" />
+            <span className="text-sm font-semibold tone-rose block">Unable to load daily activity</span>
+            <button
+              type="button"
+              onClick={refetch}
+              className="glass-btn-primary mt-3 px-5 py-1.5 text-xs font-semibold rounded-full"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       ) : (
-        /* 2. MAIN DASHBOARD GRID */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        /* MAIN DASHBOARD GRID */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* ================= DAILY FIRE ACTIVITY CALENDAR CARD ================= */}
           <div
             className={`${
               isCalendarExpanded ? "lg:col-span-12" : "lg:col-span-8"
-            } flex flex-col gap-6`}
+            } flex flex-col gap-5`}
           >
-            {/* CARD 1: EXACT REPLICA OF REFERENCE CALENDAR CARD */}
-            <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
-              {/* Top Row: Icon + Title + Info Icon on left | Action Pill Toolbar on right */}
-              <div className="flex items-center justify-between">
+            {/* CARD 1: CALENDAR CARD */}
+            <div className="activity-card p-6 sm:p-7 flex flex-col gap-6">
+              {/* Top Row: Icon + Title + Info Icon on left | Moved Year/Metric Controls + Action Pill Toolbar on right */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Flame className="w-5 h-5" style={{ color: "var(--cal-accent)" }} />
-                  <h3 className="activity-card-title text-[16px] font-semibold tracking-tight">
-                    Daily Fire Activity
-                  </h3>
+                  <h1 className="activity-card-title text-lg font-bold tracking-tight">
+                    Daily Activity Center
+                  </h1>
                   <button
                     type="button"
                     onClick={() => setIsMethodologyOpen(true)}
                     aria-label="Learn how fire activity is calculated"
-                    className="activity-muted hover:opacity-80 transition-opacity"
+                    className="glass-icon-btn p-1 rounded-full"
                   >
-                    <Info size={15} />
+                    <Info size={14} />
                   </button>
                 </div>
 
-                {/* Top-Right Compact Segmented Action Toolbar [ Expand | Edit | More ] */}
-                <div className="relative flex items-center">
-                  <div className="activity-surface-control inline-flex items-center border rounded-xl px-2.5 py-1.5 gap-3 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-                      title={isCalendarExpanded ? "Collapse card" : "Expand full width"}
-                      className="activity-muted hover:opacity-80 transition-opacity"
-                    >
-                      {isCalendarExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                    </button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {yearAndMetricControls}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCardEditOpen(!isCardEditOpen);
-                        setIsCardMoreOpen(false);
-                      }}
-                      title="Change year or metric"
-                      className="activity-muted hover:opacity-80 transition-opacity"
-                    >
-                      <Pencil size={14} />
-                    </button>
+                  {/* Top-Right Compact Segmented Action Toolbar [ Expand | Edit | More ] */}
+                  <div className="relative flex items-center">
+                    <div className="activity-surface-control inline-flex items-center rounded-full px-1.5 py-1 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+                        aria-label={isCalendarExpanded ? "Collapse card" : "Expand full width"}
+                        title={isCalendarExpanded ? "Collapse card" : "Expand full width"}
+                        className="activity-muted p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                      >
+                        {isCalendarExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCardMoreOpen(!isCardMoreOpen);
-                        setIsCardEditOpen(false);
-                      }}
-                      title="More calendar options"
-                      className="activity-muted hover:opacity-80 transition-opacity"
-                    >
-                      <MoreHorizontal size={15} />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCardEditOpen(!isCardEditOpen);
+                          setIsCardMoreOpen(false);
+                        }}
+                        aria-label="Change year or metric"
+                        title="Change year or metric"
+                        className="activity-muted p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
 
-                  {/* Edit Popover */}
-                  {isCardEditOpen && (
-                    <div className="activity-surface-control absolute right-0 top-10 w-52 rounded-2xl shadow-xl border p-3 z-30 space-y-3">
-                      <div>
-                        <span className="activity-muted text-[11px] font-semibold block mb-1.5">
-                          Select Year
-                        </span>
-                        <div className="grid grid-cols-3 gap-1">
-                          {[2026, 2025, 2024, 2023, 2022, 2021].map((yr) => (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCardMoreOpen(!isCardMoreOpen);
+                          setIsCardEditOpen(false);
+                        }}
+                        aria-label="More calendar options"
+                        title="More calendar options"
+                        className="activity-muted p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                      >
+                        <MoreHorizontal size={15} />
+                      </button>
+                    </div>
+
+                    {/* Edit Popover */}
+                    {isCardEditOpen && (
+                      <div className="activity-surface-popover absolute right-0 top-11 w-56 rounded-3xl p-4 z-30 space-y-3">
+                        <div>
+                          <span className="activity-muted text-[11px] font-semibold block mb-1.5">
+                            Select Year
+                          </span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[2026, 2025, 2024, 2023, 2022, 2021].map((yr) => (
+                              <button
+                                key={yr}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedYear(yr);
+                                  setIsCardEditOpen(false);
+                                }}
+                                className={`text-xs py-1 rounded-full font-medium transition-colors ${
+                                  selectedYear === yr
+                                    ? "bg-indigo-500/20 font-bold"
+                                    : "glass-btn-ghost"
+                                }`}
+                                style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
+                              >
+                                {yr}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="pt-2.5 glass-divider-t">
+                          <span className="activity-muted text-[11px] font-semibold block mb-1.5">
+                            Intensity Metric
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5">
                             <button
-                              key={yr}
                               type="button"
                               onClick={() => {
-                                setSelectedYear(yr);
+                                setMetricMode("fire_count");
                                 setIsCardEditOpen(false);
                               }}
-                              className={`text-xs py-1 rounded-lg border font-medium transition-colors ${
-                                selectedYear === yr
-                                  ? "bg-indigo-500/15 border-indigo-400/60 font-bold"
-                                  : "border-slate-400/20 activity-muted"
+                              className={`text-xs py-1.5 rounded-full font-medium transition-colors ${
+                                metricMode === "fire_count"
+                                  ? "bg-[#4f46e5] activity-on-accent"
+                                  : "glass-btn-ghost"
                               }`}
-                              style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
                             >
-                              {yr}
+                              Fire Count
                             </button>
-                          ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMetricMode("burn_index");
+                                setIsCardEditOpen(false);
+                              }}
+                              className={`text-xs py-1.5 rounded-full font-medium transition-colors ${
+                                metricMode === "burn_index"
+                                  ? "bg-[#4f46e5] activity-on-accent"
+                                  : "glass-btn-ghost"
+                              }`}
+                            >
+                              Burn Index
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="pt-2 border-t border-slate-400/20">
-                        <span className="activity-muted text-[11px] font-semibold block mb-1.5">
-                          Intensity Metric
-                        </span>
-                        <div className="grid grid-cols-2 gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMetricMode("fire_count");
-                              setIsCardEditOpen(false);
-                            }}
-                            className={`text-xs py-1 rounded-lg font-medium ${
-                              metricMode === "fire_count"
-                                ? "bg-[#524ad3] activity-on-accent"
-                                : "activity-muted"
-                            }`}
-                          >
-                            Fire Count
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMetricMode("burn_index");
-                              setIsCardEditOpen(false);
-                            }}
-                            className={`text-xs py-1 rounded-lg font-medium ${
-                              metricMode === "burn_index"
-                                ? "bg-[#524ad3] activity-on-accent"
-                                : "activity-muted"
-                            }`}
-                          >
-                            Burn Index
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* More Popover */}
-                  {isCardMoreOpen && (
-                    <div className="activity-surface-control absolute right-0 top-10 w-44 rounded-2xl shadow-xl border p-1.5 z-30 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleExportCSV();
-                          setIsCardMoreOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
-                      >
-                        <Download size={13} />
-                        <span>Download CSV</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleExportGeoJSON();
-                          setIsCardMoreOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
-                      >
-                        <FileText size={13} />
-                        <span>Download GeoJSON</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMethodologyOpen(true);
-                          setIsCardMoreOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
-                      >
-                        <Info size={13} />
-                        <span>Methodology</span>
-                      </button>
-                    </div>
-                  )}
+                    {/* More Popover */}
+                    {isCardMoreOpen && (
+                      <div className="activity-surface-popover absolute right-0 top-11 w-48 rounded-3xl p-2 z-30 text-xs space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleExportCSV();
+                            setIsCardMoreOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-full hover:bg-indigo-500/15 activity-subtext font-medium flex items-center gap-2 transition-colors"
+                        >
+                          <Download size={13} />
+                          <span>Download CSV</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleExportGeoJSON();
+                            setIsCardMoreOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-full hover:bg-indigo-500/15 activity-subtext font-medium flex items-center gap-2 transition-colors"
+                        >
+                          <FileText size={13} />
+                          <span>Download GeoJSON</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMethodologyOpen(true);
+                            setIsCardMoreOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-full hover:bg-indigo-500/15 activity-subtext font-medium flex items-center gap-2 transition-colors"
+                        >
+                          <Info size={13} />
+                          <span>Methodology</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Metrics Row & Legend: Big Indigo Number + Big Dark Number on Left | Less [tiles] More on Right */}
+              {/* Metrics Row & Legend: Total + Peak Single Day + Active Days on Left | Less [tiles] More on Right */}
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                <div className="flex items-baseline gap-10 sm:gap-14">
+                <div className="flex flex-wrap items-baseline gap-8 sm:gap-12">
                   {/* Stat 1: Accent Purple-Indigo (#524ad3) */}
                   <div>
                     <span
@@ -1154,6 +1178,16 @@ export default function FireActivityCalendar() {
                     <span className="activity-muted text-[13px] font-normal mt-2 block">
                       Peak single day{" "}
                       {stats.busiestDay.date ? `(${formatDisplayDate(stats.busiestDay.date)})` : ""}
+                    </span>
+                  </div>
+
+                  {/* Stat 3: Active Days (moved from removed top header bar) */}
+                  <div>
+                    <span className="activity-metric-val text-3xl sm:text-[36px] tracking-tight leading-none block font-sans tabular-nums">
+                      {stats.activeDaysCount}
+                    </span>
+                    <span className="activity-muted text-[13px] font-normal mt-2 block">
+                      Active days in {selectedYear}
                     </span>
                   </div>
                 </div>
@@ -1234,7 +1268,7 @@ export default function FireActivityCalendar() {
                                 onClick={() => setSelectedDate(cell.date)}
                                 onMouseEnter={() => setHoveredCell(cell)}
                                 onMouseLeave={() => setHoveredCell(null)}
-                                className={`w-[13px] h-[13px] rounded-[4px] transition-all hover:scale-130 hover:z-20 relative cursor-pointer ${
+                                className={`cal-day-tile w-[13px] h-[13px] rounded-[4px] transition-all hover:scale-130 hover:z-20 relative cursor-pointer ${
                                   isSelected ? "activity-tile-selected" : ""
                                 }`}
                                 style={{ backgroundColor: colorVar }}
@@ -1250,7 +1284,7 @@ export default function FireActivityCalendar() {
 
               {/* Subtle Interactive Hover / Selected Telemetry Strip */}
               <div
-                className="pt-3 border-t border-slate-400/20 flex flex-wrap items-center justify-between gap-3 text-xs"
+                className="pt-3 glass-divider-t flex flex-wrap items-center justify-between gap-3 text-xs"
                 aria-live="polite"
               >
                 {activeDetailCell ? (
@@ -1328,7 +1362,7 @@ export default function FireActivityCalendar() {
                   <button
                     type="button"
                     onClick={() => setIsMethodologyOpen(true)}
-                    className="activity-muted hover:opacity-80 text-xs font-medium flex items-center gap-0.5 transition-opacity"
+                    className="glass-btn-ghost px-3 py-1 rounded-full text-xs font-medium flex items-center gap-0.5"
                   >
                     <span>Details</span>
                     <span className="text-[10px]">›</span>
@@ -1441,7 +1475,7 @@ export default function FireActivityCalendar() {
                         const active = radarMetrics.find((m) => m.key === hoveredRadarKey);
                         if (!active) return null;
                         return (
-                          <span className="activity-radar-pill px-2.5 py-0.5 rounded-full font-medium border">
+                          <span className="activity-radar-pill px-3 py-0.5 rounded-full font-medium">
                             {active.label}: <strong>{active.value}%</strong> · {active.detail}
                           </span>
                         );
@@ -1455,7 +1489,7 @@ export default function FireActivityCalendar() {
                 </div>
 
                 {/* 4-Band Segmented Percentage Bar Legend (matching bottom-right reference) */}
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-t border-slate-400/20">
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2.5 glass-divider-t">
                   <div className="activity-muted text-[11px]">
                     Streak:{" "}
                     <strong className="activity-card-title">
@@ -1485,12 +1519,12 @@ export default function FireActivityCalendar() {
               </div>
 
               {/* CARD 4: ACTIVITY ARCHIVE EXPORT BANNER */}
-              <div className="activity-archive-banner bg-gradient-to-br from-[#5851d4] via-[#4a42c8] to-[#3129a3] rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between shadow-lg relative overflow-hidden">
+              <div className="activity-archive-banner rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="activity-on-accent w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center font-bold text-xs">
+                    <div className="activity-on-accent w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs">
                       TI
                     </div>
                     <span className="font-semibold text-sm tracking-tight text-white">
@@ -1503,16 +1537,16 @@ export default function FireActivityCalendar() {
                   </h4>
                 </div>
 
-                <div className="relative z-10 mt-6 pt-5 border-t border-white/15 flex flex-col gap-3">
+                <div className="relative z-10 mt-6 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col gap-3">
                   <span className="text-xs font-medium text-white/90">
                     {data?.total?.toLocaleString() ?? 0} observed calendar dates in {selectedYear}
                   </span>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={handleExportGeoJSON}
-                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-semibold transition-colors"
+                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/18 hover:bg-white/28 text-white rounded-full text-xs font-semibold transition-colors"
                     >
                       <FileText size={13} />
                       <span>GeoJSON</span>
@@ -1521,7 +1555,7 @@ export default function FireActivityCalendar() {
                     <button
                       type="button"
                       onClick={handleExportCSV}
-                      className="activity-archive-csv-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                      className="activity-archive-csv-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-full text-xs font-semibold shadow-xs transition-colors"
                     >
                       <Download size={13} />
                       <span>Export CSV</span>
@@ -1542,16 +1576,17 @@ export default function FireActivityCalendar() {
 
       {/* Methodology Modal */}
       {isMethodologyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
-          <div className="activity-surface-control rounded-3xl shadow-2xl border max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-400/20 mb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4">
+          <div className="activity-surface-popover rounded-3xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 glass-divider-b mb-3">
               <h3 className="activity-card-title text-sm font-bold">
                 How Daily Activity Is Aggregated
               </h3>
               <button
                 type="button"
                 onClick={() => setIsMethodologyOpen(false)}
-                className="activity-muted hover:opacity-80 p-1 rounded-md"
+                aria-label="Close modal"
+                className="glass-icon-btn p-1.5 rounded-full"
               >
                 <X size={16} />
               </button>
@@ -1572,15 +1607,15 @@ export default function FireActivityCalendar() {
                   Top 25% highest activity days.
                 </li>
                 <li>
-                  <span className="font-semibold text-[#7670e2]">High (Level 3):</span> 45%–75%
+                  <span className="font-semibold tone-blue">High (Level 3):</span> 45%–75%
                   activity threshold.
                 </li>
                 <li>
-                  <span className="font-semibold text-[#a6a2ef]">Moderate (Level 2):</span> 20%–45%
+                  <span className="font-semibold tone-sky">Moderate (Level 2):</span> 20%–45%
                   activity threshold.
                 </li>
                 <li>
-                  <span className="font-semibold text-indigo-400">Low (Level 1):</span> Baseline
+                  <span className="font-semibold tone-cyan">Low (Level 1):</span> Baseline
                   detected fire activity.
                 </li>
                 <li>
@@ -1594,7 +1629,7 @@ export default function FireActivityCalendar() {
               <button
                 type="button"
                 onClick={() => setIsMethodologyOpen(false)}
-                className="activity-on-accent px-4 py-2 bg-[#524ad3] hover:bg-indigo-700 rounded-xl text-xs font-semibold shadow-xs"
+                className="glass-btn-primary px-5 py-2 rounded-full text-xs font-semibold"
               >
                 Got it
               </button>
@@ -1648,8 +1683,8 @@ function OutlierTelemetryGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Subtle section header */}
-      <div className="flex items-center justify-between px-1">
+      {/* Subtle glass section header */}
+      <div className="activity-card px-5 py-3 flex items-center justify-between">
         <h3 className="activity-card-title text-sm font-semibold tracking-tight">
           Anomaly & Outlier Summary
         </h3>
@@ -1657,7 +1692,7 @@ function OutlierTelemetryGrid({
           <button
             type="button"
             onClick={onRetryAnomalies}
-            className="text-[11px] font-semibold text-rose-500 hover:underline"
+            className="glass-btn px-3 py-1 rounded-full text-[11px] font-semibold tone-rose"
           >
             Outlier sync error · Retry
           </button>
@@ -1681,7 +1716,7 @@ function OutlierTelemetryGrid({
               key={card.id}
               onClick={() => card.targetDate && onSelectDate(card.targetDate)}
               className={`activity-card p-6 flex flex-col justify-between gap-6 cursor-pointer transition-all hover:-translate-y-0.5 ${
-                isSelectedCard ? "ring-1 ring-[#524ad3]/40" : ""
+                isSelectedCard ? "brightness-105" : ""
               } ${anomalyLoading ? "opacity-75" : ""}`}
             >
               {/* Top Row: Title + Circular Arrow Button */}
@@ -1711,9 +1746,9 @@ function OutlierTelemetryGrid({
                     </span>
                     {card.hasData &&
                       (card.isPositive ? (
-                        <ArrowUp size={16} strokeWidth={2.3} className="text-emerald-500 shrink-0" />
+                        <ArrowUp size={16} strokeWidth={2.3} className="tone-emerald shrink-0" />
                       ) : (
-                        <ArrowDown size={16} strokeWidth={2.3} className="text-rose-500 shrink-0" />
+                        <ArrowDown size={16} strokeWidth={2.3} className="tone-rose shrink-0" />
                       ))}
                   </div>
                   <span

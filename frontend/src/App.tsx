@@ -41,7 +41,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <DashboardProvider>
-        <div className="app-shell flex flex-col h-screen overflow-hidden bg-slate-950 text-white" data-theme={theme}>
+        <div className="app-shell flex flex-col h-screen overflow-hidden" data-theme={theme}>
           {/* Top Navbar Contract */}
           <Navbar
             activeTab={activeTab}
