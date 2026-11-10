@@ -6,8 +6,6 @@ import {
   MoreHorizontal,
   ChevronUp,
   ChevronDown,
-  TrendingDown,
-  TrendingUp,
   RotateCw,
   X,
   Search,
@@ -504,6 +502,8 @@ export default function GlobalFirePulse() {
                     </div>
                   );
                 })}
+                {anomaliesLoading && <span className="w-full text-center text-[10px] text-slate-500">Loading anomaly data…</span>}
+                {anomaliesError && <span className="w-full text-center text-[10px] text-slate-500">Anomaly data unavailable</span>}
               </div>
             </div>
           </div>

@@ -6,6 +6,9 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      include: ['@deck.gl/mesh-layers', '@deck.gl/extensions', '@deck.gl/widgets'],
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

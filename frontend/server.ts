@@ -25,14 +25,20 @@ async function startServer() {
   app.use(['/api', '/health'], async (req, res) => {
     try {
       const targetUrl = `${BACKEND_URL}${req.originalUrl}`;
-      const backendRes = await fetch(targetUrl, {
+      const hasBody = ['POST', 'PUT', 'PATCH'].includes(req.method);
+      const isJsonBody = req.headers['content-type']?.includes('application/json') ?? false;
+      const proxyBody = !hasBody ? undefined : isJsonBody ? JSON.stringify(req.body) : req;
+      const fetchOptions: RequestInit & { duplex?: 'half' } = {
         method: req.method,
         headers: {
           'Accept': 'application/json',
           ...(req.headers['content-type'] ? { 'Content-Type': req.headers['content-type'] as string } : {}),
+          ...(req.headers['x-filename'] ? { 'X-Filename': req.headers['x-filename'] as string } : {}),
         },
-        body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
-      });
+        body: proxyBody as BodyInit | undefined,
+        ...(hasBody && !isJsonBody ? { duplex: 'half' as const } : {}),
+      };
+      const backendRes = await fetch(targetUrl, fetchOptions);
 
       res.status(backendRes.status);
       backendRes.headers.forEach((value, key) => {
