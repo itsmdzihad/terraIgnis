@@ -19,11 +19,11 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
+          target: (process.env.BACKEND_API_URL || process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace('localhost', '127.0.0.1'),
           changeOrigin: true,
         },
         '/health': {
-          target: process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
+          target: (process.env.BACKEND_API_URL || process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace('localhost', '127.0.0.1'),
           changeOrigin: true,
         },
       },

@@ -1,47 +1,102 @@
-import React, { useMemo, useState } from 'react';
-import { Calendar } from 'lucide-react';
-import { useCalendar } from '../hooks/useCalendar';
-import { useAnomalies } from '../hooks/useAnomalies';
-import type { AnomalyLevel } from '../types/anomaly';
-import type { CalendarDay } from '../types/calendar';
-import { useDashboard } from '../context/DashboardContext';
+import React, { useMemo, useState } from "react";
+import {
+  ChevronDown,
+  X,
+  FileText,
+  Download,
+  AlertTriangle,
+  MoreHorizontal,
+  Maximize2,
+  Minimize2,
+  Pencil,
+  Info,
+  Flame,
+  ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+import { useCalendar } from "../hooks/useCalendar";
+import { useAnomalies } from "../hooks/useAnomalies";
+import type { CalendarDay } from "../types/calendar";
+import { useDashboard } from "../context/DashboardContext";
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
 const PAGE_SIZE = 366;
+const CELL_SIZE = 13;
+const CELL_GAP = 4;
+const WEEK_COL_WIDTH = CELL_SIZE + CELL_GAP; // 17px
 
-const anomalyLevelStyle: Record<AnomalyLevel, string> = {
-  normal: 'text-emerald-300 border-emerald-800/70 bg-emerald-950/40',
-  low: 'text-amber-300 border-amber-800/70 bg-amber-950/40',
-  high: 'text-orange-300 border-orange-800/70 bg-orange-950/40',
-  extreme_low: 'text-cyan-300 border-cyan-800/70 bg-cyan-950/40',
-  extreme_high: 'text-red-300 border-red-800/70 bg-red-950/40',
-};
+// 5 Intensity levels backed by CSS custom properties (matching reference image in light mode + dark mode support)
+const COLOR_LEVEL_VARS = [
+  { bg: "var(--cal-l0)", name: "Zero detections" },
+  { bg: "var(--cal-l1)", name: "Low activity" },
+  { bg: "var(--cal-l2)", name: "Moderate activity" },
+  { bg: "var(--cal-l3)", name: "High activity" },
+  { bg: "var(--cal-l4)", name: "Peak activity" },
+];
 
 interface CalendarCell {
   date: string;
   observation: CalendarDay | null;
+  dayOfWeek: number; // 0=Sun, 1=Mon, ..., 6=Sat
+  weekIndex: number;
 }
 
 function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function burnIndexColor(value: number): string {
-  if (value <= 25) return '#00204c';
-  if (value <= 50) return '#414c6b';
-  if (value <= 75) return '#7b7b78';
-  if (value <= 90) return '#c5a852';
-  return '#fee838';
+function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const monthIdx = Number(parts[1]) - 1;
+  const day = Number(parts[2]);
+  return `${MONTH_NAMES[monthIdx]} ${day}`;
+}
+
+function formatFullDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export default function FireActivityCalendar() {
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const { selectedDate, selectedStartDate, selectedEndDate, setSelectedDate, setSelectedYear } = useDashboard();
+  const {
+    selectedDate,
+    selectedStartDate,
+    selectedEndDate,
+    setSelectedDate,
+    setSelectedYear,
+  } = useDashboard();
+
   const selectedYear = Number(selectedStartDate.slice(0, 4));
 
+  // UI state controls
+  const [metricMode, setMetricMode] = useState<"fire_count" | "burn_index">("fire_count");
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+  const [isCardEditOpen, setIsCardEditOpen] = useState(false);
+  const [isCardMoreOpen, setIsCardMoreOpen] = useState(false);
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState<CalendarCell | null>(null);
+  const [hoveredRadarKey, setHoveredRadarKey] = useState<string | null>(null);
+  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  // API Hooks - Strictly real backend telemetry, NO mock data
   const { data, loading, error, refetch } = useCalendar({
     start_date: selectedStartDate,
     end_date: selectedEndDate,
@@ -51,8 +106,8 @@ export default function FireActivityCalendar() {
 
   const {
     data: anomalyData,
-    loading: anomaliesLoading,
-    error: anomaliesError,
+    loading: anomalyLoading,
+    error: anomalyError,
     refetch: refetchAnomalies,
   } = useAnomalies({
     start_date: selectedStartDate,
@@ -61,22 +116,34 @@ export default function FireActivityCalendar() {
 
   const observationsByDate = useMemo(
     () => new Map((data?.data ?? []).map((day) => [day.date, day])),
-    [data],
+    [data]
   );
 
-  // Calendar dates are layout only. A missing response record stays unavailable; it is never assigned a synthetic value.
+  // Build the 53 weeks x 7 days grid (0=Sun, 1=Mon, ..., 6=Sat)
   const calendarWeeks = useMemo(() => {
     const weeks: (CalendarCell | null)[][] = [];
     const firstDate = new Date(selectedYear, 0, 1);
-    let week: (CalendarCell | null)[] = Array.from({ length: firstDate.getDay() }, () => null);
+    let week: (CalendarCell | null)[] = Array.from(
+      { length: firstDate.getDay() },
+      () => null
+    );
     const cursor = new Date(firstDate);
+    let weekIdx = 0;
 
     while (cursor.getFullYear() === selectedYear) {
       const date = formatLocalDate(cursor);
-      week.push({ date, observation: observationsByDate.get(date) ?? null });
+      const dayOfWeek = cursor.getDay();
+      week.push({
+        date,
+        observation: observationsByDate.get(date) ?? null,
+        dayOfWeek,
+        weekIndex: weekIdx,
+      });
+
       if (week.length === 7) {
         weeks.push(week);
         week = [];
+        weekIdx++;
       }
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -88,265 +155,1626 @@ export default function FireActivityCalendar() {
     return weeks;
   }, [observationsByDate, selectedYear]);
 
-  const monthHeaders = useMemo(() => {
-    let lastMonth = '';
-    return calendarWeeks.map((week) => {
-      const firstDate = week.find((cell): cell is CalendarCell => cell !== null)?.date;
-      const month = firstDate?.slice(5, 7) ?? '';
-      if (month && month !== lastMonth) {
-        lastMonth = month;
-        return MONTH_NAMES[Number(month) - 1];
+  // Center each Month label cleanly over its span of week columns (matching reference image)
+  const monthLabels = useMemo(() => {
+    const list: { month: string; centerPx: number }[] = [];
+    for (let m = 0; m < 12; m++) {
+      const monthPrefix = `${selectedYear}-${String(m + 1).padStart(2, "0")}-`;
+      let firstCol = -1;
+      let lastCol = -1;
+      for (let w = 0; w < calendarWeeks.length; w++) {
+        const hasMonthDay = calendarWeeks[w].some(
+          (cell) => cell && cell.date.startsWith(monthPrefix)
+        );
+        if (hasMonthDay) {
+          if (firstCol === -1) firstCol = w;
+          lastCol = w;
+        }
       }
-      return null;
-    });
+      if (firstCol >= 0) {
+        const centerPx = ((firstCol + lastCol) / 2) * WEEK_COL_WIDTH + CELL_SIZE / 2;
+        list.push({ month: MONTH_NAMES[m], centerPx });
+      }
+    }
+    return list;
+  }, [calendarWeeks, selectedYear]);
+
+  // Flattened valid days for statistics
+  const allDays = useMemo(() => {
+    const list: CalendarCell[] = [];
+    for (const week of calendarWeeks) {
+      for (const cell of week) {
+        if (cell) list.push(cell);
+      }
+    }
+    return list;
   }, [calendarWeeks]);
 
-  const strongestAnomalies = useMemo(() => {
-    if (!anomalyData) return [];
-    return [...anomalyData]
-      .sort((left, right) => {
-        const leftScore = left.robust_z_score === null ? -1 : Math.abs(left.robust_z_score);
-        const rightScore = right.robust_z_score === null ? -1 : Math.abs(right.robust_z_score);
-        return rightScore - leftScore;
-      })
-      .slice(0, 4);
-  }, [anomalyData]);
+  // Max value calculation for intensity scaling
+  const maxDayValue = useMemo(() => {
+    let max = 1;
+    for (const cell of allDays) {
+      const val =
+        metricMode === "fire_count"
+          ? cell.observation?.fire_count ?? 0
+          : cell.observation?.mean_burn_index ?? 0;
+      if (val > max) max = val;
+    }
+    return max;
+  }, [allDays, metricMode]);
 
-  const detailDate = hoveredDate ?? selectedDate;
-  const detailObservation = detailDate ? observationsByDate.get(detailDate) : undefined;
-  const observedDateRange = data?.data.length
-    ? `${data.data[0].date} — ${data.data[data.data.length - 1].date} · ${data.total} observed dates`
-    : null;
+  // Map value to 0..4 intensity levels
+  const getLevel = (cell: CalendarCell | null): number => {
+    if (!cell || !cell.observation) return 0;
+    const val =
+      metricMode === "fire_count"
+        ? cell.observation.fire_count
+        : cell.observation.mean_burn_index ?? 0;
+    if (val <= 0) return 0;
+    const ratio = val / maxDayValue;
+    if (ratio > 0.75) return 4;
+    if (ratio > 0.45) return 3;
+    if (ratio > 0.2) return 2;
+    return 1;
+  };
 
+  // Real data statistics
+  const stats = useMemo(() => {
+    let total = 0;
+    let busiestDay: { date: string; value: number } = { date: "", value: 0 };
+    let longestStreak = 0;
+    let activeDaysCount = 0;
+    let tempStreak = 0;
+
+    for (let i = 0; i < allDays.length; i++) {
+      const cell = allDays[i];
+      const val =
+        metricMode === "fire_count"
+          ? cell.observation?.fire_count ?? 0
+          : Math.round(cell.observation?.mean_burn_index ?? 0);
+
+      total += val;
+
+      if (val > busiestDay.value) {
+        busiestDay = { date: cell.date, value: val };
+      }
+
+      if (val > 0) {
+        activeDaysCount++;
+        tempStreak++;
+        if (tempStreak > longestStreak) {
+          longestStreak = tempStreak;
+        }
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    const totalDays = allDays.length || 365;
+    const activePercentage = Math.round((activeDaysCount / totalDays) * 100);
+
+    return {
+      total,
+      busiestDay,
+      longestStreak,
+      activeDaysCount,
+      totalDays,
+      activePercentage,
+    };
+  }, [allDays, metricMode]);
+
+  // 6-Axis Burn Anomaly Radar Metrics strictly from real backend data
+  const radarMetrics = useMemo(() => {
+    const calendarDays = data?.data ?? [];
+    const anomalies = anomalyData ?? [];
+
+    const activePct = Math.min(
+      100,
+      Math.round((stats.activeDaysCount / Math.max(1, stats.totalDays)) * 100)
+    );
+
+    const outlierDaysCount = calendarDays.filter((d) => d.anomaly_count > 0).length;
+    const outlierDaysPct =
+      stats.activeDaysCount > 0
+        ? Math.min(100, Math.round((outlierDaysCount / stats.activeDaysCount) * 100))
+        : 0;
+
+    const highSevereCount = anomalies.filter(
+      (a) => a.anomaly_level === "high" || a.anomaly_level === "extreme_high"
+    ).length;
+    const highSeverityPct =
+      anomalies.length > 0
+        ? Math.min(100, Math.round((highSevereCount / anomalies.length) * 100))
+        : 0;
+
+    const validPercentiles = anomalies
+      .map((a) => a.anomaly_percentile)
+      .filter((p): p is number => p !== null);
+    const meanPercentilePct =
+      validPercentiles.length > 0
+        ? Math.min(
+            100,
+            Math.round(
+              (validPercentiles.reduce((sum, p) => sum + p, 0) / validPercentiles.length) * 100
+            )
+          )
+        : 0;
+
+    const validMeanBurns = calendarDays
+      .map((d) => d.mean_burn_index)
+      .filter((b): b is number => b !== null);
+    const avgMeanBurn =
+      validMeanBurns.length > 0
+        ? validMeanBurns.reduce((sum, b) => sum + b, 0) / validMeanBurns.length
+        : 0;
+    const meanBurnPct = Math.min(100, Math.round(avgMeanBurn));
+
+    const maxBurnObserved = calendarDays.reduce(
+      (max, d) => Math.max(max, d.max_burn_index ?? 0),
+      0
+    );
+    const peakBurnPct = Math.min(100, Math.round(maxBurnObserved));
+
+    return [
+      {
+        key: "active_days",
+        label: "Active Days",
+        value: activePct,
+        detail: `${stats.activeDaysCount} of ${stats.totalDays} days`,
+      },
+      {
+        key: "outlier_days",
+        label: "Outlier Days",
+        value: outlierDaysPct,
+        detail: `${outlierDaysCount} anomalous active days`,
+      },
+      {
+        key: "high_severity",
+        label: "High Severity",
+        value: highSeverityPct,
+        detail: `${highSevereCount} of ${anomalies.length} outliers`,
+      },
+      {
+        key: "mean_percentile",
+        label: "Percentile",
+        value: meanPercentilePct,
+        detail: `${validPercentiles.length} scored anomalies`,
+      },
+      {
+        key: "mean_burn",
+        label: "Mean Burn",
+        value: meanBurnPct,
+        detail: `Avg index ${avgMeanBurn.toFixed(1)}`,
+      },
+      {
+        key: "peak_burn",
+        label: "Peak Burn",
+        value: peakBurnPct,
+        detail: `Max index ${maxBurnObserved.toFixed(1)}`,
+      },
+    ];
+  }, [data, anomalyData, stats.activeDaysCount, stats.totalDays]);
+
+  const anomalySummaryText = useMemo(() => {
+    const totalAnomalies = anomalyData?.length ?? 0;
+    const outlierDaysCount = (data?.data ?? []).filter((d) => d.anomaly_count > 0).length;
+    const highCount = (anomalyData ?? []).filter(
+      (a) => a.anomaly_level === "high" || a.anomaly_level === "extreme_high"
+    ).length;
+    const meanBurnItem = radarMetrics.find((m) => m.key === "mean_burn");
+
+    if (totalAnomalies === 0) {
+      return `Across ${stats.activeDaysCount} active fire days in ${selectedYear}, zero statistical outliers crossed the anomaly threshold (${meanBurnItem?.detail ?? "no burn index"}).`;
+    }
+    return `Across ${stats.activeDaysCount} active fire days in ${selectedYear}, ${totalAnomalies.toLocaleString()} burn anomalies occurred over ${outlierDaysCount} days, with ${highCount.toLocaleString()} classified as high or extreme severity.`;
+  }, [anomalyData, data, stats.activeDaysCount, selectedYear, radarMetrics]);
+
+  // 4 Multi-Horizon Anomaly & Outlier Telemetry Cards strictly from real backend data (/api/anomalies + /api/calendar)
+  const outlierCards = useMemo(() => {
+    const anomalies = anomalyData ?? [];
+    const totalAnomalies = anomalies.length;
+    const observedDays = [...(data?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+    const totalObservedAnomalies = observedDays.reduce((s, d) => s + d.anomaly_count, 0);
+    const effectiveTotalAnomalies = totalAnomalies > 0 ? totalAnomalies : totalObservedAnomalies;
+    const totalObservedFires = observedDays.reduce((s, d) => s + d.fire_count, 0);
+
+    const getDayMetricVal = (day: CalendarDay): number => {
+      if (effectiveTotalAnomalies === 0) {
+        return metricMode === "fire_count" ? day.fire_count : Math.round(day.mean_burn_index ?? 0);
+      }
+      return metricMode === "fire_count"
+        ? day.anomaly_count
+        : day.anomaly_count > 0
+        ? Math.round(day.max_burn_index ?? day.mean_burn_index ?? 0)
+        : 0;
+    };
+
+    const bucketIntoColumns = <T,>(
+      items: T[],
+      compute: (slice: T[]) => {
+        label: string;
+        detail: string;
+        value: number;
+        targetDate?: string;
+      }
+    ) => {
+      if (items.length === 0) {
+        return Array.from({ length: 12 }, () => ({
+          label: "",
+          detail: "No observation",
+          value: 0,
+          targetDate: undefined,
+        }));
+      }
+      const bucketCount = Math.min(12, items.length);
+      const cols: { label: string; detail: string; value: number; targetDate?: string }[] = [];
+      for (let b = 0; b < bucketCount; b++) {
+        const start = Math.floor((b * items.length) / bucketCount);
+        const end = Math.max(start + 1, Math.floor(((b + 1) * items.length) / bucketCount));
+        cols.push(compute(items.slice(start, end)));
+      }
+      while (cols.length < 12) {
+        cols.push({
+          label: "",
+          detail: "No observation",
+          value: 0,
+          targetDate: undefined,
+        });
+      }
+      return cols;
+    };
+
+    const toDotColumns = (
+      series: { label: string; detail: string; value: number; targetDate?: string }[]
+    ): DotColumn[] => {
+      const maxVal = Math.max(0, ...series.map((s) => s.value));
+      return series.map((s) => ({
+        label: s.label,
+        detail: s.detail,
+        value: s.value,
+        targetDate: s.targetDate,
+        active: s.value > 0,
+        dots:
+          s.value <= 0 || maxVal <= 0
+            ? 1
+            : Math.max(2, Math.min(6, Math.round(1 + (s.value / maxVal) * 5))),
+      }));
+    };
+
+    // Card 1: High & Extreme Outliers strictly from /api/anomalies grouped by real acq_date
+    const highExtremeAnomalies = anomalies.filter(
+      (a) => a.anomaly_level === "high" || a.anomaly_level === "extreme_high"
+    );
+    const byAnomDate = new Map<
+      string,
+      { date: string; highCount: number; totalCount: number; peakBurn: number; maxAbsZ: number }
+    >();
+    for (const a of anomalies) {
+      const entry = byAnomDate.get(a.acq_date) ?? {
+        date: a.acq_date,
+        highCount: 0,
+        totalCount: 0,
+        peakBurn: 0,
+        maxAbsZ: 0,
+      };
+      if (a.anomaly_level === "high" || a.anomaly_level === "extreme_high") {
+        entry.highCount += 1;
+      }
+      entry.totalCount += 1;
+      entry.peakBurn = Math.max(entry.peakBurn, a.burn_index);
+      if (a.robust_z_score !== null) {
+        entry.maxAbsZ = Math.max(entry.maxAbsZ, Math.abs(a.robust_z_score));
+      }
+      byAnomDate.set(a.acq_date, entry);
+    }
+    const sortedAnomDates = [...byAnomDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+    const peakPositiveAnom = [...anomalies]
+      .sort((a, b) => {
+        const aZ = a.robust_z_score ?? -Infinity;
+        const bZ = b.robust_z_score ?? -Infinity;
+        if (bZ !== aZ) return bZ - aZ;
+        return b.burn_index - a.burn_index;
+      })[0] ?? null;
+
+    const card1Date = peakPositiveAnom?.acq_date || stats.busiestDay.date;
+    const card1Pct =
+      totalAnomalies > 0
+        ? ((highExtremeAnomalies.length / totalAnomalies) * 100).toFixed(2)
+        : "0.00";
+    const card1Positive =
+      totalAnomalies > 0 ? highExtremeAnomalies.length >= totalAnomalies / 2 : false;
+    const card1Sub = peakPositiveAnom
+      ? `${highExtremeAnomalies.length.toLocaleString()}/${totalAnomalies.toLocaleString()} high · ${
+          peakPositiveAnom.robust_z_score !== null
+            ? `Z ${peakPositiveAnom.robust_z_score > 0 ? "+" : ""}${peakPositiveAnom.robust_z_score.toFixed(2)}`
+            : `Burn ${peakPositiveAnom.burn_index.toFixed(1)}`
+        } (${formatDisplayDate(peakPositiveAnom.acq_date)})`
+      : `No outlier records in ${selectedYear}`;
+
+    const card1Series = bucketIntoColumns(sortedAnomDates, (slice) => {
+      const highSum = slice.reduce((s, x) => s + x.highCount, 0);
+      const totalSum = slice.reduce((s, x) => s + x.totalCount, 0);
+      const peakItem = slice.reduce((best, cur) =>
+        cur.highCount >= best.highCount ? cur : best
+      );
+      const rangeLabel =
+        slice.length === 1
+          ? formatDisplayDate(slice[0].date)
+          : `${formatDisplayDate(slice[0].date)}–${formatDisplayDate(slice[slice.length - 1].date)}`;
+      const val =
+        metricMode === "fire_count"
+          ? highSum
+          : Math.round(Math.max(...slice.map((x) => x.peakBurn)));
+      return {
+        label: rangeLabel,
+        detail:
+          metricMode === "fire_count"
+            ? `${rangeLabel} · ${highSum} high/ext (${totalSum} total)`
+            : `${rangeLabel} · Peak burn ${val}`,
+        value: val,
+        targetDate: peakItem.date,
+      };
+    });
+
+    // Card 2: Peak 7-Day Outlier Burst strictly across consecutive observed dates from /api/calendar
+    let bestWeekStart = 0;
+    let bestWeekMetric = -1;
+    let bestWeekAnomSum = 0;
+    const windowSize = Math.min(7, Math.max(1, observedDays.length));
+    for (let i = 0; i <= Math.max(0, observedDays.length - windowSize); i++) {
+      let metricSum = 0;
+      let anomSum = 0;
+      for (let j = 0; j < windowSize && i + j < observedDays.length; j++) {
+        metricSum += getDayMetricVal(observedDays[i + j]);
+        anomSum += observedDays[i + j].anomaly_count;
+      }
+      if (metricSum > bestWeekMetric) {
+        bestWeekMetric = metricSum;
+        bestWeekStart = i;
+        bestWeekAnomSum = anomSum;
+      }
+    }
+
+    let peakBurstDay: CalendarDay | null = observedDays[bestWeekStart] ?? null;
+    for (let j = 0; j < windowSize && bestWeekStart + j < observedDays.length; j++) {
+      const cur = observedDays[bestWeekStart + j];
+      if (!peakBurstDay || getDayMetricVal(cur) > getDayMetricVal(peakBurstDay)) {
+        peakBurstDay = cur;
+      }
+    }
+
+    const c2Start =
+      observedDays.length <= 12
+        ? 0
+        : Math.max(0, Math.min(observedDays.length - 12, bestWeekStart - 3));
+    const card2RawSlice = observedDays.slice(c2Start, c2Start + 12);
+    const card2Series = Array.from({ length: 12 }, (_, i) => {
+      const day = card2RawSlice[i];
+      if (!day) {
+        return { label: "", detail: "No observation", value: 0, targetDate: undefined };
+      }
+      const val = getDayMetricVal(day);
+      const disp = formatDisplayDate(day.date);
+      return {
+        label: disp,
+        detail:
+          metricMode === "fire_count"
+            ? `${disp} · ${day.anomaly_count} outliers (${day.fire_count} fires)`
+            : `${disp} · Max burn ${(day.max_burn_index ?? 0).toFixed(1)} (${day.anomaly_count} outliers)`,
+        value: val,
+        targetDate: day.date,
+      };
+    });
+
+    const card2Pct =
+      effectiveTotalAnomalies > 0
+        ? ((bestWeekAnomSum / effectiveTotalAnomalies) * 100).toFixed(2)
+        : "0.00";
+    const card2Positive = bestWeekAnomSum > 0;
+    const card2Sub = peakBurstDay
+      ? `${bestWeekAnomSum.toLocaleString()} outliers · Peak ${formatDisplayDate(
+          peakBurstDay.date
+        )} (${peakBurstDay.anomaly_count})`
+      : `No burst windows in ${selectedYear}`;
+
+    // Card 3: Peak Month (real month in /api/calendar with highest anomaly burden)
+    const monthTotals = MONTH_NAMES.map((name, mIdx) => {
+      const prefix = `${selectedYear}-${String(mIdx + 1).padStart(2, "0")}-`;
+      const days = observedDays.filter((d) => d.date.startsWith(prefix));
+      let anom = 0;
+      let fireSum = 0;
+      let peakDay: CalendarDay | null = null;
+      for (const d of days) {
+        anom += d.anomaly_count;
+        fireSum += d.fire_count;
+        if (!peakDay || getDayMetricVal(d) > getDayMetricVal(peakDay)) {
+          peakDay = d;
+        }
+      }
+      return { name, mIdx, days, anom, fireSum, peakDate: peakDay?.date ?? "" };
+    });
+
+    const bestMonth = monthTotals.reduce(
+      (best, cur) =>
+        cur.anom !== best.anom
+          ? cur.anom > best.anom
+            ? cur
+            : best
+          : cur.fireSum > best.fireSum
+          ? cur
+          : best,
+      monthTotals[0]
+    );
+
+    const card3Series = bucketIntoColumns(bestMonth.days, (slice) => {
+      const anomSum = slice.reduce((s, d) => s + d.anomaly_count, 0);
+      const fireSum = slice.reduce((s, d) => s + d.fire_count, 0);
+      const peakDay = slice.reduce((best, cur) =>
+        getDayMetricVal(cur) >= getDayMetricVal(best) ? cur : best
+      );
+      const rangeLabel =
+        slice.length === 1
+          ? formatDisplayDate(slice[0].date)
+          : `${formatDisplayDate(slice[0].date)}–${formatDisplayDate(slice[slice.length - 1].date)}`;
+      const val =
+        effectiveTotalAnomalies > 0
+          ? metricMode === "fire_count"
+            ? anomSum
+            : Math.round(Math.max(...slice.map((d) => (d.anomaly_count > 0 ? d.max_burn_index ?? 0 : 0))))
+          : fireSum;
+      return {
+        label: rangeLabel,
+        detail: `${rangeLabel} · ${anomSum} outliers (${fireSum.toLocaleString()} fires)`,
+        value: val,
+        targetDate: peakDay.date,
+      };
+    });
+
+    const card3Pct =
+      effectiveTotalAnomalies > 0
+        ? ((bestMonth.anom / effectiveTotalAnomalies) * 100).toFixed(2)
+        : "0.00";
+    const card3Positive = bestMonth.anom > 0;
+    const card3Sub =
+      bestMonth.days.length > 0
+        ? `${bestMonth.name} · ${bestMonth.anom.toLocaleString()} outliers (${bestMonth.fireSum.toLocaleString()} fires)`
+        : `No monthly outliers in ${selectedYear}`;
+
+    // Card 4: Outlier Detection Rate across full observed backend timeline (/api/calendar)
+    const peakRateDay =
+      observedDays.length > 0
+        ? observedDays.reduce((best, cur) => {
+            const curRate = cur.anomaly_count / Math.max(1, cur.fire_count);
+            const bestRate = best.anomaly_count / Math.max(1, best.fire_count);
+            return curRate > bestRate ? cur : best;
+          }, observedDays[0])
+        : null;
+
+    const card4Pct =
+      totalObservedFires > 0
+        ? ((effectiveTotalAnomalies / totalObservedFires) * 100).toFixed(2)
+        : "0.00";
+    const card4Positive = effectiveTotalAnomalies > 0;
+    const card4Sub = `${effectiveTotalAnomalies.toLocaleString()} outliers · ${totalObservedFires.toLocaleString()} detections`;
+
+    const card4Series = bucketIntoColumns(observedDays, (slice) => {
+      const anomSum = slice.reduce((s, d) => s + d.anomaly_count, 0);
+      const fireSum = slice.reduce((s, d) => s + d.fire_count, 0);
+      const ratePct = fireSum > 0 ? (anomSum / fireSum) * 100 : 0;
+      const peakSliceDay = slice.reduce((best, cur) =>
+        cur.anomaly_count >= best.anomaly_count ? cur : best
+      );
+      const rangeLabel =
+        slice.length === 1
+          ? formatDisplayDate(slice[0].date)
+          : `${formatDisplayDate(slice[0].date)}–${formatDisplayDate(slice[slice.length - 1].date)}`;
+      const val =
+        metricMode === "fire_count"
+          ? Number(ratePct.toFixed(2))
+          : Math.round(
+              slice.reduce((s, d) => s + (d.mean_burn_index ?? 0), 0) / Math.max(1, slice.length)
+            );
+      return {
+        label: rangeLabel,
+        detail:
+          metricMode === "fire_count"
+            ? `${rangeLabel} · ${ratePct.toFixed(2)}% (${anomSum}/${fireSum.toLocaleString()})`
+            : `${rangeLabel} · Mean burn ${val} (${anomSum} outliers)`,
+        value: val,
+        targetDate: peakSliceDay.date,
+      };
+    });
+
+    return [
+      {
+        id: "high-outliers",
+        title: "High & Extreme Outliers",
+        pct: card1Pct,
+        sub: card1Sub,
+        isPositive: card1Positive,
+        hasData: totalAnomalies > 0,
+        dotColor: "var(--dot-purple)",
+        targetDate: card1Date,
+        columns: toDotColumns(card1Series),
+      },
+      {
+        id: "peak-burst",
+        title: "Peak 7-Day Burst",
+        pct: card2Pct,
+        sub: card2Sub,
+        isPositive: card2Positive,
+        hasData: bestWeekAnomSum > 0,
+        dotColor: "var(--dot-blue)",
+        targetDate: peakBurstDay?.date ?? "",
+        columns: toDotColumns(card2Series),
+      },
+      {
+        id: "peak-month",
+        title: `Peak Month (${bestMonth.name})`,
+        pct: card3Pct,
+        sub: card3Sub,
+        isPositive: card3Positive,
+        hasData: bestMonth.anom > 0,
+        dotColor: "var(--dot-green)",
+        targetDate: bestMonth.peakDate,
+        columns: toDotColumns(card3Series),
+      },
+      {
+        id: "outlier-rate",
+        title: `Outlier Rate (${selectedYear})`,
+        pct: card4Pct,
+        sub: card4Sub,
+        isPositive: card4Positive,
+        hasData: effectiveTotalAnomalies > 0,
+        dotColor: "var(--dot-amber)",
+        targetDate: peakRateDay?.date ?? stats.busiestDay.date,
+        columns: toDotColumns(card4Series),
+      },
+    ];
+  }, [anomalyData, data, metricMode, selectedYear, stats.busiestDay.date]);
+
+  // Detail cell for hovered / selected telemetry strip
+  const activeDetailCell = useMemo(() => {
+    if (hoveredCell) return hoveredCell;
+    if (selectedDate) {
+      const match = allDays.find((c) => c.date === selectedDate);
+      if (match) return match;
+      const obs = observationsByDate.get(selectedDate);
+      if (obs) {
+        return {
+          date: selectedDate,
+          observation: obs,
+          dayOfWeek: new Date(selectedDate).getDay(),
+          weekIndex: 0,
+        };
+      }
+    }
+    return null;
+  }, [hoveredCell, selectedDate, allDays, observationsByDate]);
+
+  // Client-side GeoJSON and CSV Exports
+  const handleExportGeoJSON = () => {
+    const calendarDays = data?.data ?? [];
+    if (calendarDays.length === 0) {
+      setExportStatus("No calendar data to export for this year.");
+      return;
+    }
+    setExportStatus("Compiling GeoJSON point vectors...");
+    setTimeout(() => {
+      const geoJson = {
+        type: "FeatureCollection",
+        metadata: {
+          generated: new Date().toISOString(),
+          mission: "TerraIgnis DAILY FIRE TELEMETRY",
+          year: selectedYear,
+          total_records: calendarDays.length,
+        },
+        features: calendarDays.map((day) => ({
+          type: "Feature",
+          properties: {
+            date: day.date,
+            fire_count: day.fire_count,
+            mean_burn_index: day.mean_burn_index,
+            max_burn_index: day.max_burn_index,
+            anomaly_count: day.anomaly_count,
+          },
+          geometry: null,
+        })),
+      };
+
+      const blob = new Blob([JSON.stringify(geoJson, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `terraignis_fire_activity_${selectedYear}.geojson`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setExportStatus(`Exported ${calendarDays.length} records to GeoJSON.`);
+    }, 400);
+  };
+
+  const handleExportCSV = () => {
+    const calendarDays = data?.data ?? [];
+    if (calendarDays.length === 0) {
+      setExportStatus("No calendar data to export for this year.");
+      return;
+    }
+    setExportStatus("Formatting telemetry CSV tables...");
+    setTimeout(() => {
+      let csvContent = "Date,Fire_Count,Mean_Burn_Index,Max_Burn_Index,Anomaly_Count\n";
+      calendarDays.forEach((day) => {
+        csvContent += `${day.date},${day.fire_count},${day.mean_burn_index ?? ""},${day.max_burn_index ?? ""},${day.anomaly_count}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `terraignis_activity_daily_${selectedYear}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setExportStatus(`Exported CSV successfully (${calendarDays.length} rows).`);
+    }, 300);
+  };
+
+  // 6-Axis Radar SVG Geometry
+  const radarGeometry = useMemo(() => {
+    const cx = 200;
+    const cy = 134;
+    const maxR = 84;
+    const points = radarMetrics.map((metric, idx) => {
+      const angle = -Math.PI / 2 + (idx * Math.PI) / 3;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const valRadius = (metric.value / 100) * maxR;
+      const labelRadius = maxR + 18;
+      let textAnchor: "middle" | "start" | "end" = "middle";
+      if (cos > 0.2) textAnchor = "start";
+      else if (cos < -0.2) textAnchor = "end";
+      const labelYOffset = Math.abs(sin) < 0.2 ? 4 : sin > 0 ? 10 : -2;
+
+      return {
+        ...metric,
+        spokeX: cx + maxR * cos,
+        spokeY: cy + maxR * sin,
+        vx: cx + valRadius * cos,
+        vy: cy + valRadius * sin,
+        lx: cx + labelRadius * cos,
+        ly: cy + labelRadius * sin + labelYOffset,
+        textAnchor,
+      };
+    });
+
+    const polygonPoints = points.map((p) => `${p.vx.toFixed(1)},${p.vy.toFixed(1)}`).join(" ");
+    return { cx, cy, maxR, points, polygonPoints };
+  }, [radarMetrics]);
 
   return (
-    <div className="calendar-view flex flex-col w-full h-full min-h-0 bg-slate-950 p-4 sm:p-6 gap-5 overflow-y-auto overscroll-contain">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg">
+    <div className="activity-dashboard flex flex-col w-full h-full min-h-0 p-4 sm:p-6 lg:p-8 gap-6 overflow-y-auto overscroll-contain">
+      {/* 1. TOP HEADER BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-orange-500" />
-            Activity Calendar
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Daily fire-activity observations · coverage varies by year</p>
+          <span className="activity-muted text-xs font-medium tracking-wide block">
+            Satellite Telemetry
+          </span>
+          <div className="flex flex-wrap items-center gap-3 mt-0.5">
+            <h1 className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
+              Daily Activity Center
+            </h1>
+
+            {/* Statistic Year Pill Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                className="activity-surface-control flex items-center gap-2 px-3.5 py-1.5 border rounded-full text-xs font-semibold shadow-2xs transition-colors"
+              >
+                <span className="activity-on-accent w-4 h-4 rounded-md bg-[#524ad3] flex items-center justify-center text-[10px] font-bold">
+                  Σ
+                </span>
+                <span className="activity-muted font-normal">Year</span>
+                <span className="font-bold">{selectedYear}</span>
+                <ChevronDown size={13} className="activity-muted" />
+              </button>
+
+              {isYearDropdownOpen && (
+                <div className="activity-surface-control absolute left-0 mt-2 w-44 rounded-2xl shadow-xl border p-2 z-30 space-y-1">
+                  {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() => {
+                        setSelectedYear(yr);
+                        setIsYearDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                        selectedYear === yr
+                          ? "bg-indigo-500/15 font-bold"
+                          : "activity-muted hover:bg-indigo-500/5"
+                      }`}
+                      style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
+                    >
+                      {yr}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Segmented Switcher: Fire Count | Burn Index */}
+            <div className="activity-pill-track flex items-center p-1 rounded-full border">
+              <button
+                type="button"
+                onClick={() => setMetricMode("fire_count")}
+                className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
+                  metricMode === "fire_count"
+                    ? "activity-pill-active shadow-xs font-semibold"
+                    : "activity-pill-inactive"
+                }`}
+              >
+                Fire Count
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetricMode("burn_index")}
+                className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
+                  metricMode === "burn_index"
+                    ? "activity-pill-active shadow-xs font-semibold"
+                    : "activity-pill-inactive"
+                }`}
+              >
+                Burn Index
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 min-w-[280px]">
-          <label htmlFor="calendar-year" className="text-xs text-slate-400 shrink-0">Year</label>
-          <input
-            id="calendar-year"
-            type="range"
-            min="2000"
-            max="2026"
-            value={selectedYear}
-            onChange={(event) => {
-              setSelectedYear(Number(event.target.value));
-              setHoveredDate(null);
-            }}
-            className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-green-500"
-          />
-          <span className="text-sm font-semibold text-white bg-slate-950 border border-slate-800 px-2.5 py-1 rounded font-mono">
-            {selectedYear}
+        {/* Right Header Counter */}
+        <div className="text-left sm:text-right">
+          <span className="activity-muted text-xs font-medium block">
+            Active Observations
+          </span>
+          <span className="activity-metric-val text-2xl sm:text-3xl tracking-tight">
+            {stats.activeDaysCount} active days
           </span>
         </div>
       </div>
 
-      <section className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 sm:p-5 flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-white">Daily fire activity · {selectedYear}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Mean relative Burn Index · blank dates have no observation record</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400" aria-label="Burn Index legend">
-            <span>No observation</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] bg-slate-950 border border-slate-700 block" />
-            <span>Low</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#00204c' }} />
-            <span>Medium</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#7b7b78' }} />
-            <span>High</span>
-            <span className="w-[13px] h-[13px] rounded-[3px] block" style={{ backgroundColor: '#fee838' }} />
-          </div>
+      {/* Loading or Error */}
+      {loading ? (
+        <div className="activity-card p-12 text-center flex flex-col items-center justify-center">
+          <div className="w-8 h-8 border-3 border-[#524ad3] border-t-transparent rounded-full animate-spin mb-3" />
+          <span className="text-xs font-semibold text-[#524ad3] dark:text-indigo-400 tracking-wider uppercase">
+            Loading Satellite Telemetry...
+          </span>
         </div>
+      ) : error ? (
+        <div className="activity-card p-6 text-center border-rose-300 dark:border-rose-900">
+          <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-2" />
+          <span className="text-sm font-semibold text-rose-600">Telemetry Connection Error</span>
+          <button
+            onClick={refetch}
+            className="activity-on-accent mt-3 px-4 py-1.5 bg-rose-600 text-xs font-semibold rounded-xl"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        /* 2. MAIN DASHBOARD GRID */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* ================= DAILY FIRE ACTIVITY CALENDAR CARD ================= */}
+          <div
+            className={`${
+              isCalendarExpanded ? "lg:col-span-12" : "lg:col-span-8"
+            } flex flex-col gap-6`}
+          >
+            {/* CARD 1: EXACT REPLICA OF REFERENCE CALENDAR CARD */}
+            <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
+              {/* Top Row: Icon + Title + Info Icon on left | Action Pill Toolbar on right */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5" style={{ color: "var(--cal-accent)" }} />
+                  <h3 className="activity-card-title text-[16px] font-semibold tracking-tight">
+                    Daily Fire Activity
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsMethodologyOpen(true)}
+                    aria-label="Learn how fire activity is calculated"
+                    className="activity-muted hover:opacity-80 transition-opacity"
+                  >
+                    <Info size={15} />
+                  </button>
+                </div>
 
-        {observedDateRange && !loading && !error && (
-          <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
-            Observed data · {observedDateRange}
-          </div>
-        )}
+                {/* Top-Right Compact Segmented Action Toolbar [ Expand | Edit | More ] */}
+                <div className="relative flex items-center">
+                  <div className="activity-surface-control inline-flex items-center border rounded-xl px-2.5 py-1.5 gap-3 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+                      title={isCalendarExpanded ? "Collapse card" : "Expand full width"}
+                      className="activity-muted hover:opacity-80 transition-opacity"
+                    >
+                      {isCalendarExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
 
-        <div className="bg-slate-950 rounded-lg p-4 sm:p-5 border border-slate-800/60 overflow-x-auto" onMouseLeave={() => setHoveredDate(null)}>
-          {loading ? (
-            <div role="status" className="min-h-32 flex flex-col items-center justify-center text-center">
-              <span className="text-[9px] font-mono tracking-widest text-orange-400">CALENDAR TELEMETRY</span>
-              <span className="mt-1 text-xs font-mono text-slate-300">LOADING...</span>
-            </div>
-          ) : error ? (
-            <div role="alert" className="min-h-32 flex flex-col items-center justify-center text-center">
-              <span className="text-[9px] font-mono tracking-widest text-red-400">CALENDAR TELEMETRY · CONNECTION ERROR</span>
-              <span className="mt-1 text-xs text-slate-300">Unable to retrieve daily fire activity.</span>
-              <button onClick={refetch} className="mt-3 border border-slate-700 px-3 py-1 text-[10px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
-            </div>
-          ) : data && data.count === 0 ? (
-            <div className="min-h-32 flex flex-col items-center justify-center text-center">
-              <span className="text-[9px] font-mono tracking-widest text-slate-300">NO CALENDAR DATA</span>
-              <span className="mt-1 text-xs text-slate-400">No daily fire-activity observations are available for this period.</span>
-            </div>
-          ) : (
-            <div className="inline-block min-w-max">
-              <div className="flex gap-[4px] ml-[28px] mb-2 text-[10px] font-mono text-slate-400 select-none">
-                {monthHeaders.map((month, columnIndex) => (
-                  <div key={columnIndex} className="w-[15px] relative">
-                    {month && <span className="absolute bottom-0 whitespace-nowrap">{month}</span>}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCardEditOpen(!isCardEditOpen);
+                        setIsCardMoreOpen(false);
+                      }}
+                      title="Change year or metric"
+                      className="activity-muted hover:opacity-80 transition-opacity"
+                    >
+                      <Pencil size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCardMoreOpen(!isCardMoreOpen);
+                        setIsCardEditOpen(false);
+                      }}
+                      title="More calendar options"
+                      className="activity-muted hover:opacity-80 transition-opacity"
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
                   </div>
-                ))}
-              </div>
 
-              <div className="flex items-start">
-                <div className="flex flex-col gap-[4px] mr-2 text-[10px] font-mono text-slate-500 select-none">
-                  {['', 'M', '', 'W', '', 'F', ''].map((day, index) => (
-                    <div key={index} className="h-[15px] flex items-center justify-end w-[20px] leading-none">{day}</div>
-                  ))}
-                </div>
-
-                <div className="flex gap-[4px]">
-                  {calendarWeeks.map((week, columnIndex) => (
-                    <div key={columnIndex} className="flex flex-col gap-[4px]">
-                      {week.map((cell, rowIndex) => {
-                        if (!cell) return <div key={rowIndex} className="w-[15px] h-[15px]" />;
-                        const observation = cell.observation;
-                        const color = observation?.mean_burn_index == null
-                          ? undefined
-                          : burnIndexColor(observation.mean_burn_index);
-                        const label = observation
-                          ? `${cell.date}: ${observation.fire_count} observed records, mean Burn Index ${observation.mean_burn_index ?? 'unavailable'}`
-                          : `${cell.date}: no observed fire activity data`;
-
-                        return (
+                  {/* Edit Popover */}
+                  {isCardEditOpen && (
+                    <div className="activity-surface-control absolute right-0 top-10 w-52 rounded-2xl shadow-xl border p-3 z-30 space-y-3">
+                      <div>
+                        <span className="activity-muted text-[11px] font-semibold block mb-1.5">
+                          Select Year
+                        </span>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[2026, 2025, 2024, 2023, 2022, 2021].map((yr) => (
+                            <button
+                              key={yr}
+                              type="button"
+                              onClick={() => {
+                                setSelectedYear(yr);
+                                setIsCardEditOpen(false);
+                              }}
+                              className={`text-xs py-1 rounded-lg border font-medium transition-colors ${
+                                selectedYear === yr
+                                  ? "bg-indigo-500/15 border-indigo-400/60 font-bold"
+                                  : "border-slate-400/20 activity-muted"
+                              }`}
+                              style={selectedYear === yr ? { color: "var(--cal-accent)" } : undefined}
+                            >
+                              {yr}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-400/20">
+                        <span className="activity-muted text-[11px] font-semibold block mb-1.5">
+                          Intensity Metric
+                        </span>
+                        <div className="grid grid-cols-2 gap-1">
                           <button
-                            key={rowIndex}
                             type="button"
-                            aria-label={label}
-                            aria-pressed={selectedDate === cell.date}
-                            onClick={() => setSelectedDate(cell.date)}
-                            onMouseEnter={() => setHoveredDate(cell.date)}
-                            onPointerEnter={() => setHoveredDate(cell.date)}
-                            onFocus={() => setHoveredDate(cell.date)}
-                            onBlur={() => setHoveredDate(null)}
-                            className={`w-[15px] h-[15px] rounded-[3px] transition-all hover:ring-1 hover:ring-white focus:ring-1 focus:ring-white border ${selectedDate === cell.date ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-slate-950' : ''} ${color ? 'border-white/20' : 'bg-slate-950 border-slate-800/80'}`}
-                            style={color ? { backgroundColor: color } : undefined}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="calendar-detail min-h-[64px] bg-slate-950/60 rounded-lg border border-slate-800 p-3 flex items-center text-xs" aria-live="polite" aria-atomic="true">
-          {detailDate ? detailObservation ? (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full">
-              <Telemetry label="Date" value={detailObservation.date} />
-              <Telemetry label="Fire Count" value={detailObservation.fire_count.toLocaleString()} emphasis="text-green-300" />
-              <Telemetry label="Mean Burn Index" value={detailObservation.mean_burn_index === null ? 'Unavailable' : detailObservation.mean_burn_index.toFixed(1)} emphasis="text-orange-300" />
-              <Telemetry label="Max Burn Index" value={detailObservation.max_burn_index === null ? 'Unavailable' : detailObservation.max_burn_index.toFixed(1)} emphasis="text-orange-400" />
-              <Telemetry label="Anomaly Count" value={detailObservation.anomaly_count.toLocaleString()} emphasis="text-cyan-300" />
-            </div>
-          ) : (
-            <div className="w-full text-center text-slate-400">
-              <span className="block text-[9px] font-mono tracking-wider text-slate-500">{detailDate}</span>
-              NO OBSERVED FIRE ACTIVITY DATA
-            </div>
-          ) : (
-            <div className="text-slate-500 text-xs text-center w-full">Hover over a date, or select one to keep its telemetry here.</div>
-          )}
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-            <h4 className="text-sm font-semibold text-white">Z-Score Outlier Report</h4>
-            {!anomaliesLoading && !anomaliesError && anomalyData && (
-              <span className="text-[9px] font-mono text-emerald-400">
-                {anomalyData.length.toLocaleString()} anomaly records
-              </span>
-            )}
-          </div>
-
-          {anomaliesLoading ? (
-            <div role="status" className="text-center py-8">
-              <span className="block text-[9px] font-mono tracking-widest text-orange-400">ANOMALY TELEMETRY</span>
-              <span className="block mt-1 text-xs font-mono text-slate-300">LOADING...</span>
-            </div>
-          ) : anomaliesError ? (
-            <div role="alert" className="text-center py-8">
-              <span className="block text-[9px] font-mono tracking-widest text-red-400">ANOMALY TELEMETRY · CONNECTION ERROR</span>
-              <span className="block mt-1 text-xs text-slate-300">Unable to retrieve anomaly observations.</span>
-              <button onClick={refetchAnomalies} className="mt-3 border border-slate-700 px-3 py-1 text-[10px] font-mono text-slate-200 hover:border-orange-500">RETRY</button>
-            </div>
-          ) : anomalyData && anomalyData.length === 0 ? (
-            <div className="text-center py-8">
-              <span className="block text-[9px] font-mono tracking-widest text-slate-300">NO ANOMALIES</span>
-              <span className="block mt-1 text-xs text-slate-400">No anomaly observations are available for this period.</span>
-            </div>
-          ) : (
-            <>
-              <p className="text-[10px] text-slate-500">
-                Showing the 4 strongest by absolute robust Z-score from the complete outlier set.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {strongestAnomalies.map((anomaly) => (
-                  <article key={`${anomaly.acq_date}-${anomaly.h3_cell}`} className="p-3 bg-slate-950/70 border border-slate-800 rounded hover:border-slate-700 transition-colors">
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-sm font-medium text-white">{anomaly.acq_date}</span>
-                      <span className={`text-[9px] font-mono uppercase tracking-wider border px-1.5 py-0.5 rounded ${anomalyLevelStyle[anomaly.anomaly_level]}`}>
-                        {anomaly.anomaly_level.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3">
-                      <Telemetry label="Burn Index" value={anomaly.burn_index.toFixed(2)} emphasis="text-orange-300" />
-                      <Telemetry
-                        label="Robust Z"
-                        value={anomaly.robust_z_score === null ? 'Unavailable' : `${anomaly.robust_z_score > 0 ? '+' : ''}${anomaly.robust_z_score.toFixed(2)}`}
-                        emphasis="text-white"
-                      />
-                      <Telemetry
-                        label="Percentile"
-                        value={anomaly.anomaly_percentile === null ? 'Unavailable' : `${(anomaly.anomaly_percentile * 100).toFixed(0)}%`}
-                        emphasis="text-cyan-300"
-                      />
-                      <div className="min-w-0">
-                        <span className="text-slate-500 block text-[10px] mb-0.5">H3 CELL</span>
-                        <span className="font-mono text-[10px] text-slate-300 break-all">{anomaly.h3_cell}</span>
+                            onClick={() => {
+                              setMetricMode("fire_count");
+                              setIsCardEditOpen(false);
+                            }}
+                            className={`text-xs py-1 rounded-lg font-medium ${
+                              metricMode === "fire_count"
+                                ? "bg-[#524ad3] activity-on-accent"
+                                : "activity-muted"
+                            }`}
+                          >
+                            Fire Count
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMetricMode("burn_index");
+                              setIsCardEditOpen(false);
+                            }}
+                            className={`text-xs py-1 rounded-lg font-medium ${
+                              metricMode === "burn_index"
+                                ? "bg-[#524ad3] activity-on-accent"
+                                : "activity-muted"
+                            }`}
+                          >
+                            Burn Index
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </article>
-                ))}
+                  )}
+
+                  {/* More Popover */}
+                  {isCardMoreOpen && (
+                    <div className="activity-surface-control absolute right-0 top-10 w-44 rounded-2xl shadow-xl border p-1.5 z-30 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleExportCSV();
+                          setIsCardMoreOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
+                      >
+                        <Download size={13} />
+                        <span>Download CSV</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleExportGeoJSON();
+                          setIsCardMoreOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
+                      >
+                        <FileText size={13} />
+                        <span>Download GeoJSON</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMethodologyOpen(true);
+                          setIsCardMoreOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-500/10 activity-subtext font-medium flex items-center gap-2"
+                      >
+                        <Info size={13} />
+                        <span>Methodology</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
+
+              {/* Metrics Row & Legend: Big Indigo Number + Big Dark Number on Left | Less [tiles] More on Right */}
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div className="flex items-baseline gap-10 sm:gap-14">
+                  {/* Stat 1: Accent Purple-Indigo (#524ad3) */}
+                  <div>
+                    <span
+                      className="text-3xl sm:text-[36px] font-bold tracking-tight leading-none block font-sans"
+                      style={{ color: "var(--cal-accent)" }}
+                    >
+                      {stats.total.toLocaleString()}
+                    </span>
+                    <span className="activity-muted text-[13px] font-normal mt-2 block">
+                      {metricMode === "fire_count"
+                        ? "Detections in this year"
+                        : "Burn points in this year"}
+                    </span>
+                  </div>
+
+                  {/* Stat 2: Crisp High-Contrast Ink */}
+                  <div>
+                    <span className="activity-metric-val text-3xl sm:text-[36px] tracking-tight leading-none block font-sans">
+                      {stats.busiestDay.value.toLocaleString()}
+                    </span>
+                    <span className="activity-muted text-[13px] font-normal mt-2 block">
+                      Peak single day{" "}
+                      {stats.busiestDay.date ? `(${formatDisplayDate(stats.busiestDay.date)})` : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tight Rounded Legend Strip matching reference picture: Less [ ■ ■ ■ ■ ■ ] More */}
+                <div className="activity-subtext flex items-center gap-2 text-xs font-semibold select-none self-end sm:self-auto pb-0.5">
+                  <span>Less</span>
+                  <div className="flex items-center gap-[3px]">
+                    {COLOR_LEVEL_VARS.map((col, idx) => (
+                      <span
+                        key={idx}
+                        className="w-[13px] h-[13px] rounded-[3.5px] inline-block transition-transform hover:scale-125"
+                        style={{ backgroundColor: col.bg }}
+                        title={col.name}
+                      />
+                    ))}
+                  </div>
+                  <span>More</span>
+                </div>
+              </div>
+
+              {/* Heatmap Matrix with Aligned Typography */}
+              <div className="overflow-x-auto pb-2 pt-1" onMouseLeave={() => setHoveredCell(null)}>
+                <div className="inline-block min-w-max">
+                  {/* Month Labels Centered Over Each Month's Span */}
+                  <div className="flex items-center mb-2">
+                    <div className="w-[34px] shrink-0" />
+                    <div className="relative h-4 flex-1">
+                      {monthLabels.map(({ month, centerPx }) => (
+                        <span
+                          key={month}
+                          className="activity-muted absolute -translate-x-1/2 text-[11px] font-medium select-none whitespace-nowrap"
+                          style={{ left: `${centerPx}px` }}
+                        >
+                          {month}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Matrix Grid */}
+                  <div className="flex items-start">
+                    {/* 7-Row Weekday Labels (Mon, Wed, Fri vertically aligned with row 1, row 3, row 5) */}
+                    <div className="activity-muted flex flex-col gap-[4px] w-[30px] mr-[4px] select-none text-[11px] font-medium">
+                      <div className="h-[13px]" />
+                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                        Mon
+                      </div>
+                      <div className="h-[13px]" />
+                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                        Wed
+                      </div>
+                      <div className="h-[13px]" />
+                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                        Fri
+                      </div>
+                      <div className="h-[13px]" />
+                    </div>
+
+                    {/* 53 Columns of Flat Soft Rounded Tiles */}
+                    <div className="flex gap-[4px]">
+                      {calendarWeeks.map((week, wIdx) => (
+                        <div key={wIdx} className="flex flex-col gap-[4px]">
+                          {week.map((cell, dIdx) => {
+                            if (!cell) {
+                              return <div key={dIdx} className="w-[13px] h-[13px]" />;
+                            }
+
+                            const level = getLevel(cell);
+                            const colorVar = COLOR_LEVEL_VARS[level].bg;
+                            const isSelected = selectedDate === cell.date;
+
+                            return (
+                              <button
+                                key={dIdx}
+                                type="button"
+                                aria-label={`${cell.date}: ${cell.observation?.fire_count ?? 0} detections`}
+                                onClick={() => setSelectedDate(cell.date)}
+                                onMouseEnter={() => setHoveredCell(cell)}
+                                onMouseLeave={() => setHoveredCell(null)}
+                                className={`w-[13px] h-[13px] rounded-[4px] transition-all hover:scale-130 hover:z-20 relative cursor-pointer ${
+                                  isSelected ? "activity-tile-selected" : ""
+                                }`}
+                                style={{ backgroundColor: colorVar }}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subtle Interactive Hover / Selected Telemetry Strip */}
+              <div
+                className="pt-3 border-t border-slate-400/20 flex flex-wrap items-center justify-between gap-3 text-xs"
+                aria-live="polite"
+              >
+                {activeDetailCell ? (
+                  activeDetailCell.observation ? (
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                      <span className="activity-card-title font-semibold">
+                        {formatFullDate(activeDetailCell.date)}
+                      </span>
+                      <span className="activity-muted">
+                        Detections:{" "}
+                        <strong style={{ color: "var(--cal-accent)" }}>
+                          {activeDetailCell.observation.fire_count.toLocaleString()}
+                        </strong>
+                      </span>
+                      <span className="activity-muted">
+                        Mean Burn:{" "}
+                        <strong className="activity-card-title">
+                          {activeDetailCell.observation.mean_burn_index !== null
+                            ? activeDetailCell.observation.mean_burn_index.toFixed(1)
+                            : "N/A"}
+                        </strong>
+                      </span>
+                      <span className="activity-muted">
+                        Max Burn:{" "}
+                        <strong className="activity-card-title">
+                          {activeDetailCell.observation.max_burn_index !== null
+                            ? activeDetailCell.observation.max_burn_index.toFixed(1)
+                            : "N/A"}
+                        </strong>
+                      </span>
+                      <span className="activity-muted">
+                        Anomalies:{" "}
+                        <strong className="activity-card-title">
+                          {activeDetailCell.observation.anomaly_count}
+                        </strong>
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="activity-muted">
+                      <strong className="activity-subtext">
+                        {formatFullDate(activeDetailCell.date)}
+                      </strong>{" "}
+                      · Zero active fire detections recorded
+                    </span>
+                  )
+                ) : (
+                  <span className="activity-muted">
+                    Hover over or click any day square to inspect daily satellite telemetry
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Anomaly & Outlier Telemetry 2x2 Dot-Matrix Grid */}
+            <OutlierTelemetryGrid
+              outlierCards={outlierCards}
+              totalAnomalies={anomalyData?.length ?? 0}
+              anomalyLoading={anomalyLoading && !anomalyData}
+              anomalyError={anomalyError}
+              onRetryAnomalies={refetchAnomalies}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+            />
+          </div>
+
+          {/* ================= RIGHT SIDEBAR (4 COLS) ================= */}
+          {!isCalendarExpanded && (
+            <div className="lg:col-span-4 flex flex-col gap-6">
+              {/* CARD 3: BURN ANOMALY RATIO CONCENTRIC RADAR ANALYSIS */}
+              <div className="activity-card p-6 sm:p-7 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="activity-card-title text-base font-semibold">
+                    Burn Anomaly Ratio
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsMethodologyOpen(true)}
+                    className="activity-muted hover:opacity-80 text-xs font-medium flex items-center gap-0.5 transition-opacity"
+                  >
+                    <span>Details</span>
+                    <span className="text-[10px]">›</span>
+                  </button>
+                </div>
+
+                {/* Real-data analytical summary paragraph matching top-left reference layout */}
+                <p className="activity-muted text-[11px] leading-relaxed">
+                  {anomalySummaryText}
+                </p>
+
+                {/* Concentric 6-Axis Radar Chart */}
+                <div className="relative flex flex-col items-center justify-center my-1">
+                  <svg
+                    viewBox="0 0 400 265"
+                    className="w-full h-auto max-h-[260px] overflow-visible select-none"
+                    onMouseLeave={() => setHoveredRadarKey(null)}
+                  >
+                    {/* 4 Concentric Shaded Target Rings (100%, 75%, 50%, 25%) */}
+                    <circle
+                      cx={radarGeometry.cx}
+                      cy={radarGeometry.cy}
+                      r={radarGeometry.maxR}
+                      fill="var(--radar-r4)"
+                    />
+                    <circle
+                      cx={radarGeometry.cx}
+                      cy={radarGeometry.cy}
+                      r={radarGeometry.maxR * 0.75}
+                      fill="var(--radar-r3)"
+                    />
+                    <circle
+                      cx={radarGeometry.cx}
+                      cy={radarGeometry.cy}
+                      r={radarGeometry.maxR * 0.5}
+                      fill="var(--radar-r2)"
+                    />
+                    <circle
+                      cx={radarGeometry.cx}
+                      cy={radarGeometry.cy}
+                      r={radarGeometry.maxR * 0.25}
+                      fill="var(--radar-r1)"
+                    />
+
+                    {/* 6 Radial Spoke Lines */}
+                    {radarGeometry.points.map((pt) => (
+                      <line
+                        key={`spoke-${pt.key}`}
+                        x1={radarGeometry.cx}
+                        y1={radarGeometry.cy}
+                        x2={pt.spokeX}
+                        y2={pt.spokeY}
+                        stroke="var(--radar-spoke)"
+                        strokeWidth="1"
+                      />
+                    ))}
+
+                    {/* Data Polygon */}
+                    <polygon
+                      points={radarGeometry.polygonPoints}
+                      fill="var(--radar-fill)"
+                      stroke="var(--radar-stroke)"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+
+                    {/* Vertex Dots & Axis Labels */}
+                    {radarGeometry.points.map((pt) => {
+                      const isHovered = hoveredRadarKey === pt.key;
+                      return (
+                        <g
+                          key={`axis-${pt.key}`}
+                          className="cursor-pointer"
+                          onMouseEnter={() => setHoveredRadarKey(pt.key)}
+                        >
+                          {isHovered && (
+                            <circle
+                              cx={pt.vx}
+                              cy={pt.vy}
+                              r="7"
+                              fill="var(--radar-stroke)"
+                              fillOpacity="0.2"
+                            />
+                          )}
+                          <circle
+                            cx={pt.vx}
+                            cy={pt.vy}
+                            r={isHovered ? "4.5" : "3.2"}
+                            fill="var(--radar-stroke)"
+                          />
+                          <text
+                            x={pt.lx}
+                            y={pt.ly}
+                            textAnchor={pt.textAnchor}
+                            className={`activity-radar-label text-[11px] transition-colors ${
+                              isHovered ? "is-active" : ""
+                            }`}
+                          >
+                            {pt.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+
+                  {/* Active Axis Detail Pill */}
+                  <div className="min-h-[22px] mt-1 flex items-center justify-center text-[11px]">
+                    {hoveredRadarKey ? (
+                      (() => {
+                        const active = radarMetrics.find((m) => m.key === hoveredRadarKey);
+                        if (!active) return null;
+                        return (
+                          <span className="activity-radar-pill px-2.5 py-0.5 rounded-full font-medium border">
+                            {active.label}: <strong>{active.value}%</strong> · {active.detail}
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      <span className="activity-muted text-[10px]">
+                        Hover any axis vertex to inspect normalized telemetry
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4-Band Segmented Percentage Bar Legend (matching bottom-right reference) */}
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-t border-slate-400/20">
+                  <div className="activity-muted text-[11px]">
+                    Streak:{" "}
+                    <strong className="activity-card-title">
+                      {stats.longestStreak}d
+                    </strong>{" "}
+                    · Records:{" "}
+                    <strong className="activity-card-title">
+                      {data?.data?.length ?? 0}
+                    </strong>
+                  </div>
+
+                  <div className="w-full sm:w-52 shrink-0">
+                    <div className="activity-muted grid grid-cols-4 text-[9.5px] font-medium mb-1">
+                      <span>0–25%</span>
+                      <span>25–50%</span>
+                      <span>50–75%</span>
+                      <span>75–100%</span>
+                    </div>
+                    <div className="grid grid-cols-4 h-2.5 rounded-xs overflow-hidden">
+                      <div style={{ backgroundColor: "var(--radar-leg-1)" }} />
+                      <div style={{ backgroundColor: "var(--radar-leg-2)" }} />
+                      <div style={{ backgroundColor: "var(--radar-leg-3)" }} />
+                      <div style={{ backgroundColor: "var(--radar-leg-4)" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 4: TERRAIGNIS TELEMETRY ARCHIVE EXPORT BANNER */}
+              <div className="activity-archive-banner bg-gradient-to-br from-[#5851d4] via-[#4a42c8] to-[#3129a3] rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between shadow-lg relative overflow-hidden">
+                <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="activity-on-accent w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center font-bold text-xs">
+                      TI
+                    </div>
+                    <span className="font-semibold text-sm tracking-tight text-white">
+                      TerraIgnis Archive
+                    </span>
+                  </div>
+
+                  <h4 className="text-xl font-bold leading-tight text-white">
+                    Harmonized satellite telemetry exports
+                  </h4>
+                </div>
+
+                <div className="relative z-10 mt-6 pt-5 border-t border-white/15 flex flex-col gap-3">
+                  <span className="text-xs font-medium text-white/90">
+                    {data?.total?.toLocaleString() ?? 0} observed calendar dates in {selectedYear}
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleExportGeoJSON}
+                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-semibold transition-colors"
+                    >
+                      <FileText size={13} />
+                      <span>GeoJSON</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportCSV}
+                      className="activity-archive-csv-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                    >
+                      <Download size={13} />
+                      <span>Export CSV</span>
+                    </button>
+                  </div>
+
+                  {exportStatus && (
+                    <span className="activity-on-accent text-[11px] opacity-90 truncate">
+                      ● {exportStatus}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
+      )}
 
-        <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col justify-between gap-4">
-          <div>
-            <h4 className="text-sm font-semibold text-white">Archive Exports</h4>
-            <p className="text-xs text-slate-400 mt-0.5">The current backend does not provide an export endpoint.</p>
+      {/* Methodology Modal */}
+      {isMethodologyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+          <div className="activity-surface-control rounded-3xl shadow-2xl border max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-400/20 mb-3">
+              <h3 className="activity-card-title text-sm font-bold">
+                How TerraIgnis Aggregates Daily Telemetry
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsMethodologyOpen(false)}
+                className="activity-muted hover:opacity-80 p-1 rounded-md"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="activity-subtext text-xs space-y-3">
+              <p>
+                Each tile in the Daily Fire Activity grid represents one UTC calendar day.
+                Observations from NASA FIRMS MODIS and VIIRS instruments are standardized and
+                aggregated into spatial H3 resolution-7 cells.
+              </p>
+              <p className="activity-card-title font-semibold">Intensity Ramp Levels:</p>
+              <ul className="list-disc pl-4 space-y-1.5">
+                <li>
+                  <span className="font-semibold" style={{ color: "var(--cal-accent)" }}>
+                    Peak (Level 4):
+                  </span>{" "}
+                  Top 25% highest activity days.
+                </li>
+                <li>
+                  <span className="font-semibold text-[#7670e2]">High (Level 3):</span> 45%–75%
+                  activity threshold.
+                </li>
+                <li>
+                  <span className="font-semibold text-[#a6a2ef]">Moderate (Level 2):</span> 20%–45%
+                  activity threshold.
+                </li>
+                <li>
+                  <span className="font-semibold text-indigo-400">Low (Level 1):</span> Baseline
+                  detected fire telemetry.
+                </li>
+                <li>
+                  <span className="activity-muted font-semibold">Blank (Level 0):</span> Zero active
+                  satellite detections recorded.
+                </li>
+              </ul>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsMethodologyOpen(false)}
+                className="activity-on-accent px-4 py-2 bg-[#524ad3] hover:bg-indigo-700 rounded-xl text-xs font-semibold shadow-xs"
+              >
+                Got it
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-slate-500">Exports will be available when the backend supports downloadable fire and anomaly records.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-function Telemetry({ label, value, emphasis = 'text-white' }: { label: string; value: string; emphasis?: string }) {
+interface DotColumn {
+  label: string;
+  detail: string;
+  value: number;
+  targetDate?: string;
+  active: boolean;
+  dots: number;
+}
+
+interface OutlierCardData {
+  id: string;
+  title: string;
+  pct: string;
+  sub: string;
+  isPositive: boolean;
+  hasData: boolean;
+  dotColor: string;
+  targetDate: string;
+  columns: DotColumn[];
+}
+
+function OutlierTelemetryGrid({
+  outlierCards,
+  totalAnomalies,
+  anomalyLoading,
+  anomalyError,
+  onRetryAnomalies,
+  selectedDate,
+  onSelectDate,
+}: {
+  outlierCards: OutlierCardData[];
+  totalAnomalies: number;
+  anomalyLoading: boolean;
+  anomalyError: string | null;
+  onRetryAnomalies: () => void;
+  selectedDate: string | null;
+  onSelectDate: (date: string) => void;
+}) {
+  const [hoveredBar, setHoveredBar] = useState<{ cardId: string; colIdx: number } | null>(null);
+
   return (
-    <div className="min-w-0">
-      <span className="text-slate-500 block text-[10px] mb-0.5">{label}</span>
-      <span className={`font-semibold ${emphasis} break-words`}>{value}</span>
+    <div className="flex flex-col gap-3">
+      {/* Subtle section header */}
+      <div className="flex items-center justify-between px-1">
+        <h3 className="activity-card-title text-sm font-semibold tracking-tight">
+          Anomaly & Outlier Telemetry
+        </h3>
+        {anomalyError ? (
+          <button
+            type="button"
+            onClick={onRetryAnomalies}
+            className="text-[11px] font-semibold text-rose-500 hover:underline"
+          >
+            Outlier sync error · Retry
+          </button>
+        ) : (
+          <span className="activity-muted text-[11px] font-medium">
+            {anomalyLoading
+              ? "Loading outlier telemetry..."
+              : `${totalAnomalies.toLocaleString()} verified outliers`}
+          </span>
+        )}
+      </div>
+
+      {/* 2x2 Grid of 4 crisp cards matching reference image */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {outlierCards.map((card) => {
+          const isSelectedCard = Boolean(card.targetDate && card.targetDate === selectedDate);
+          const activeColIdx = hoveredBar?.cardId === card.id ? hoveredBar.colIdx : null;
+          const activeCol = activeColIdx !== null ? card.columns[activeColIdx] : null;
+          return (
+            <div
+              key={card.id}
+              onClick={() => card.targetDate && onSelectDate(card.targetDate)}
+              className={`activity-card p-6 flex flex-col justify-between gap-6 cursor-pointer transition-all hover:-translate-y-0.5 ${
+                isSelectedCard ? "ring-1 ring-[#524ad3]/40" : ""
+              } ${anomalyLoading ? "opacity-75" : ""}`}
+            >
+              {/* Top Row: Title + Circular Arrow Button */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="activity-card-title text-[14px] font-medium">
+                  {card.title}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (card.targetDate) onSelectDate(card.targetDate);
+                  }}
+                  aria-label={`Inspect ${card.title}`}
+                  className="activity-circle-btn w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
+                >
+                  <ArrowUpRight size={16} strokeWidth={1.8} />
+                </button>
+              </div>
+
+              {/* Bottom Row: Big Percentage + Subtext on left | Dot-Matrix Sparkline on right */}
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="activity-metric-val text-[26px] sm:text-[28px] font-semibold tracking-tight leading-none tabular-nums">
+                      {card.pct}%
+                    </span>
+                    {card.hasData &&
+                      (card.isPositive ? (
+                        <ArrowUp size={16} strokeWidth={2.3} className="text-emerald-500 shrink-0" />
+                      ) : (
+                        <ArrowDown size={16} strokeWidth={2.3} className="text-rose-500 shrink-0" />
+                      ))}
+                  </div>
+                  <span
+                    className="activity-subtext text-xs font-medium mt-1.5 block truncate"
+                    title={activeCol?.detail ?? card.sub}
+                  >
+                    {activeCol?.label ? activeCol.detail : card.sub}
+                  </span>
+                </div>
+
+                {/* 12-Column Interactive Backend Dot Matrix Mini Chart */}
+                <div
+                  className="flex items-end gap-[3.5px] shrink-0 pb-0.5"
+                  onMouseLeave={() => setHoveredBar(null)}
+                >
+                  {card.columns.map((col, idx) => {
+                    const isColHovered = activeColIdx === idx;
+                    const baseOpacity = col.active ? 1 : 0.3;
+                    const opacity =
+                      activeColIdx === null ? baseOpacity : isColHovered ? 1 : baseOpacity * 0.45;
+                    return (
+                      <div
+                        key={`${card.id}-col-${idx}`}
+                        title={col.detail}
+                        onMouseEnter={() => setHoveredBar({ cardId: card.id, colIdx: idx })}
+                        onClick={(e) => {
+                          if (!col.targetDate) return;
+                          e.stopPropagation();
+                          onSelectDate(col.targetDate);
+                        }}
+                        className={`flex flex-col-reverse gap-[3px] px-[0.5px] transition-transform ${
+                          isColHovered ? "scale-110" : ""
+                        }`}
+                      >
+                        {Array.from({ length: col.dots }, (_, dotIdx) => (
+                          <span
+                            key={dotIdx}
+                            className="w-[5px] h-[5px] rounded-full block transition-opacity"
+                            style={{
+                              backgroundColor: card.dotColor,
+                              opacity,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
