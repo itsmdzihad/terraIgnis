@@ -204,37 +204,23 @@ export default function GlobalFirePulse() {
 
   return (
     <div className="dataplay-overview flex flex-col h-full w-full overflow-hidden p-4 lg:p-6 gap-4">
-      {/* 1. TOP HEADER CONTRACT (Matches "Real Time Overview" in reference) */}
+      {/* 1. TOP HEADER */}
       <header className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl lg:text-[26px] font-bold tracking-tight text-slate-900">
-            Real Time Overview
+            Fire Overview
           </h1>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white border border-slate-200/80 shadow-xs">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                error
-                  ? "bg-rose-500"
-                  : loading
-                  ? "bg-amber-400 animate-pulse"
-                  : "bg-emerald-500"
-              }`}
-            />
-            <span className="text-slate-600 font-sans">
-              {error ? "Telemetry Offline" : loading ? "Syncing..." : "Live Active Stream"}
-            </span>
-          </span>
         </div>
 
         <div className="flex items-center gap-2.5">
-          {/* View user snapshot action pill from reference */}
+          {/* Dataset snapshot action pill */}
           <button
             type="button"
             onClick={() => setIsSnapshotOpen(true)}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition-colors"
           >
             <Camera size={14} className="text-slate-500" />
-            <span>View telemetry snapshot</span>
+            <span>Dataset snapshot</span>
           </button>
 
           {/* Filters Toggle Button */}
@@ -264,7 +250,7 @@ export default function GlobalFirePulse() {
               refetchStats();
               refetchAnomalies();
             }}
-            title="Refresh active telemetry"
+            title="Refresh data"
             className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
           >
             <RotateCw size={14} className={loading ? "animate-spin text-blue-600" : ""} />
@@ -282,7 +268,7 @@ export default function GlobalFirePulse() {
             <div className="flex items-center gap-2">
               <Filter size={15} className="text-blue-600" />
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Telemetry Filter Controls
+                Filter Controls
               </h2>
             </div>
             <div className="flex items-center gap-2">
@@ -515,13 +501,13 @@ export default function GlobalFirePulse() {
               {/* Breakdown Rows */}
               <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">VIIRS Telemetry</span>
+                  <span className="text-slate-500">VIIRS Detections</span>
                   <span className="font-semibold text-slate-800 tabular-nums">
                     {formatCount(stats?.sensors.viirs_observations ?? 12324)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">MODIS Telemetry</span>
+                  <span className="text-slate-500">MODIS Detections</span>
                   <span className="font-semibold text-slate-800 tabular-nums">
                     {formatCount(stats?.sensors.modis_observations ?? 10532)}
                   </span>
@@ -551,7 +537,7 @@ export default function GlobalFirePulse() {
                   </button>
                 </div>
                 <span className="text-[11px] text-slate-400 font-medium block">
-                  Observed Hexagons
+                  Unique H3 Cells
                 </span>
 
                 <div className="flex items-center gap-2 mt-1 mb-2">
@@ -852,14 +838,11 @@ export default function GlobalFirePulse() {
 
         {/* RIGHT COLUMN: MAP CONTAINER WITH FLOATING OVERLAYS */}
         <div className="flex-1 min-w-0 h-full relative rounded-2xl overflow-hidden border border-slate-200/80 bg-white shadow-xs flex flex-col">
-          {/* Top Left Floating Pill: Fire Telemetry Summary */}
-          <div className="absolute top-4 left-4 z-10 bg-white/95 border border-slate-200/90 rounded-xl px-3.5 py-2.5 shadow-md backdrop-blur-md max-w-sm pointer-events-none">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-              OBSERVED FIRE ACTIVITY
-            </span>
-            <span className="text-xs font-bold text-slate-800 block mt-0.5">
+          {/* Top Left Floating Pill: Record Count Summary */}
+          <div className="absolute top-4 left-4 z-10 bg-white/95 border border-slate-200/90 rounded-xl px-3.5 py-2 shadow-md backdrop-blur-md max-w-sm pointer-events-none">
+            <span className="text-xs font-semibold text-slate-800 block">
               {data?.total == null
-                ? "Satellite detections by H3 cell"
+                ? "Detections by H3 cell"
                 : `Showing ${formatCount(data.count)} of ${formatCount(data.total)} cell-date records`}
             </span>
           </div>
@@ -881,20 +864,14 @@ export default function GlobalFirePulse() {
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-xs p-4">
                 {loading ? (
                   <div className="bg-white border border-slate-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-[10px] font-bold tracking-widest text-blue-600 uppercase">
-                      Fire Telemetry
-                    </span>
-                    <span className="block mt-1 text-xs font-semibold text-slate-700">
-                      Syncing satellite observations...
+                    <span className="block text-xs font-semibold text-slate-700">
+                      Loading detections...
                     </span>
                   </div>
                 ) : error ? (
                   <div className="max-w-sm bg-white border border-rose-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-[10px] font-bold tracking-widest text-rose-500 uppercase">
-                      Connection Notice
-                    </span>
-                    <span className="block mt-1 text-xs text-slate-600">
-                      Unable to retrieve fire telemetry observations.
+                    <span className="block text-xs font-semibold text-rose-600">
+                      Unable to load fire detections.
                     </span>
                     <button
                       type="button"
@@ -906,11 +883,11 @@ export default function GlobalFirePulse() {
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200 shadow-xl px-5 py-4 rounded-xl text-center">
-                    <span className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      No Records
+                    <span className="block text-xs font-semibold text-slate-700">
+                      No matching records
                     </span>
-                    <span className="block mt-1 text-xs text-slate-600">
-                      No observations match the selected parameters.
+                    <span className="block mt-1 text-xs text-slate-500">
+                      No detections match the selected parameters.
                     </span>
                   </div>
                 )}
@@ -1006,7 +983,7 @@ export default function GlobalFirePulse() {
         </div>
       </div>
 
-      {/* 4. TELEMETRY SNAPSHOT MODAL (Triggered by "View telemetry snapshot") */}
+      {/* 4. DATASET SNAPSHOT MODAL (Triggered by "Dataset snapshot") */}
       {isSnapshotOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in duration-200">
@@ -1014,7 +991,7 @@ export default function GlobalFirePulse() {
               <div className="flex items-center gap-2">
                 <Camera size={18} className="text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">
-                  Global Telemetry Snapshot
+                  Dataset Snapshot
                 </h3>
               </div>
               <button
