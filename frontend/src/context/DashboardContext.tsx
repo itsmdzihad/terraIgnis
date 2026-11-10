@@ -7,6 +7,7 @@ interface DashboardContextValue {
   selectedStartDate: string;
   selectedEndDate: string;
   selectedH3Cell: string | null;
+  selectedCountry: string | null;
   selectedSensor: FireSensor | null;
   minBurnIndex: number | null;
   maxBurnIndex: number | null;
@@ -14,6 +15,7 @@ interface DashboardContextValue {
   setDateRange: (startDate: string, endDate: string) => void;
   setSelectedYear: (year: number) => void;
   setSelectedH3Cell: (h3Cell: string | null) => void;
+  setSelectedCountry: (country: string | null) => void;
   setSelectedSensor: (sensor: FireSensor | null) => void;
   setBurnIndexRange: (min: number | null, max: number | null) => void;
   clearFilters: () => void;
@@ -29,6 +31,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [selectedStartDate, setSelectedStartDate] = useState(INITIAL_START_DATE);
   const [selectedEndDate, setSelectedEndDate] = useState(INITIAL_END_DATE);
   const [selectedH3Cell, updateSelectedH3Cell] = useState<string | null>(null);
+  const [selectedCountry, updateSelectedCountry] = useState<string | null>(null);
   const [selectedSensor, updateSelectedSensor] = useState<FireSensor | null>(null);
   const [minBurnIndex, setMinBurnIndex] = useState<number | null>(null);
   const [maxBurnIndex, setMaxBurnIndex] = useState<number | null>(null);
@@ -57,6 +60,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     updateSelectedH3Cell(h3Cell?.trim() || null);
   }, []);
 
+  const setSelectedCountry = useCallback((country: string | null) => {
+    updateSelectedCountry(country?.trim() || null);
+    updateSelectedH3Cell(null);
+  }, []);
+
   const setSelectedSensor = useCallback((sensor: FireSensor | null) => {
     updateSelectedSensor(sensor);
   }, []);
@@ -71,6 +79,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setSelectedStartDate(INITIAL_START_DATE);
     setSelectedEndDate(INITIAL_END_DATE);
     setSelectedH3Cell(null);
+    setSelectedCountry(null);
     setSelectedSensor(null);
     setMinBurnIndex(null);
     setMaxBurnIndex(null);
@@ -81,6 +90,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
@@ -88,6 +98,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setDateRange,
     setSelectedYear,
     setSelectedH3Cell,
+    setSelectedCountry,
     setSelectedSensor,
     setBurnIndexRange,
     clearFilters,
@@ -96,6 +107,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     selectedStartDate,
     selectedEndDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
@@ -103,6 +115,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setDateRange,
     setSelectedYear,
     setSelectedH3Cell,
+    setSelectedCountry,
     setSelectedSensor,
     setBurnIndexRange,
     clearFilters,

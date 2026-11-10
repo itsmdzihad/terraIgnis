@@ -5,6 +5,8 @@ import { useCellAnomalyHistory } from '../hooks/useCellAnomalyHistory';
 import { useDashboard } from '../context/DashboardContext';
 import { useFires } from '../hooks/useFires';
 import { useRegion } from '../hooks/useRegion';
+import { useCountries } from '../hooks/useCountries';
+import { useCountryFires } from '../hooks/useCountryFires';
 import type { FireRecord } from '../types/fire';
 import AnomalyHistoryChart from './AnomalyHistoryChart';
 import TerraIgnisMap from './TerraIgnisMap';
@@ -46,18 +48,25 @@ export default function RegionalDeepDive() {
   const {
     selectedDate,
     selectedH3Cell,
+    selectedCountry,
     selectedSensor,
     minBurnIndex,
     maxBurnIndex,
     setSelectedH3Cell,
+    setSelectedCountry,
   } = useDashboard();
-  const fires = useFires({
+  const fireFilters = {
     date: selectedDate ?? undefined,
     sensor: selectedSensor ?? undefined,
     min_burn_index: minBurnIndex ?? undefined,
     max_burn_index: maxBurnIndex ?? undefined,
-    limit: 5000,
-  });
+  };
+  const fires = useFires({ ...fireFilters, limit: 5000 });
+  const countryFires = useCountryFires(fireFilters, selectedCountry);
+  const { countries, error: countriesError } = useCountries();
+  const fireLoading = selectedCountry ? countryFires.loading : fires.loading;
+  const fireError = selectedCountry ? countryFires.error : fires.error;
+  const fireRecords = selectedCountry ? countryFires.records : fires.data?.data ?? [];
   const region = useRegion(selectedH3Cell);
   const history = useCellAnomalyHistory(selectedH3Cell);
   const regionData = region.data?.h3_cell === selectedH3Cell ? region.data : null;
@@ -65,11 +74,11 @@ export default function RegionalDeepDive() {
 
   const mapRecords = useMemo(() => {
     const uniqueRecords = new Map<string, FireRecord>();
-    for (const record of fires.data?.data ?? []) {
+    for (const record of fireRecords) {
       if (!uniqueRecords.has(record.h3_cell)) uniqueRecords.set(record.h3_cell, record);
     }
     return [...uniqueRecords.values()];
-  }, [fires.data]);
+  }, [fireRecords]);
 
   const mapFireData = useMemo(() => mapRecords.map((record) => ({
     h3Index: record.h3_cell,
