@@ -58,7 +58,7 @@ def get_fires(
     min_burn_index: float | None = Query(default=None, ge=0, le=100),
     max_burn_index: float | None = Query(default=None, ge=0, le=100),
     sensor: SENSOR_FILTER | None = Query(default=None),
-    limit: int = Query(default=500, ge=1, le=5000),
+    limit: int = Query(default=500, ge=1, le=50000),
     offset: int = Query(default=0, ge=0),
 ) -> FiresResponse:
     """Return a filtered, paginated view of detected H3 cell/date records."""

@@ -1723,6 +1723,10 @@ Example:
 GET /api/fires?date=2026-09-02&limit=100
 ```
 
+`limit` defaults to 500 and accepts values from 1 to 50,000; `offset` selects
+the page start. The Fire Overview map uses 5,000 by default and lets users
+change its page size in the filter controls.
+
 Sensor values supported by the current dataset/API include:
 
 ```text
@@ -1973,9 +1977,11 @@ Fire Overview and Cell Explorer include a country selector that filters
 observations against country boundaries. Ignish can answer country-specific
 questions from the processed dashboard data.
 
-Fire map requests are paginated and capped at 5,000 records per request. The
-map plots the current page; the “Showing 5,000 of …” label reports the full
-matching total separately.
+Fire map requests are paginated and capped at 50,000 records per request. The
+map plots the current page, provides map-side previous/next controls and
+reports the total and remaining records. The frontend defaults to 5,000 and
+lets users select 1,000, 2,500, 5,000, 10,000, 25,000, or 50,000 records per
+page.
 
 The Data Pipeline page supports same-sensor multi-file uploads, full dataset
 generation, NRT polling, and historical backfill start/resume/cancel controls.
@@ -2778,8 +2784,8 @@ stages in order.
 ## Application Improvements
 
 The React/Vite dashboard is integrated with the FastAPI service. Future
-application work can improve map pagination and sampling for large datasets,
-while the existing API remains the source for processed analytics.
+application work can improve map rendering and point sampling for very large
+datasets, while the existing API remains the source for processed analytics.
 
 ---
 
