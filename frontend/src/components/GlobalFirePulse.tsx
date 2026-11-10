@@ -343,9 +343,9 @@ export default function GlobalFirePulse() {
     const dualRatio =
       totalCellDates > 0 ? Math.min(1, (stats?.sensors.both_sensor_cell_dates ?? 0) / totalCellDates) : 0;
 
-    const viirsCirc = 2 * Math.PI * 62;
-    const modisCirc = 2 * Math.PI * 48;
-    const dualCirc = 2 * Math.PI * 34;
+    const viirsCirc = 2 * Math.PI * 68;
+    const modisCirc = 2 * Math.PI * 52;
+    const dualCirc = 2 * Math.PI * 36;
 
     return {
       viirsCirc,
@@ -383,7 +383,7 @@ export default function GlobalFirePulse() {
       {/* MAIN CONTENT STAGE (Left Cards Panel & Right Map with Floating Controls) */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:gap-4 lg:overflow-hidden">
         {/* LEFT COLUMN: CARDS DASHBOARD */}
-        <div className="w-full lg:w-[54%] xl:w-[56%] lg:max-w-[960px] shrink-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-0.5">
+        <div className="w-full lg:w-[49%] xl:w-[48%] lg:max-w-[780px] shrink-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-0.5">
           {/* ROW 1: SESSIONS & USERS CARDS (2-Col Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
             {/* CARD 1: ACTIVE DETECTIONS */}
@@ -580,21 +580,21 @@ export default function GlobalFirePulse() {
                     className="flex items-center gap-2 text-xs glass-muted"
                     title={`VIIRS raw share: ${sensorRingMetrics.viirsPct.toFixed(1)}%`}
                   >
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-viirs)" }} />
+                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-viirs)" }} />
                     <span>VIIRS Raw</span>
                   </div>
                   <div
                     className="flex items-center gap-2 text-xs glass-muted"
                     title={`MODIS raw share: ${sensorRingMetrics.modisPct.toFixed(1)}%`}
                   >
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-modis)" }} />
+                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-modis)" }} />
                     <span>MODIS Raw</span>
                   </div>
                   <div
                     className="flex items-center gap-2 text-xs glass-muted"
                     title={`Dual-sensor share of cell-dates: ${sensorRingMetrics.dualPct.toFixed(1)}%`}
                   >
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-dual)" }} />
+                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: "var(--ring-dual)" }} />
                     <span>Dual Match</span>
                   </div>
                 </div>
@@ -602,24 +602,24 @@ export default function GlobalFirePulse() {
 
               {/* Center Concentric Rings Graphic (proportional to /api/stats) */}
               <div className="col-span-6 flex items-center justify-center">
-                <div className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center">
+                <div className="relative w-44 h-44 sm:w-52 sm:h-52 lg:w-48 lg:h-48 xl:w-52 xl:h-52 flex items-center justify-center">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
                     {/* Ring 1 - Outer (VIIRS Share of Raw Observations) */}
                     <circle
                       cx="80"
                       cy="80"
-                      r="62"
+                      r="68"
                       fill="none"
                       stroke="var(--ring-track)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                     />
                     <circle
                       cx="80"
                       cy="80"
-                      r="62"
+                      r="68"
                       fill="none"
                       stroke="var(--ring-viirs)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                       strokeDasharray={sensorRingMetrics.viirsCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.viirsOffset.toFixed(2)}
                       strokeLinecap="round"
@@ -629,18 +629,18 @@ export default function GlobalFirePulse() {
                     <circle
                       cx="80"
                       cy="80"
-                      r="48"
+                      r="52"
                       fill="none"
                       stroke="var(--ring-track)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                     />
                     <circle
                       cx="80"
                       cy="80"
-                      r="48"
+                      r="52"
                       fill="none"
                       stroke="var(--ring-modis)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                       strokeDasharray={sensorRingMetrics.modisCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.modisOffset.toFixed(2)}
                       strokeLinecap="round"
@@ -650,18 +650,18 @@ export default function GlobalFirePulse() {
                     <circle
                       cx="80"
                       cy="80"
-                      r="34"
+                      r="36"
                       fill="none"
                       stroke="var(--ring-track)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                     />
                     <circle
                       cx="80"
                       cy="80"
-                      r="34"
+                      r="36"
                       fill="none"
                       stroke="var(--ring-dual)"
-                      strokeWidth="8"
+                      strokeWidth="11"
                       strokeDasharray={sensorRingMetrics.dualCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.dualOffset.toFixed(2)}
                       strokeLinecap="round"
@@ -670,7 +670,7 @@ export default function GlobalFirePulse() {
 
                   {/* Center Metric */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
-                    <span className="text-sm sm:text-base font-bold glass-heading tracking-tight tabular-nums">
+                    <span className="text-base sm:text-lg font-bold glass-heading tracking-tight tabular-nums">
                       {formatCount(stats?.coverage.total_raw_observations)}
                     </span>
                     <span className="text-[10px] sm:text-[11px] glass-subtle font-medium leading-tight">Observations</span>
@@ -724,7 +724,7 @@ export default function GlobalFirePulse() {
         </div>
 
         {/* RIGHT COLUMN: MAP CONTAINER WITH FLOATING OVERLAYS */}
-        <div className="flex-1 min-w-0 min-h-[300px] sm:min-h-[340px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
+        <div className="flex-1 min-w-0 min-h-[360px] sm:min-h-[420px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
           {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
           <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
             <div className="pointer-events-auto glass-panel-strong rounded-full px-4 py-1.5 flex items-center gap-2.5 max-w-full">

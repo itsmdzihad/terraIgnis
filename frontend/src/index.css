@@ -129,8 +129,8 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]) {
   --chart-series-muted: #818cf8;
   --chart-series-accent: #2563eb;
   --ring-viirs: #2563eb;
-  --ring-modis: #0284c7;
-  --ring-dual: #6366f1;
+  --ring-modis: #dc2626;
+  --ring-dual: #eab308;
 
   position: relative;
   isolation: isolate;
@@ -219,9 +219,9 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]) {
   --progress-track: rgba(255, 255, 255, 0.11);
   --chart-series-muted: #818cf8;
   --chart-series-accent: #60a5fa;
-  --ring-viirs: #60a5fa;
-  --ring-modis: #38bdf8;
-  --ring-dual: #a5b4fc;
+  --ring-viirs: #3b82f6;
+  --ring-modis: #ef4444;
+  --ring-dual: #facc15;
 
   color: var(--ink);
   color-scheme: dark;
