@@ -6,6 +6,8 @@ import {
   MoreHorizontal,
   ChevronUp,
   ChevronDown,
+  TrendingDown,
+  TrendingUp,
   RotateCw,
   X,
   Search,
@@ -402,14 +404,17 @@ export default function GlobalFirePulse() {
                           className="flex-1 rounded-full transition-all duration-200"
                           style={{
                             height: `${bar.pct}%`,
-                            backgroundColor: idx < Math.ceil(detectionBars.length / 2) ? "#0062ff" : "#00c7d4",
+                            backgroundColor:
+                              idx < Math.ceil(detectionBars.length / 2)
+                                ? "var(--chart-series-muted)"
+                                : "var(--chart-series-accent)",
                           }}
                         />
                       ))
                     : Array.from({ length: 22 }, (_, idx) => (
                         <div
                           key={idx}
-                          className="flex-1 rounded-full bg-slate-400/25"
+                          className="flex-1 rounded-full bg-[#A7A7A7]/35"
                           style={{ height: "25%" }}
                         />
                       ))}
@@ -476,34 +481,42 @@ export default function GlobalFirePulse() {
 
               {/* Monthly Vertical Bar Chart */}
               <div className="h-14 flex items-end gap-1.5 pt-1">
-                {monthlyAnomalyCounts.map((count, index) => {
-                  const normalizedHeight =
-                    count === 0 ? 12 : Math.max(18, Math.round((count / maxMonthlyAnomalies) * 100));
-                  return (
-                    <div
-                      key={monthNames[index]}
-                      className="flex-1 flex flex-col items-center h-full justify-end group relative"
-                    >
+                {anomaliesLoading ? (
+                  <span className="w-full h-full flex items-center justify-center text-[10px] glass-subtle">
+                    Loading anomaly data…
+                  </span>
+                ) : anomaliesError ? (
+                  <span className="w-full h-full flex items-center justify-center text-[10px] tone-rose">
+                    Anomaly data unavailable
+                  </span>
+                ) : (
+                  monthlyAnomalyCounts.map((count, index) => {
+                    const normalizedHeight =
+                      count === 0 ? 12 : Math.max(18, Math.round((count / maxMonthlyAnomalies) * 100));
+                    return (
                       <div
-                        className="w-full rounded-t-sm transition-all duration-300 group-hover:brightness-110"
-                        style={{
-                          height: `${normalizedHeight}%`,
-                          backgroundColor: "#0062ff",
-                          opacity: count === 0 ? 0.2 : 1,
-                        }}
-                      />
-                      <span className="text-[8px] glass-subtle mt-1 uppercase font-sans">
-                        {monthNames[index][0]}
-                      </span>
-                      {/* Tooltip on hover */}
-                      <div className="glass-tooltip absolute -top-7 z-20 hidden group-hover:block text-[9px] px-2 py-0.5 rounded-full whitespace-nowrap pointer-events-none">
-                        {monthNames[index]}: {count}
+                        key={monthNames[index]}
+                        className="flex-1 flex flex-col items-center h-full justify-end group relative"
+                      >
+                        <div
+                          className="w-full rounded-t-sm transition-all duration-300 group-hover:brightness-110"
+                          style={{
+                            height: `${normalizedHeight}%`,
+                            backgroundColor: "var(--brand-orange)",
+                            opacity: count === 0 ? 0.2 : 1,
+                          }}
+                        />
+                        <span className="text-[8px] glass-subtle mt-1 uppercase font-sans">
+                          {monthNames[index][0]}
+                        </span>
+                        {/* Tooltip on hover */}
+                        <div className="glass-tooltip absolute -top-7 z-20 hidden group-hover:block text-[9px] px-2 py-0.5 rounded-full whitespace-nowrap pointer-events-none">
+                          {monthNames[index]}: {count}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-                {anomaliesLoading && <span className="w-full text-center text-[10px] text-slate-500">Loading anomaly data…</span>}
-                {anomaliesError && <span className="w-full text-center text-[10px] text-slate-500">Anomaly data unavailable</span>}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -545,21 +558,21 @@ export default function GlobalFirePulse() {
                     className="flex items-center gap-1.5 text-[11px] glass-muted"
                     title={`VIIRS raw share: ${sensorRingMetrics.viirsPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full bg-[#0062ff]" />
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-viirs)" }} />
                     <span>VIIRS Raw</span>
                   </div>
                   <div
                     className="flex items-center gap-1.5 text-[11px] glass-muted"
                     title={`MODIS raw share: ${sensorRingMetrics.modisPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full bg-[#00c7d4]" />
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-modis)" }} />
                     <span>MODIS Raw</span>
                   </div>
                   <div
                     className="flex items-center gap-1.5 text-[11px] glass-muted"
                     title={`Dual-sensor share of cell-dates: ${sensorRingMetrics.dualPct.toFixed(1)}%`}
                   >
-                    <span className="h-2 w-2 rounded-full bg-[#84cc16]" />
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ring-dual)" }} />
                     <span>Dual Match</span>
                   </div>
                 </div>
@@ -583,7 +596,7 @@ export default function GlobalFirePulse() {
                       cy="80"
                       r="62"
                       fill="none"
-                      stroke="#0062ff"
+                      stroke="var(--ring-viirs)"
                       strokeWidth="8"
                       strokeDasharray={sensorRingMetrics.viirsCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.viirsOffset.toFixed(2)}
@@ -604,7 +617,7 @@ export default function GlobalFirePulse() {
                       cy="80"
                       r="48"
                       fill="none"
-                      stroke="#00c7d4"
+                      stroke="var(--ring-modis)"
                       strokeWidth="8"
                       strokeDasharray={sensorRingMetrics.modisCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.modisOffset.toFixed(2)}
@@ -625,7 +638,7 @@ export default function GlobalFirePulse() {
                       cy="80"
                       r="34"
                       fill="none"
-                      stroke="#84cc16"
+                      stroke="var(--ring-dual)"
                       strokeWidth="8"
                       strokeDasharray={sensorRingMetrics.dualCirc.toFixed(2)}
                       strokeDashoffset={sensorRingMetrics.dualOffset.toFixed(2)}
@@ -696,7 +709,7 @@ export default function GlobalFirePulse() {
               <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
                 Fire Overview
               </h1>
-              <span className="h-3.5 w-px bg-slate-400/35 shrink-0" />
+              <span className="h-3.5 w-px bg-[#A7A7A7]/45 shrink-0" />
               <span className="text-xs font-medium glass-muted truncate tabular-nums">
                 {data?.total == null
                   ? "Detections by H3 cell"
@@ -726,7 +739,7 @@ export default function GlobalFirePulse() {
                 <SlidersHorizontal size={13} />
                 <span>Filters</span>
                 {activeFiltersCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-[#E85002] text-[#F9F9F9] text-[10px] font-bold">
                     {activeFiltersCount}
                   </span>
                 )}
@@ -800,7 +813,7 @@ export default function GlobalFirePulse() {
                       setSelectedDate(event.target.value || null);
                       setOffset(0);
                     }}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                   />
                 </label>
 
@@ -812,7 +825,7 @@ export default function GlobalFirePulse() {
                       setSelectedSensor((event.target.value || null) as FireSensor | null);
                       setOffset(0);
                     }}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                   >
                     <option value="">All sensors (Harmonized)</option>
                     <option value="MODIS">MODIS</option>
@@ -836,7 +849,7 @@ export default function GlobalFirePulse() {
                       setOffset(0);
                     }}
                     placeholder="0"
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                   />
                 </label>
 
@@ -855,7 +868,7 @@ export default function GlobalFirePulse() {
                       setOffset(0);
                     }}
                     placeholder="100"
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                   />
                 </label>
 
@@ -864,7 +877,7 @@ export default function GlobalFirePulse() {
                   <select
                     value={selectedH3Cell ?? ""}
                     onChange={(event) => setSelectedH3Cell(event.target.value || null)}
-                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="mt-1 block w-full glass-control rounded-xl px-2.5 py-1.5 text-xs font-sans tabular-nums focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                   >
                     <option value="">No cell selected</option>
                     {selectedH3Cell && !h3Cells.includes(selectedH3Cell) && (
@@ -892,7 +905,7 @@ export default function GlobalFirePulse() {
                       value={latitudeInput}
                       onChange={(event) => setLatitudeInput(event.target.value)}
                       placeholder="Lat"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                     />
                     <input
                       aria-label="Longitude"
@@ -903,7 +916,7 @@ export default function GlobalFirePulse() {
                       value={longitudeInput}
                       onChange={(event) => setLongitudeInput(event.target.value)}
                       placeholder="Lon"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85002]/40"
                     />
                     <button
                       type="submit"
@@ -958,7 +971,7 @@ export default function GlobalFirePulse() {
 
             {/* Loading / Error States Overlay */}
             {(loading || error || (!loading && data?.count === 0)) && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/35 backdrop-blur-xs p-4">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
                 {loading ? (
                   <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
@@ -1058,7 +1071,7 @@ export default function GlobalFirePulse() {
                   className="h-2 rounded-full w-full mt-2"
                   style={{
                     background:
-                      "linear-gradient(to right, #c7f9cc, #80ed99, #38bdf8, #0062ff, #0a2540)",
+                      "linear-gradient(to right, #D9C3AB, #F16001, #E85002, #C10801, #000000)",
                   }}
                 />
                 <div className="flex justify-between text-[10px] glass-subtle mt-1 font-sans tabular-nums">
@@ -1077,7 +1090,7 @@ export default function GlobalFirePulse() {
 
       {/* 4. DATASET SNAPSHOT MODAL (Triggered by "Dataset snapshot") */}
       {isSnapshotOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md p-4">
           <div className="glass-panel-strong rounded-3xl max-w-lg w-full p-6 animate-in fade-in duration-200">
             <div className="flex items-center justify-between pb-3 glass-divider-b mb-4">
               <div className="flex items-center gap-2">

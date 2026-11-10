@@ -26,9 +26,6 @@ const MONTH_NAMES = [
 ];
 
 const PAGE_SIZE = 366;
-const CELL_SIZE = 13;
-const CELL_GAP = 4;
-const WEEK_COL_WIDTH = CELL_SIZE + CELL_GAP; // 17px
 
 // 5 Intensity levels backed by CSS custom properties (matching reference image in light mode + dark mode support)
 const COLOR_LEVEL_VARS = [
@@ -155,9 +152,10 @@ export default function FireActivityCalendar() {
     return weeks;
   }, [observationsByDate, selectedYear]);
 
-  // Center each Month label cleanly over its span of week columns (matching reference image)
+  // Center each Month label cleanly over its span of week columns
   const monthLabels = useMemo(() => {
-    const list: { month: string; centerPx: number }[] = [];
+    const list: { month: string; centerPct: number }[] = [];
+    const totalWeeks = Math.max(1, calendarWeeks.length);
     for (let m = 0; m < 12; m++) {
       const monthPrefix = `${selectedYear}-${String(m + 1).padStart(2, "0")}-`;
       let firstCol = -1;
@@ -172,8 +170,8 @@ export default function FireActivityCalendar() {
         }
       }
       if (firstCol >= 0) {
-        const centerPx = ((firstCol + lastCol) / 2) * WEEK_COL_WIDTH + CELL_SIZE / 2;
-        list.push({ month: MONTH_NAMES[m], centerPx });
+        const centerPct = ((firstCol + lastCol + 1) / (2 * totalWeeks)) * 100;
+        list.push({ month: MONTH_NAMES[m], centerPct });
       }
     }
     return list;
@@ -854,6 +852,8 @@ export default function FireActivityCalendar() {
     return { cx, cy, maxR, points, polygonPoints };
   }, [radarMetrics]);
 
+  const tileHeightClass = isCalendarExpanded ? "h-[32px]" : "h-[24px] sm:h-[26px]";
+
   const yearAndMetricControls = (
     <div className="flex flex-wrap items-center gap-2">
       {/* Statistic Year Pill Dropdown */}
@@ -1192,14 +1192,14 @@ export default function FireActivityCalendar() {
                   </div>
                 </div>
 
-                {/* Tight Rounded Legend Strip matching reference picture: Less [ ■ ■ ■ ■ ■ ] More */}
+                {/* Tight Rounded Legend Strip matching reference picture: Less [ ▮ ▮ ▮ ▮ ▮ ] More */}
                 <div className="activity-subtext flex items-center gap-2 text-xs font-semibold select-none self-end sm:self-auto pb-0.5">
                   <span>Less</span>
-                  <div className="flex items-center gap-[3px]">
+                  <div className="flex items-center gap-[3.5px]">
                     {COLOR_LEVEL_VARS.map((col, idx) => (
                       <span
                         key={idx}
-                        className="w-[13px] h-[13px] rounded-[3.5px] inline-block transition-transform hover:scale-125"
+                        className="w-[14px] h-[20px] rounded-[4.5px] inline-block transition-transform hover:scale-120"
                         style={{ backgroundColor: col.bg }}
                         title={col.name}
                       />
@@ -1210,17 +1210,17 @@ export default function FireActivityCalendar() {
               </div>
 
               {/* Heatmap Matrix with Aligned Typography */}
-              <div className="overflow-x-auto pb-2 pt-1" onMouseLeave={() => setHoveredCell(null)}>
-                <div className="inline-block min-w-max">
+              <div className="overflow-x-auto pb-2.5 pt-1.5 px-1" onMouseLeave={() => setHoveredCell(null)}>
+                <div className="w-full min-w-[960px]">
                   {/* Month Labels Centered Over Each Month's Span */}
                   <div className="flex items-center mb-2">
                     <div className="w-[34px] shrink-0" />
                     <div className="relative h-4 flex-1">
-                      {monthLabels.map(({ month, centerPx }) => (
+                      {monthLabels.map(({ month, centerPct }) => (
                         <span
                           key={month}
                           className="activity-muted absolute -translate-x-1/2 text-[11px] font-medium select-none whitespace-nowrap"
-                          style={{ left: `${centerPx}px` }}
+                          style={{ left: `${centerPct}%` }}
                         >
                           {month}
                         </span>
@@ -1231,29 +1231,34 @@ export default function FireActivityCalendar() {
                   {/* Matrix Grid */}
                   <div className="flex items-start">
                     {/* 7-Row Weekday Labels (Mon, Wed, Fri vertically aligned with row 1, row 3, row 5) */}
-                    <div className="activity-muted flex flex-col gap-[4px] w-[30px] mr-[4px] select-none text-[11px] font-medium">
-                      <div className="h-[13px]" />
-                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                    <div className="activity-muted flex flex-col gap-[4px] w-[30px] mr-[4px] shrink-0 select-none text-[11px] font-medium">
+                      <div className={tileHeightClass} />
+                      <div className={`${tileHeightClass} flex items-center justify-end leading-none`}>
                         Mon
                       </div>
-                      <div className="h-[13px]" />
-                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                      <div className={tileHeightClass} />
+                      <div className={`${tileHeightClass} flex items-center justify-end leading-none`}>
                         Wed
                       </div>
-                      <div className="h-[13px]" />
-                      <div className="h-[13px] flex items-center justify-end leading-[13px]">
+                      <div className={tileHeightClass} />
+                      <div className={`${tileHeightClass} flex items-center justify-end leading-none`}>
                         Fri
                       </div>
-                      <div className="h-[13px]" />
+                      <div className={tileHeightClass} />
                     </div>
 
-                    {/* 53 Columns of Flat Soft Rounded Tiles */}
-                    <div className="flex gap-[4px]">
+                    {/* 53 Columns of Soft Rounded Rectangular Tiles */}
+                    <div
+                      className="flex-1 grid gap-[4px]"
+                      style={{
+                        gridTemplateColumns: `repeat(${calendarWeeks.length}, minmax(0, 1fr))`,
+                      }}
+                    >
                       {calendarWeeks.map((week, wIdx) => (
-                        <div key={wIdx} className="flex flex-col gap-[4px]">
+                        <div key={wIdx} className="flex flex-col gap-[4px] min-w-0">
                           {week.map((cell, dIdx) => {
                             if (!cell) {
-                              return <div key={dIdx} className="w-[13px] h-[13px]" />;
+                              return <div key={dIdx} className={`w-full ${tileHeightClass}`} />;
                             }
 
                             const level = getLevel(cell);
@@ -1268,7 +1273,7 @@ export default function FireActivityCalendar() {
                                 onClick={() => setSelectedDate(cell.date)}
                                 onMouseEnter={() => setHoveredCell(cell)}
                                 onMouseLeave={() => setHoveredCell(null)}
-                                className={`cal-day-tile w-[13px] h-[13px] rounded-[4px] transition-all hover:scale-130 hover:z-20 relative cursor-pointer ${
+                                className={`cal-day-tile w-full ${tileHeightClass} rounded-[5px] transition-all hover:scale-[1.16] hover:z-20 relative cursor-pointer ${
                                   isSelected ? "activity-tile-selected" : ""
                                 }`}
                                 style={{ backgroundColor: colorVar }}
@@ -1332,7 +1337,7 @@ export default function FireActivityCalendar() {
                   )
                 ) : (
                   <span className="activity-muted">
-                    Hover or click any day square to inspect daily activity
+                    Hover or click any day tile to inspect daily activity
                   </span>
                 )}
               </div>
@@ -1546,7 +1551,7 @@ export default function FireActivityCalendar() {
                     <button
                       type="button"
                       onClick={handleExportGeoJSON}
-                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/18 hover:bg-white/28 text-white rounded-full text-xs font-semibold transition-colors"
+                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/18 hover:bg-white/28 backdrop-blur-md text-white rounded-full text-xs font-semibold transition-colors"
                     >
                       <FileText size={13} />
                       <span>GeoJSON</span>

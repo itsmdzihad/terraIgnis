@@ -66,24 +66,17 @@ function DashboardView({
   const direction = previousIndex === -1 || activeIndex >= previousIndex ? 1 : -1;
 
   return (
-    <MotionConfig reducedMotion="user">
-      <DashboardProvider>
-        <div className="app-shell flex flex-col h-screen overflow-hidden" data-theme={theme}>
-          {/* Top Navbar Contract */}
-          <Navbar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            theme={theme}
-            onThemeToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
-          />
+    <div className="app-shell flex flex-col h-screen overflow-hidden" data-theme={theme}>
+      {/* Top Navbar Contract */}
+      <Navbar theme={theme} onThemeToggle={onThemeToggle} />
 
-          {/* Main Container Stage */}
-          <main className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
-            {TABS.map((tabId, tabIndex) => {
-              if (!visitedTabs.includes(tabId)) return null;
-              const isActive = activeTab === tabId;
-              const isExiting = tabId === previousTab && !isActive;
-              const inactiveOffsetX = tabIndex < activeIndex ? -20 : 20;
+      {/* Main Container Stage */}
+      <main className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
+        {TABS.map((tabId, tabIndex) => {
+          if (!visitedTabs.includes(tabId)) return null;
+          const isActive = activeTab === tabId;
+          const isExiting = tabId === previousTab && !isActive;
+          const inactiveOffsetX = tabIndex < activeIndex ? -20 : 20;
 
           return (
             <motion.div
