@@ -6,6 +6,7 @@ import csv
 import ctypes
 import errno
 import hashlib
+import json
 import logging
 import os
 import re
@@ -54,6 +55,33 @@ PIPELINE_OUTPUTS = (
 
 DATA_ROOT = BACKEND_ROOT / "data"
 GENERATIONS_ROOT = DATA_ROOT / ".generations"
+LAST_GENERATION_PATH = DATA_ROOT / "state" / "last_dataset_generation.json"
+
+
+def _load_last_generation() -> dict[str, str | None]:
+    try:
+        payload = json.loads(LAST_GENERATION_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"last_successful_at": None, "last_successful_job_id": None}
+    if not isinstance(payload, dict):
+        return {"last_successful_at": None, "last_successful_job_id": None}
+    return {
+        "last_successful_at": payload.get("last_successful_at"),
+        "last_successful_job_id": payload.get("last_successful_job_id"),
+    }
+
+
+def _save_last_generation(finished_at: str, job_id: str) -> None:
+    LAST_GENERATION_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = LAST_GENERATION_PATH.with_name(f".{LAST_GENERATION_PATH.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps({
+            "last_successful_at": finished_at,
+            "last_successful_job_id": job_id,
+        }), encoding="utf-8")
+        os.replace(temporary, LAST_GENERATION_PATH)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 _LOCK = threading.Lock()
 _ACTIVE_UPLOADS = 0
@@ -66,6 +94,7 @@ _JOB: dict[str, object] = {
     "logs": [],
     "started_at": None,
     "finished_at": None,
+    **_load_last_generation(),
 }
 
 
@@ -277,12 +306,23 @@ def _run_pipeline_locked(job_id: str) -> None:
             logger.exception("Published datasets but could not update the supplementary profile report")
             _append_log("Datasets were published; the supplementary profile report could not be updated.")
         with _LOCK:
+            finished_at = datetime.now(timezone.utc).isoformat()
             _JOB.update({
                 "status": "succeeded",
                 "stage": None,
                 "message": "All processed datasets were generated successfully.",
-                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "finished_at": finished_at,
+                "last_successful_at": finished_at,
+                "last_successful_job_id": job_id,
             })
+        try:
+            _save_last_generation(finished_at, job_id)
+            from app.services.firms_ingestion import firms_ingestion
+
+            firms_ingestion.mark_generation_published(job_id)
+        except Exception:
+            logger.exception("Datasets were published, but ingestion completion state could not be updated")
+            _append_log("Datasets were published; ingestion completion state could not be updated.")
     except Exception as exc:
         logger.exception("TerraIgnis data pipeline failed (job_id=%s)", job_id)
         if published:

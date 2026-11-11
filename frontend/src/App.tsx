@@ -7,6 +7,7 @@ import IgnishChat from './components/IgnishChat';
 import GlobalFirePulse from './components/GlobalFirePulse';
 import RegionalDeepDive from './components/RegionalDeepDive';
 import FireActivityCalendar from './components/FireActivityCalendar';
+import IngestionCompletionPrompt from './components/IngestionCompletionPrompt';
 import { DashboardProvider } from './context/DashboardContext';
 
 type TabId = 'global' | 'regional' | 'calendar' | 'pipeline';
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <DashboardProvider>
+        <IngestionCompletionPrompt theme={theme} />
         <Routes>
           <Route path="/" element={<DashboardView activeTab="global" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/cells" element={<DashboardView activeTab="regional" theme={theme} onThemeToggle={toggleTheme} />} />

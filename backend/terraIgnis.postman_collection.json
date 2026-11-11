@@ -633,6 +633,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Returns NRT and historical job state, including pending_generation and download_notice_pending flags used by the dashboard to offer dataset generation after new raw files arrive.",
             "url": {
               "raw": "{{base_url}}/api/ingestion/status",
               "host": [
@@ -652,6 +653,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Returns scheduler and latest poll details, including raw_files_added, pending_generation, download_notice_pending, run_id, and per-product results.",
             "url": {
               "raw": "{{base_url}}/api/ingestion/nrt/status",
               "host": [
@@ -879,6 +881,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Returns raw-file inventory, current generation progress, and last_successful_at / last_successful_job_id for the most recently published datasets.",
             "url": {
               "raw": "{{base_url}}/api/pipeline/status",
               "host": [

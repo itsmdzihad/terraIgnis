@@ -39,6 +39,8 @@ export interface PipelineStatus {
   logs: string[];
   started_at: string | null;
   finished_at: string | null;
+  last_successful_at?: string | null;
+  last_successful_job_id?: string | null;
   raw_files: RawFileInventory;
 }
 
@@ -52,11 +54,14 @@ export interface NRTIngestionStatus {
   last_success_at?: string | null;
   last_error?: string | null;
   pending_generation?: boolean;
+  download_notice_pending?: boolean;
+  manual_run?: boolean;
+  run_id?: string | null;
   interval_minutes?: number;
   downloaded_records?: number;
   raw_files_added?: number;
   sources_configured?: string[];
-  sources?: Record<string, { status: string; downloaded_records?: number; date_start?: string; date_end?: string; error?: string }>;
+  sources?: Record<string, { status: string; downloaded_records?: number; date_start?: string; date_end?: string; raw_file_saved?: boolean; error?: string }>;
 }
 
 export interface HistoricalIngestionChunk {
@@ -65,6 +70,8 @@ export interface HistoricalIngestionChunk {
   end_date: string;
   status: string;
   records: number;
+  raw_file?: string | null;
+  raw_file_added?: boolean;
   error?: string | null;
 }
 
@@ -82,6 +89,12 @@ export interface HistoricalIngestionJob {
   failed_chunks: number;
   progress_percent: number;
   downloaded_records: number;
+  raw_files_added?: number;
+  pending_generation?: boolean;
+  download_notice_pending?: boolean;
+  generation_job_id?: string | null;
+  updated_at?: string;
+  finished_at?: string | null;
   last_error?: string | null;
   chunks: HistoricalIngestionChunk[];
 }
@@ -146,7 +159,9 @@ export async function startPipeline(): Promise<{ job_id: string; status: 'queued
     method: 'POST',
     headers: { Accept: 'application/json' },
   });
-  return readResponse(response);
+  const result = await readResponse<{ job_id: string; status: 'queued'; message: string }>(response);
+  window.dispatchEvent(new CustomEvent('terraignis:pipeline-generation-started', { detail: result }));
+  return result;
 }
 
 function operatorHeaders(token?: string): Record<string, string> {

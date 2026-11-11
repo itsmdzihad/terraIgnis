@@ -118,6 +118,11 @@ class FIRMSIngestionService:
             "sources": {},
             "last_error": None,
             "pending_generation": False,
+            "download_notice_pending": False,
+            "manual_run": False,
+            "run_id": None,
+            "downloaded_records": 0,
+            "raw_files_added": 0,
         }
 
     def _save_json(self, path: Path, payload: Any) -> None:
@@ -186,7 +191,7 @@ class FIRMSIngestionService:
             time.sleep(0.25)
         raise TimeoutError("Dataset generation did not finish before the wait limit.")
 
-    def _nrt_cycle(self) -> dict[str, Any]:
+    def _nrt_cycle(self, *, manual: bool = False) -> dict[str, Any]:
         if not self.config.firms_map_key:
             raise FIRMSConfigurationError("NASA FIRMS ingestion is not configured. Set FIRMS_MAP_KEY in backend/.env.")
         run_id = uuid.uuid4().hex
@@ -196,6 +201,7 @@ class FIRMSIngestionService:
                 "enabled": self.config.firms_nrt_enabled,
                 "status": "running",
                 "run_id": run_id,
+                "manual_run": manual,
                 "last_started_at": started,
                 "last_error": None,
                 "sources": self._nrt_status.get("sources", {}),
@@ -251,37 +257,27 @@ class FIRMSIngestionService:
 
         pending_generation = bool(new_files or self._nrt_status.get("pending_generation"))
         successful_sources = [name for name, result in source_results.items() if result.get("status") == "succeeded"]
-        generation: dict[str, Any] | None = None
-        generation_error: str | None = None
-        if pending_generation:
-            try:
-                generation = self._generate_datasets()
-                pending_generation = False
-            except Exception as exc:
-                generation_error = str(exc)
-                logger.exception("FIRMS NRT analytical generation failed run_id=%s", run_id)
-
         finished = utc_now()
         with self._thread_lock:
             checkpoints = dict(self._nrt_status.get("checkpoints") or {})
-            if generation_error is None:
-                for source in successful_sources:
-                    result = source_results[source]
-                    checkpoints[source] = {
-                        "date_start": result["date_start"],
-                        "date_end": result["date_end"],
-                        "last_success_at": finished,
-                    }
+            for source in successful_sources:
+                result = source_results[source]
+                checkpoints[source] = {
+                    "date_start": result["date_start"],
+                    "date_end": result["date_end"],
+                    "last_success_at": finished,
+                }
             errors = [result["error"] for result in source_results.values() if result.get("error")]
             self._nrt_status.update({
-                "status": "failed" if generation_error or (errors and not successful_sources) else "succeeded",
+                "status": "failed" if errors and not successful_sources else "succeeded",
                 "last_finished_at": finished,
-                "last_success_at": finished if successful_sources and generation_error is None else self._nrt_status.get("last_success_at"),
+                "last_success_at": finished if successful_sources else self._nrt_status.get("last_success_at"),
                 "sources": source_results,
                 "checkpoints": checkpoints,
-                "last_error": generation_error or ("; ".join(errors) if errors else None),
+                "last_error": "; ".join(errors) if errors else None,
                 "pending_generation": pending_generation,
-                "last_generation_job_id": generation.get("job_id") if generation else None,
+                "download_notice_pending": bool(manual or new_files),
+                "last_generation_job_id": self._nrt_status.get("last_generation_job_id"),
                 "downloaded_records": sum(int(value.get("downloaded_records", 0)) for value in source_results.values()),
                 "raw_files_added": new_files,
             })
@@ -296,13 +292,13 @@ class FIRMSIngestionService:
             )
             return dict(self._nrt_status)
 
-    def run_nrt_once(self) -> dict[str, Any]:
+    def run_nrt_once(self, *, manual: bool = False) -> dict[str, Any]:
         """Run a single poll cycle while preventing overlap across processes."""
         with _file_lock(self.nrt_lock_path, blocking=False) as acquired:
             if not acquired:
                 raise RuntimeError("An NRT ingestion run is already active.")
             try:
-                return self._nrt_cycle()
+                return self._nrt_cycle(manual=manual)
             except Exception as exc:
                 with self._thread_lock:
                     self._nrt_status.update({"status": "failed", "last_finished_at": utc_now(), "last_error": str(exc)})
@@ -317,7 +313,7 @@ class FIRMSIngestionService:
 
             def worker() -> None:
                 try:
-                    self.run_nrt_once()
+                    self.run_nrt_once(manual=True)
                 except Exception as exc:
                     logger.warning("On-demand FIRMS NRT run failed: %s", exc)
 
@@ -428,6 +424,7 @@ class FIRMSIngestionService:
                     "status": "pending",
                     "records": 0,
                     "raw_file": None,
+                    "raw_file_added": False,
                     "error": None,
                 })
         if not chunks:
@@ -446,11 +443,15 @@ class FIRMSIngestionService:
             "completed_chunks": 0,
             "failed_chunks": 0,
             "downloaded_records": 0,
+            "raw_files_added": 0,
             "started_at": utc_now(),
             "updated_at": utc_now(),
             "finished_at": None,
             "last_error": None,
             "cancel_requested": False,
+            "pending_generation": False,
+            "download_notice_pending": False,
+            "generation_job_id": None,
         }
         with _file_lock(self.history_path.with_suffix(".lock")):
             jobs = _read_json(self.history_path, {})
@@ -495,14 +496,22 @@ class FIRMSIngestionService:
             if not job:
                 return
             if job.get("status") == "cancelled" or job.get("cancel_requested"):
-                self._update_history_job(job_id, {"status": "cancelled", "stage": None, "finished_at": utc_now()})
+                has_downloads = int(job.get("raw_files_added", 0)) > 0
+                self._update_history_job(job_id, {
+                    "status": "cancelled", "stage": None, "finished_at": utc_now(),
+                    "pending_generation": has_downloads, "download_notice_pending": True,
+                })
                 return
             self._update_history_job(job_id, {"status": "running", "stage": "downloading", "last_error": None})
             failed = False
             for index, chunk in enumerate(job["chunks"]):
                 job = self._get_history_job(job_id) or job
                 if job.get("cancel_requested"):
-                    self._update_history_job(job_id, {"status": "cancelled", "stage": None, "finished_at": utc_now()})
+                    has_downloads = int(job.get("raw_files_added", 0)) > 0
+                    self._update_history_job(job_id, {
+                        "status": "cancelled", "stage": None, "finished_at": utc_now(),
+                        "pending_generation": has_downloads, "download_notice_pending": True,
+                    })
                     return
                 if chunk["status"] == "completed":
                     continue
@@ -513,8 +522,8 @@ class FIRMSIngestionService:
                 try:
                     with self.client_factory(self.config) as client:
                         result = client.fetch_area(source, job["area"], start, end)
-                    path, _, digest = self._store_raw(source, "historical", start, end, result.text)
-                    chunk.update({"status": "completed", "records": result.row_count, "raw_file": str(path.relative_to(self.data_root)), "sha256": digest, "error": None})
+                    path, created, digest = self._store_raw(source, "historical", start, end, result.text)
+                    chunk.update({"status": "completed", "records": result.row_count, "raw_file": str(path.relative_to(self.data_root)), "raw_file_added": created, "sha256": digest, "error": None})
                     logger.info(
                         "FIRMS historical chunk complete job_id=%s source=%s area=%s dates=%s..%s records=%d",
                         job_id,
@@ -532,36 +541,46 @@ class FIRMSIngestionService:
                 completed = sum(item["status"] == "completed" for item in job["chunks"])
                 failed_count = sum(item["status"] == "failed" for item in job["chunks"])
                 records = sum(int(item.get("records", 0)) for item in job["chunks"])
+                raw_files_added = sum(bool(item.get("raw_file_added")) for item in job["chunks"])
                 self._update_history_job(job_id, {
                     "chunks": job["chunks"],
                     "completed_chunks": completed,
                     "failed_chunks": failed_count,
                     "downloaded_records": records,
+                    "raw_files_added": raw_files_added,
                 })
 
             job = self._get_history_job(job_id) or job
             if any(chunk["status"] != "completed" for chunk in job["chunks"]):
                 status = "partial_failure" if failed else "cancelled"
-                self._update_history_job(job_id, {"status": status, "stage": None, "finished_at": utc_now(), "last_error": "One or more chunks failed." if failed else None})
+                has_downloads = int(job.get("raw_files_added", 0)) > 0
+                self._update_history_job(job_id, {
+                    "status": status,
+                    "stage": None,
+                    "finished_at": utc_now(),
+                    "last_error": "One or more chunks failed." if failed else None,
+                    "pending_generation": has_downloads,
+                    "download_notice_pending": True,
+                })
                 return
 
             if job.get("cancel_requested"):
-                self._update_history_job(job_id, {"status": "cancelled", "stage": None, "finished_at": utc_now()})
+                has_downloads = int(job.get("raw_files_added", 0)) > 0
+                self._update_history_job(job_id, {
+                    "status": "cancelled", "stage": None, "finished_at": utc_now(),
+                    "pending_generation": has_downloads, "download_notice_pending": True,
+                })
                 return
 
-            self._update_history_job(job_id, {"status": "processing", "stage": "generating_datasets"})
-            try:
-                generation = self._generate_datasets()
-                self._update_history_job(job_id, {
-                    "status": "succeeded",
-                    "stage": None,
-                    "finished_at": utc_now(),
-                    "last_error": None,
-                    "generation_job_id": generation.get("job_id"),
-                })
-            except Exception as exc:
-                logger.exception("Historical FIRMS dataset generation failed job_id=%s", job_id)
-                self._update_history_job(job_id, {"status": "processing_failed", "stage": None, "finished_at": utc_now(), "last_error": str(exc)})
+            has_downloads = int(job.get("raw_files_added", 0)) > 0
+            self._update_history_job(job_id, {
+                "status": "succeeded",
+                "stage": None,
+                "finished_at": utc_now(),
+                "last_error": None,
+                "pending_generation": has_downloads,
+                "download_notice_pending": True,
+            })
 
     @staticmethod
     def _public_history_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -570,6 +589,7 @@ class FIRMSIngestionService:
         public["pending_chunks"] = sum(chunk["status"] == "pending" for chunk in chunks)
         public["failed_chunks"] = sum(chunk["status"] == "failed" for chunk in chunks)
         public["completed_chunks"] = sum(chunk["status"] == "completed" for chunk in chunks)
+        public["raw_files_added"] = sum(bool(chunk.get("raw_file_added")) for chunk in chunks)
         public["progress_percent"] = round(public["completed_chunks"] * 100 / max(1, len(chunks)), 2)
         public.pop("cancel_requested", None)
         return public
@@ -596,6 +616,7 @@ class FIRMSIngestionService:
                 self._public_history_job(job)
                 for job in ordered
                 if job.get("status") in {"queued", "running", "processing", "processing_failed", "partial_failure"}
+                or job.get("download_notice_pending")
                 or resumable_cancelled(job)
             ), None),
             "jobs": [self._public_history_job(job) for job in ordered[:20]],
@@ -614,7 +635,16 @@ class FIRMSIngestionService:
         if not any(chunk.get("status") != "completed" for chunk in chunks):
             if job.get("status") not in {"processing_failed", "partial_failure", "cancelled"}:
                 raise RuntimeError("This historical FIRMS job has no pending chunks to resume.")
-        self._update_history_job(job_id, {"chunks": chunks, "status": "queued", "stage": "downloading", "finished_at": None, "cancel_requested": False, "last_error": None})
+        self._update_history_job(job_id, {
+            "chunks": chunks,
+            "status": "queued",
+            "stage": "downloading",
+            "finished_at": None,
+            "cancel_requested": False,
+            "last_error": None,
+            "pending_generation": False,
+            "download_notice_pending": False,
+        })
         self._start_history_worker(job_id)
         return self.get_historical_status(job_id)
 
@@ -628,7 +658,14 @@ class FIRMSIngestionService:
             raise RuntimeError("Only an active historical FIRMS job can be cancelled.")
         update = {"cancel_requested": True}
         if job.get("status") == "queued":
-            update.update({"status": "cancelled", "stage": None, "finished_at": utc_now()})
+            has_downloads = int(job.get("raw_files_added", 0)) > 0
+            update.update({
+                "status": "cancelled",
+                "stage": None,
+                "finished_at": utc_now(),
+                "pending_generation": has_downloads,
+                "download_notice_pending": True,
+            })
         self._update_history_job(job_id, update)
         return self.get_historical_status(job_id)
 
@@ -645,6 +682,34 @@ class FIRMSIngestionService:
             "nrt": self.get_nrt_status(),
             "historical": self.get_historical_status(),
         }
+
+    def mark_generation_published(self, generation_job_id: str) -> None:
+        """Clear ingestion prompts after a full processed generation is published."""
+        with self._thread_lock:
+            persisted_nrt = _read_json(self.nrt_state_path, self._empty_nrt_status())
+            persisted_nrt.update({
+                "pending_generation": False,
+                "download_notice_pending": False,
+                "last_generation_job_id": generation_job_id,
+            })
+            self._nrt_status = persisted_nrt
+            self._save_nrt()
+
+        with _file_lock(self.history_path.with_suffix(".lock")):
+            jobs = _read_json(self.history_path, {})
+            changed = False
+            for job in jobs.values():
+                if not isinstance(job, dict) or not job.get("download_notice_pending"):
+                    continue
+                job.update({
+                    "pending_generation": False,
+                    "download_notice_pending": False,
+                    "generation_job_id": generation_job_id,
+                    "updated_at": utc_now(),
+                })
+                changed = True
+            if changed:
+                self._save_json(self.history_path, jobs)
 
 
 firms_ingestion = FIRMSIngestionService()
