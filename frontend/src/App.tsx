@@ -38,6 +38,7 @@ export default function App() {
           <Route path="/activity" element={<DashboardView activeTab="calendar" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/pipeline" element={<DashboardView activeTab="pipeline" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/how-it-works" element={<DashboardView activeTab="how-it-works" theme={theme} onThemeToggle={toggleTheme} />} />
+          <Route path="/how-it-works/:section" element={<DashboardView activeTab="how-it-works" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </DashboardProvider>
@@ -128,7 +129,7 @@ function DashboardView({
               {tabId === 'regional' && <RegionalDeepDive />}
               {tabId === 'calendar' && <FireActivityCalendar />}
               {tabId === 'pipeline' && <DataPipeline />}
-              {tabId === 'how-it-works' && <HowItWorks />}
+              {tabId === 'how-it-works' && <HowItWorks theme={theme} />}
             </motion.div>
           );
         })}
