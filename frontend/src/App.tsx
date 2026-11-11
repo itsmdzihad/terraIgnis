@@ -8,10 +8,11 @@ import GlobalFirePulse from './components/GlobalFirePulse';
 import RegionalDeepDive from './components/RegionalDeepDive';
 import FireActivityCalendar from './components/FireActivityCalendar';
 import IngestionCompletionPrompt from './components/IngestionCompletionPrompt';
+import HowItWorks from './components/HowItWorks';
 import { DashboardProvider } from './context/DashboardContext';
 
-type TabId = 'global' | 'regional' | 'calendar' | 'pipeline';
-const TABS: readonly TabId[] = ['global', 'regional', 'calendar', 'pipeline'];
+type TabId = 'global' | 'regional' | 'calendar' | 'pipeline' | 'how-it-works';
+const TABS: readonly TabId[] = ['global', 'regional', 'calendar', 'pipeline', 'how-it-works'];
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/cells" element={<DashboardView activeTab="regional" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/activity" element={<DashboardView activeTab="calendar" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="/pipeline" element={<DashboardView activeTab="pipeline" theme={theme} onThemeToggle={toggleTheme} />} />
+          <Route path="/how-it-works" element={<DashboardView activeTab="how-it-works" theme={theme} onThemeToggle={toggleTheme} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </DashboardProvider>
@@ -126,6 +128,7 @@ function DashboardView({
               {tabId === 'regional' && <RegionalDeepDive />}
               {tabId === 'calendar' && <FireActivityCalendar />}
               {tabId === 'pipeline' && <DataPipeline />}
+              {tabId === 'how-it-works' && <HowItWorks />}
             </motion.div>
           );
         })}

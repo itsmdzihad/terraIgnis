@@ -21,6 +21,7 @@ const navItems = [
   { id: 'regional', label: 'Cell explorer', path: '/cells' },
   { id: 'calendar', label: 'Daily activity', path: '/activity' },
   { id: 'pipeline', label: 'Data pipeline', path: '/pipeline' },
+  { id: 'how-it-works', label: 'How It Works', path: '/how-it-works' },
 ];
 
 function fmt(value: number): string {
@@ -275,12 +276,12 @@ export default function Navbar({ theme, onThemeToggle }: NavbarProps) {
                     to={path}
                     end={id === 'global'}
                     className={({ isActive }) =>
-                      `site-nav-link${isActive ? ' is-active' : ''}`
+                      `site-nav-link${id === 'how-it-works' ? ' is-featured' : ''}${isActive ? ' is-active' : ''}`
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        {isActive && (
+                        {isActive && id !== 'how-it-works' && (
                           <motion.span
                             layoutId="site-nav-active-pill"
                             className="site-nav-pill"
