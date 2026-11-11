@@ -82,20 +82,18 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]) {
   --glass-control-hover: rgba(15, 23, 42, 0.085);
   --glass-divider: rgba(15, 23, 42, 0.08);
 
-  --nav-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(244, 247, 255, 0.72) 100%);
-  --nav-shell-highlight: rgba(255, 255, 255, 0.96);
+  --nav-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.54) 0%, rgba(244, 247, 255, 0.38) 100%);
+  --nav-shell-highlight: rgba(255, 255, 255, 0.78);
   --nav-brand-ink: #0b1220;
   --nav-brand-accent: #2563eb;
-  --nav-inner-bg: rgba(15, 23, 42, 0.045);
-  --nav-inner-border: rgba(15, 23, 42, 0.10);
+  --nav-inner-bg: rgba(15, 23, 42, 0.04);
   --nav-divider: rgba(15, 23, 42, 0.14);
   --nav-ink: #475569;
   --nav-ink-active: #0b1220;
-  --nav-pill-bg: rgba(255, 255, 255, 0.94);
-  --nav-pill-shadow: 0 1px 4px rgba(15, 23, 42, 0.10), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
-  --nav-hover-bg: rgba(255, 255, 255, 0.65);
-  --nav-toggle-hover-bg: rgba(255, 255, 255, 0.92);
-  --nav-toggle-hover-border: rgba(37, 99, 235, 0.28);
+  --nav-pill-bg: rgba(255, 255, 255, 0.76);
+  --nav-pill-shadow: 0 1px 4px rgba(15, 23, 42, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.90);
+  --nav-hover-bg: rgba(255, 255, 255, 0.45);
+  --nav-toggle-hover-bg: rgba(255, 255, 255, 0.65);
 
   --glass-blur: blur(26px) saturate(165%);
   --glass-blur-strong: blur(32px) saturate(180%);
@@ -178,20 +176,18 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]) {
   --glass-control-hover: rgba(255, 255, 255, 0.16);
   --glass-divider: rgba(255, 255, 255, 0.10);
 
-  --nav-shell-bg: linear-gradient(180deg, rgba(23, 32, 51, 0.80) 0%, rgba(17, 24, 39, 0.70) 100%);
-  --nav-shell-highlight: rgba(255, 255, 255, 0.14);
+  --nav-shell-bg: linear-gradient(180deg, rgba(23, 32, 51, 0.48) 0%, rgba(17, 24, 39, 0.34) 100%);
+  --nav-shell-highlight: rgba(255, 255, 255, 0.16);
   --nav-brand-ink: #f8fafc;
   --nav-brand-accent: #60a5fa;
-  --nav-inner-bg: rgba(9, 13, 22, 0.56);
-  --nav-inner-border: rgba(148, 163, 184, 0.22);
+  --nav-inner-bg: rgba(255, 255, 255, 0.06);
   --nav-divider: rgba(148, 163, 184, 0.24);
   --nav-ink: #94a8c4;
   --nav-ink-active: #f8fafc;
-  --nav-pill-bg: rgba(30, 41, 59, 0.92);
-  --nav-pill-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), 0 2px 8px rgba(2, 6, 18, 0.45);
+  --nav-pill-bg: rgba(255, 255, 255, 0.16);
+  --nav-pill-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22), 0 2px 8px rgba(2, 6, 18, 0.32);
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
-  --nav-toggle-hover-bg: rgba(30, 41, 59, 0.92);
-  --nav-toggle-hover-border: rgba(96, 165, 250, 0.36);
+  --nav-toggle-hover-bg: rgba(255, 255, 255, 0.14);
 
   --glass-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
@@ -325,6 +321,93 @@ select.glass-control option {
   background: rgba(59, 130, 246, 0.28) !important;
   color: #93c5fd !important;
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), 0 4px 14px -4px rgba(37, 99, 235, 0.40);
+}
+
+.map-floating-btn {
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+  color: var(--ink-strong) !important;
+  backdrop-filter: blur(22px) saturate(185%);
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.88),
+    0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 10px 24px -8px rgba(15, 23, 42, 0.18);
+  transition: background-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+}
+
+.map-floating-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.76) !important;
+}
+
+.app-shell[data-theme="dark"] .map-floating-btn {
+  background: rgba(17, 24, 39, 0.52) !important;
+  color: var(--ink-strong) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px rgba(148, 163, 184, 0.20),
+    0 12px 28px -8px rgba(2, 6, 18, 0.62);
+}
+
+.app-shell[data-theme="dark"] .map-floating-btn:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 0.70) !important;
+}
+
+.map-floating-btn-active {
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: rgba(219, 234, 254, 0.68) !important;
+  color: #1d4ed8 !important;
+  backdrop-filter: blur(22px) saturate(185%);
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.86),
+    0 0 0 1px rgba(37, 99, 235, 0.24),
+    0 10px 24px -8px rgba(37, 99, 235, 0.28);
+  transition: background-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+}
+
+.map-floating-btn-active:hover:not(:disabled) {
+  background: rgba(219, 234, 254, 0.84) !important;
+}
+
+.app-shell[data-theme="dark"] .map-floating-btn-active {
+  background: rgba(37, 99, 235, 0.36) !important;
+  color: #93c5fd !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.20),
+    0 0 0 1px rgba(96, 165, 250, 0.34),
+    0 12px 28px -8px rgba(2, 6, 18, 0.62);
+}
+
+.app-shell[data-theme="dark"] .map-floating-btn-active:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.50) !important;
+}
+
+.map-floating-panel {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(22px) saturate(185%);
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.88),
+    0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 14px 32px -10px rgba(15, 23, 42, 0.18);
+}
+
+.app-shell[data-theme="dark"] .map-floating-panel {
+  background: rgba(17, 24, 39, 0.52) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px rgba(148, 163, 184, 0.20),
+    0 16px 36px -10px rgba(2, 6, 18, 0.64);
 }
 
 .glass-btn-primary {
@@ -486,8 +569,10 @@ select.glass-control option {
   z-index: 1;
   pointer-events: none;
   background: var(--nav-shell-bg);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  transform: translateZ(0);
+  will-change: backdrop-filter;
 }
 
 .site-navbar-shell :focus-visible {
@@ -519,8 +604,8 @@ select.glass-control option {
 .site-navbar-shell:not(.has-unified-shell) .site-nav-lobe,
 .site-navbar-shell:not(.has-unified-shell) .site-action-lobe {
   background: var(--nav-shell-bg);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
 }
 
 .site-logo-mark {
@@ -572,7 +657,7 @@ select.glass-control option {
   height: 100%;
   min-width: 0;
   padding: 3px;
-  border: 1px solid var(--nav-inner-border);
+  border: 0;
   border-radius: 9999px;
   background: var(--nav-inner-bg);
 }
@@ -653,7 +738,7 @@ select.glass-control option {
   gap: 7px;
   height: 100%;
   padding: 0 16px;
-  border: 1px solid var(--nav-inner-border);
+  border: 0;
   border-radius: 9999px;
   background: var(--nav-inner-bg);
   color: var(--nav-ink-active);
@@ -661,12 +746,11 @@ select.glass-control option {
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
-  transition: background-color 0.16s ease, border-color 0.16s ease;
+  transition: background-color 0.16s ease;
 }
 
 .theme-toggle:hover {
   background: var(--nav-toggle-hover-bg);
-  border-color: var(--nav-toggle-hover-border);
 }
 
 main {

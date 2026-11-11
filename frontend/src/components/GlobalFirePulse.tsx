@@ -780,7 +780,7 @@ export default function GlobalFirePulse() {
         <div className="order-1 flex-1 min-w-0 min-h-[360px] sm:min-h-[420px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
           {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
           <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-            <div className="pointer-events-auto glass-panel-strong rounded-full pl-4 pr-1.5 py-1.5 flex items-center gap-2.5 max-w-full min-w-0">
+            <div className="pointer-events-auto map-floating-panel rounded-full pl-4 pr-1.5 py-1.5 flex items-center gap-2.5 max-w-full min-w-0">
               <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
                 Fire Overview
               </h1>
@@ -818,12 +818,12 @@ export default function GlobalFirePulse() {
               </div>
             </div>
 
-            <div className="pointer-events-auto glass-panel-strong rounded-full p-1 flex items-center gap-1.5">
+            <div className="pointer-events-auto flex items-center gap-2">
               {/* Dataset snapshot action pill */}
               <button
                 type="button"
                 onClick={() => setIsSnapshotOpen(true)}
-                className="glass-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold"
+                className="map-floating-btn inline-flex items-center h-8 gap-1.5 px-3.5 rounded-full text-xs font-semibold"
               >
                 <Camera size={13} className="glass-muted" />
                 <span>Dataset snapshot</span>
@@ -836,8 +836,8 @@ export default function GlobalFirePulse() {
                 aria-expanded={isFiltersOpen}
                 aria-controls="fire-filter-controls"
                 onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                  isFiltersOpen || activeFiltersCount > 0 ? "glass-btn-active" : "glass-btn"
+                className={`inline-flex items-center h-8 gap-1.5 px-3.5 rounded-full text-xs font-semibold ${
+                  isFiltersOpen || activeFiltersCount > 0 ? "map-floating-btn-active" : "map-floating-btn"
                 }`}
               >
                 <SlidersHorizontal size={13} />
@@ -861,7 +861,7 @@ export default function GlobalFirePulse() {
                 }}
                 title="Refresh data"
                 aria-label="Refresh data"
-                className="glass-btn p-1.5 rounded-full"
+                className="map-floating-btn inline-flex items-center justify-center h-8 w-8 rounded-full"
               >
                 <RotateCw
                   size={13}
@@ -877,7 +877,7 @@ export default function GlobalFirePulse() {
               id="fire-filter-controls"
               ref={filtersPanelRef}
               aria-label="Fire API filters"
-              className="absolute top-16 left-3.5 right-3.5 z-30 glass-panel-strong rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
+              className="absolute top-16 left-3.5 right-3.5 z-30 map-floating-panel rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 glass-divider-b">
                 <div className="flex items-center gap-2">
@@ -1125,13 +1125,13 @@ export default function GlobalFirePulse() {
             {(mapLoading || mapError || (!mapLoading && records.length === 0)) && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/35 backdrop-blur-xs p-4">
                 {mapLoading ? (
-                  <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                  <div className="map-floating-panel px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
                       Loading detections...
                     </span>
                   </div>
                 ) : mapError ? (
-                  <div className="max-w-sm glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                  <div className="max-w-sm map-floating-panel px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold tone-rose">
                       Unable to load fire detections.
                     </span>
@@ -1144,7 +1144,7 @@ export default function GlobalFirePulse() {
                     </button>
                   </div>
                 ) : (
-                  <div className="glass-panel-strong px-6 py-4 rounded-3xl text-center">
+                  <div className="map-floating-panel px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
                       No matching records
                     </span>
@@ -1158,7 +1158,7 @@ export default function GlobalFirePulse() {
           </div>
 
           {/* FLOATING LEGEND CARD (Bottom-Right) */}
-          <div className="absolute bottom-4 right-4 z-10 glass-panel-strong rounded-3xl p-4 w-64 xl:w-72 pointer-events-auto">
+          <div className="absolute bottom-4 right-4 z-10 map-floating-panel rounded-3xl p-4 w-64 xl:w-72 pointer-events-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-bold glass-heading">Legend</span>
               <button
