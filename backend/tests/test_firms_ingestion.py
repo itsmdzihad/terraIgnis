@@ -72,53 +72,39 @@ class FIRMSIngestionTests(unittest.TestCase):
             calls: list[tuple[str, str, str]] = []
             csv_text = "latitude,longitude\n27,90\n"
             client_factory = lambda config: FakeClient(config, responses={"MODIS_NRT": csv_text}, calls=calls)
-            generations: list[int] = []
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp), client_factory=client_factory,
-                dataset_generator=lambda: generations.append(1) or {"job_id": "gen1"},
             )
             first = service.run_nrt_once()
             second = service.run_nrt_once()
             self.assertEqual(first["status"], "succeeded")
             self.assertEqual(first["checkpoints"]["MODIS_NRT"]["date_end"], "2020-01-10")
             self.assertEqual(first["raw_files_added"], 1)
+            self.assertTrue(first["pending_generation"])
             self.assertEqual(second["raw_files_added"], 0)
-            self.assertEqual(len(generations), 1)
+            self.assertTrue(second["pending_generation"])
             self.assertEqual(len(calls), 2)
             self.assertTrue((Path(temp) / "state" / "nrt_status.json").is_file())
 
-    def test_failed_dataset_generation_does_not_advance_nrt_checkpoint_and_retries_pending_work(self) -> None:
+    def test_nrt_download_waits_for_user_confirmed_dataset_generation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
-            attempts = []
-
-            def generate():
-                attempts.append(1)
-                if len(attempts) == 1:
-                    raise RuntimeError("mock generator failure")
-                return {"job_id": "gen-ok"}
-
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp),
                 client_factory=lambda config: FakeClient(config, responses={"MODIS_NRT": "latitude,longitude\n1,2\n"}),
-                dataset_generator=generate,
             )
-            failed = service.run_nrt_once()
-            succeeded = service.run_nrt_once()
-            self.assertEqual(failed["status"], "failed")
-            self.assertTrue(failed["pending_generation"])
-            self.assertNotIn("MODIS_NRT", failed["checkpoints"])
-            self.assertEqual(succeeded["status"], "succeeded")
-            self.assertFalse(succeeded["pending_generation"])
-            self.assertIn("MODIS_NRT", succeeded["checkpoints"])
+            downloaded = service.run_nrt_once(manual=True)
+            self.assertEqual(downloaded["status"], "succeeded")
+            self.assertTrue(downloaded["pending_generation"])
+            self.assertTrue(downloaded["download_notice_pending"])
+            self.assertTrue(downloaded["manual_run"])
+            self.assertIn("MODIS_NRT", downloaded["checkpoints"])
 
     def test_historical_range_is_chunked_and_job_state_is_persisted(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             calls: list[tuple[str, str, str]] = []
-            generations: list[int] = []
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp),
                 client_factory=lambda config: FakeClient(config, responses={"MODIS_SP": "header\nrow\n"}, calls=calls),
-                dataset_generator=lambda: generations.append(1) or {"job_id": "generated"},
             )
             initial = service.create_historical_job(date(2020, 1, 1), date(2020, 1, 10), sources=("MODIS_SP",))
             final = self.wait_for_job(service, initial["job_id"], {"succeeded"})
@@ -126,7 +112,8 @@ class FIRMSIngestionTests(unittest.TestCase):
             self.assertEqual(final["completed_chunks"], 2)
             self.assertEqual(final["progress_percent"], 100)
             self.assertEqual(len(calls), 2)
-            self.assertEqual(len(generations), 1)
+            self.assertTrue(final["pending_generation"])
+            self.assertTrue(final["download_notice_pending"])
             self.assertTrue((Path(temp) / "state" / "historical_jobs.json").is_file())
 
     def test_resume_skips_successful_chunks_and_retries_only_failed_chunk(self) -> None:
@@ -137,10 +124,8 @@ class FIRMSIngestionTests(unittest.TestCase):
             def factory(config):
                 return FakeClient(config, responses={"MODIS_SP": "header\nrow\n"}, fail_dates=fail_dates, calls=calls)
 
-            generations: list[int] = []
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp), client_factory=factory,
-                dataset_generator=lambda: generations.append(1) or {"job_id": "generated"},
             )
             initial = service.create_historical_job(date(2020, 1, 1), date(2020, 1, 10), sources=("MODIS_SP",))
             partial = self.wait_for_job(service, initial["job_id"], {"partial_failure"})
@@ -150,29 +135,30 @@ class FIRMSIngestionTests(unittest.TestCase):
             final = self.wait_for_job(service, initial["job_id"], {"succeeded"})
             self.assertEqual(final["completed_chunks"], 2)
             self.assertEqual(len(calls), 3)
-            self.assertEqual(generations, [1])
+            self.assertTrue(final["pending_generation"])
 
     def test_single_historical_job_at_a_time_and_cancel_endpoint_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             calls: list[tuple[str, str, str]] = []
-            generation_started = threading.Event()
-            allow_generation = threading.Event()
 
-            def generate():
-                generation_started.set()
-                allow_generation.wait(timeout=2)
-                return {"job_id": "generated"}
+            fetch_started = threading.Event()
+            allow_fetch = threading.Event()
+
+            class SlowClient(FakeClient):
+                def fetch_area(self, source: str, area: str, start: date, end: date) -> CSVResult:
+                    fetch_started.set()
+                    allow_fetch.wait(timeout=2)
+                    return CSVResult(("header",), 1, "header\nrow\n")
 
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp),
-                client_factory=lambda config: FakeClient(config, responses={"MODIS_SP": "header\nrow\n"}, calls=calls),
-                dataset_generator=generate,
+                client_factory=lambda config: SlowClient(config, responses={"MODIS_SP": "header\nrow\n"}, calls=calls),
             )
             first = service.create_historical_job(date(2020, 1, 1), date(2020, 1, 1), sources=("MODIS_SP",))
-            self.assertTrue(generation_started.wait(timeout=1))
+            self.assertTrue(fetch_started.wait(timeout=1))
             with self.assertRaises(RuntimeError):
                 service.create_historical_job(date(2020, 1, 1), date(2020, 1, 1), sources=("MODIS_SP",))
-            allow_generation.set()
+            allow_fetch.set()
             self.wait_for_job(service, first["job_id"], {"succeeded"})
 
     def test_cancel_historical_job_stops_at_the_next_chunk_boundary(self) -> None:
@@ -189,7 +175,6 @@ class FIRMSIngestionTests(unittest.TestCase):
             service = FIRMSIngestionService(
                 make_settings(), data_root=Path(temp),
                 client_factory=lambda config: SlowClient(config, responses={"MODIS_SP": "header\nrow\n"}),
-                dataset_generator=lambda: {"job_id": "generated"},
             )
             job = service.create_historical_job(date(2020, 1, 1), date(2020, 1, 10), sources=("MODIS_SP",))
             self.assertTrue(fetch_started.wait(timeout=1))
@@ -198,6 +183,8 @@ class FIRMSIngestionTests(unittest.TestCase):
             cancelled = self.wait_for_job(service, job["job_id"], {"cancelled"})
             self.assertEqual(cancelled["completed_chunks"], 1)
             self.assertEqual(cancelled["pending_chunks"], 1)
+            self.assertTrue(cancelled["pending_generation"])
+            self.assertTrue(cancelled["download_notice_pending"])
 
     def test_scheduler_disabled_stays_stopped_and_duplicate_start_creates_one_thread(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

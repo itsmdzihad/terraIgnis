@@ -213,6 +213,45 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]) {
   outline-color: #60a5fa;
 }
 
+/* Global ingestion prompt uses its own theme scope so its fixed overlay never
+   inherits the app shell's full-page layout or background. */
+.ingestion-modal-theme {
+  --brand-gradient: linear-gradient(135deg, #2563eb 0%, #4338ca 100%);
+  --ink-strong: #0b1220;
+  --ink-muted: #3b495e;
+  --tone-rose: #be123c;
+  --glass-bg-strong: rgba(255, 255, 255, 0.88);
+  --glass-blur-strong: blur(32px) saturate(180%);
+  --glass-track-bg: rgba(15, 23, 42, 0.08);
+  --glass-control-bg: rgba(15, 23, 42, 0.045);
+  --glass-control-hover: rgba(15, 23, 42, 0.085);
+  --glass-shadow-strong: inset 0 1px 0 0 rgba(255, 255, 255, 0.96), 0 22px 48px -12px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.10);
+  --glass-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.09), 0 1px 2px rgba(15, 23, 42, 0.05);
+  color: var(--ink-muted);
+  color-scheme: light;
+}
+
+.ingestion-modal-theme[data-theme="dark"] {
+  --brand-gradient: linear-gradient(135deg, #4f70ff 0%, #6d28d9 100%);
+  --ink-strong: #f8fafc;
+  --ink-muted: #c0cbe0;
+  --tone-rose: #fb7185;
+  --glass-bg-strong: rgba(20, 27, 45, 0.92);
+  --glass-blur-strong: blur(32px) saturate(180%);
+  --glass-track-bg: rgba(255, 255, 255, 0.10);
+  --glass-control-bg: rgba(255, 255, 255, 0.09);
+  --glass-control-hover: rgba(255, 255, 255, 0.16);
+  --glass-shadow-strong: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 24px 54px -10px rgba(2, 6, 18, 0.48), 0 0 0 1px rgba(148, 163, 184, 0.24);
+  --glass-shadow-soft: inset 0 1px 0 0 rgba(255, 255, 255, 0.10), 0 4px 14px -4px rgba(2, 6, 18, 0.50);
+  color: var(--ink-muted);
+  color-scheme: dark;
+}
+
+.ingestion-file-list {
+  background: var(--glass-control-bg);
+  scrollbar-width: thin;
+}
+
 /* ============================================================================
    SEMANTIC LIQUID GLASS PANELS, TYPOGRAPHY, DIVIDERS & CONTROLS
    ============================================================================ */
@@ -1399,6 +1438,36 @@ main {
   box-shadow: 0 8px 24px rgba(37, 99, 235, 0.34);
   transition: transform .18s ease, box-shadow .18s ease;
 }
+.ignish-launcher-wrap { position: relative; display: inline-flex; }
+.ignish-launcher-tooltip {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  z-index: 2;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 100px));
+  padding: 8px 11px;
+  transform: translate(4px, -50%);
+  border: 1px solid var(--ignish-border);
+  border-radius: 10px;
+  background: var(--ignish-panel);
+  color: var(--ignish-ink);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease;
+  visibility: hidden;
+}
+.ignish-launcher-wrap:hover .ignish-launcher-tooltip,
+.ignish-launcher-wrap:focus-within .ignish-launcher-tooltip {
+  transform: translate(0, -50%);
+  opacity: 1;
+  visibility: visible;
+}
 .ignish-launcher:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(37, 99, 235, 0.42); }
 .ignish-window {
   position: absolute;
@@ -1511,9 +1580,16 @@ main {
   background: var(--ignish-panel);
 }
 .ignish-composer textarea {
-  width: 100%;
+  width: 0;
+  min-width: 0;
+  min-height: 34px;
+  flex: 1 1 auto;
   max-height: 96px;
+  box-sizing: border-box;
+  padding: 7px 0;
   resize: none;
+  overflow-x: hidden;
+  scrollbar-width: none;
   border: 0;
   outline: 0;
   background: transparent;
@@ -1522,6 +1598,7 @@ main {
   font-size: 13px;
   line-height: 1.45;
 }
+.ignish-composer textarea::-webkit-scrollbar { display: none; }
 .ignish-composer textarea::placeholder { color: var(--ignish-muted); }
 .ignish-composer button {
   display: grid;

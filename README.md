@@ -1950,7 +1950,8 @@ to 1 GB total and 512 MB per file; exact duplicate files are skipped.
 ### `GET /api/pipeline/status`
 
 Returns the raw-file inventory and current generation job status, stage,
-and logs.
+and logs. It also includes the most recent successful dataset-generation
+timestamp and job ID; the timestamp persists across backend restarts.
 
 ### `POST /api/pipeline/generate`
 
@@ -1985,8 +1986,14 @@ The API enforces a maximum page size of 50,000.
 
 The Data Pipeline route uploads a batch of same-sensor MODIS or VIIRS files,
 then starts the six-stage generation workflow. Its automated ingestion panel
-can run NRT polls and start, resume, or cancel historical SP backfills.
-Cancelled jobs retain already downloaded raw files and completed chunks.
+can run NRT polls and start, resume, or cancel historical SP backfills. New
+files downloaded by NRT or historical jobs trigger a dashboard-wide prompt to
+generate datasets; canceled and partially completed historical jobs retain
+downloaded files and offer to process them or resume. The page also shows the
+last successful generation time and can refresh the file inventory and job
+status. Starting generation from the prompt uses the same pipeline endpoint as
+the page's Generate datasets button; a small progress card stays visible while
+the rest of the dashboard remains usable.
 
 ---
 

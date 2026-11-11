@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -12,7 +12,9 @@ import {
   Play,
   Radio,
   RotateCw,
+  RefreshCw,
   XCircle,
+  X,
   UploadCloud,
 } from 'lucide-react';
 import {
@@ -68,6 +70,9 @@ export default function DataPipeline() {
   const [historicalArea, setHistoricalArea] = useState('world');
   const [historicalSources, setHistoricalSources] = useState<string[]>(['MODIS_SP', 'VIIRS_SNPP_SP', 'VIIRS_NOAA20_SP', 'VIIRS_NOAA21_SP']);
   const [historicalBusy, setHistoricalBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const nrtNoticePendingRef = useRef(false);
+  const nrtNoticeBaselineRef = useRef<string | null>(null);
 
   const refreshStatus = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -103,6 +108,14 @@ export default function DataPipeline() {
   }, [refreshIngestion, refreshStatus]);
 
   useEffect(() => {
+    const handleGenerationStarted = () => {
+      void refreshStatus();
+    };
+    window.addEventListener('terraignis:pipeline-generation-started', handleGenerationStarted);
+    return () => window.removeEventListener('terraignis:pipeline-generation-started', handleGenerationStarted);
+  }, [refreshStatus]);
+
+  useEffect(() => {
     if (status?.status !== 'queued' && status?.status !== 'running') return;
     const timer = window.setInterval(() => void refreshStatus(), 1500);
     return () => window.clearInterval(timer);
@@ -116,6 +129,31 @@ export default function DataPipeline() {
     const timer = window.setInterval(() => void refreshIngestion(), 2500);
     return () => window.clearInterval(timer);
   }, [ingestion?.historical.active_job?.status, ingestion?.nrt.status, refreshIngestion]);
+
+  useEffect(() => {
+    const nrt = ingestion?.nrt;
+    if (!nrtNoticePendingRef.current || !nrt?.last_finished_at) return;
+    if (nrt.last_finished_at === nrtNoticeBaselineRef.current || nrt.status === 'running') return;
+
+    nrtNoticePendingRef.current = false;
+    if (nrt.status === 'failed') {
+      setIngestionNotice(`NRT poll failed: ${nrt.last_error || 'NASA FIRMS could not complete the download.'}`);
+    } else if ((nrt.raw_files_added ?? 0) > 0) {
+      const partial = nrt.last_error ? ' Some sources reported errors.' : '';
+      setIngestionNotice(`NRT poll complete: ${nrt.raw_files_added} new files and ${(nrt.downloaded_records ?? 0).toLocaleString()} records.${partial}`);
+    } else {
+      setIngestionNotice('NRT poll complete. No new files were found.');
+    }
+  }, [ingestion]);
+
+  useEffect(() => {
+    if (!ingestionNotice && !ingestionError) return;
+    const timer = window.setTimeout(() => {
+      setIngestionNotice(null);
+      setIngestionError(null);
+    }, 7000);
+    return () => window.clearTimeout(timer);
+  }, [ingestionError, ingestionNotice]);
 
   const canGenerate = useMemo(
     () => (status?.raw_files.total ?? 0) > 0 && !uploading && !starting && status?.status !== 'queued' && status?.status !== 'running',
@@ -161,15 +199,24 @@ export default function DataPipeline() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([refreshStatus(), refreshIngestion()]);
+    setRefreshing(false);
+  };
+
   const handleNrtRun = async () => {
     setHistoricalBusy(true);
     setIngestionError(null);
     setIngestionNotice(null);
     try {
+      nrtNoticeBaselineRef.current = ingestion?.nrt.last_finished_at ?? null;
+      nrtNoticePendingRef.current = true;
       const result = await startNrtIngestion(operatorToken);
       setIngestionNotice(result.message);
       await refreshIngestion();
     } catch (error) {
+      nrtNoticePendingRef.current = false;
       setIngestionError(error instanceof Error ? error.message : 'Could not start an NRT poll.');
     } finally {
       setHistoricalBusy(false);
@@ -254,8 +301,9 @@ export default function DataPipeline() {
         )}
 
         {(ingestionError || ingestionNotice) && (
-          <div role={ingestionError ? 'alert' : 'status'} className={`rounded-xl border px-4 py-3 text-sm ${ingestionError ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/35 dark:bg-rose-500/15 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300'}`}>
-            {ingestionError || ingestionNotice}
+          <div role={ingestionError ? 'alert' : 'status'} className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${ingestionError ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/35 dark:bg-rose-500/15 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300'}`}>
+            <span>{ingestionError || ingestionNotice}</span>
+            <button type="button" onClick={() => { setIngestionNotice(null); setIngestionError(null); }} className="shrink-0 rounded-full p-1 opacity-75 hover:opacity-100" aria-label="Dismiss notification"><X size={15} /></button>
           </div>
         )}
 
@@ -440,15 +488,27 @@ export default function DataPipeline() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => void handleGenerate()}
-              disabled={!canGenerate}
-              className="pipeline-action-button inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {running || starting ? <LoaderCircle size={16} className="animate-spin" /> : status?.status === 'succeeded' ? <RotateCw size={16} /> : <Play size={16} />}
-              {running ? 'Generating…' : starting ? 'Starting…' : status?.status === 'succeeded' ? 'Generate again' : 'Generate datasets'}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={refreshing}
+                title="Refresh file counts and pipeline status"
+                aria-label="Refresh file counts and pipeline status"
+                className="glass-btn inline-flex items-center justify-center rounded-lg p-2.5 disabled:opacity-45"
+              >
+                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleGenerate()}
+                disabled={!canGenerate}
+                className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {running || starting ? <LoaderCircle size={16} className="animate-spin" /> : status?.status === 'succeeded' ? <RotateCw size={16} /> : <Play size={16} />}
+                {running ? 'Generating…' : starting ? 'Starting…' : status?.status === 'succeeded' ? 'Generate again' : 'Generate datasets'}
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -458,6 +518,13 @@ export default function DataPipeline() {
                 <div className="mt-1 text-xl font-bold tabular-nums text-slate-900">{status?.raw_files[sensor] ?? '—'}</div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-800/70">
+            <span className="font-medium text-slate-500">Last successful dataset generation</span>
+            <time className="tabular-nums text-slate-700 dark:text-slate-200">
+              {formatTimestamp(status?.last_successful_at)}
+            </time>
           </div>
 
           {status && status.status !== 'idle' && (

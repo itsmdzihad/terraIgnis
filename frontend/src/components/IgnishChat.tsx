@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { LoaderCircle, MessageCircle, Send, X } from 'lucide-react';
+import { LoaderCircle, Send, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { sendIgnishMessage, type IgnishMessage } from '../services/chat';
@@ -43,6 +43,16 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
   useEffect(() => {
     if (isOpen) inputRef.current?.focus();
   }, [isOpen]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.style.height = '0px';
+    const nextHeight = Math.min(input.scrollHeight, 96);
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY = input.scrollHeight > 96 ? 'auto' : 'hidden';
+  }, [draft, isOpen]);
 
   useEffect(() => {
     if (hasStartedWelcomeRef.current) return;
@@ -103,7 +113,7 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
             <div className="ignish-avatar"><img src="/terraignis-icon.svg" alt="" /></div>
             <div className="ignish-header-copy">
               <h2>Ignish</h2>
-              <p>TerraIgnis data assistant</p>
+              <p>TerraIgnis AI agent</p>
             </div>
             <button type="button" className="ignish-close" onClick={() => setIsOpen(false)} aria-label="Close chat">
               <X size={18} />
@@ -159,15 +169,23 @@ export default function IgnishChat({ theme }: IgnishChatProps) {
         </section>
       )}
 
-      <button
-        type="button"
-        className="ignish-launcher"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-label={isOpen ? 'Close Ignish chat' : 'Chat with Ignish'}
-        aria-expanded={isOpen}
-      >
-        {isOpen ? <X size={22} /> : <MessageCircle size={23} />}
-      </button>
+      <div className="ignish-launcher-wrap">
+        <button
+          type="button"
+          className="ignish-launcher"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-label={isOpen ? 'Close Ignish chat' : 'Open Ignish AI agent'}
+          aria-describedby={!isOpen ? 'ignish-launcher-tooltip' : undefined}
+          aria-expanded={isOpen}
+        >
+          {isOpen ? <X size={22} /> : <img src="/terraignis-icon.svg" alt="" aria-hidden="true" />}
+        </button>
+        {!isOpen && (
+          <span id="ignish-launcher-tooltip" className="ignish-launcher-tooltip" role="tooltip">
+            Ignish · TerraIgnis AI agent
+          </span>
+        )}
+      </div>
     </div>
   );
 }

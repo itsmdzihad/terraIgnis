@@ -1949,7 +1949,9 @@ to 1 GB total and 512 MB per file; exact duplicate files are skipped.
 ### `GET /api/pipeline/status`
 
 Returns the raw-file inventory and current generation job status, stage,
-and logs.
+and logs. It also returns `last_successful_at` and
+`last_successful_job_id` for the most recent published dataset generation;
+the successful timestamp persists across backend restarts.
 
 ### `POST /api/pipeline/generate`
 
@@ -2006,14 +2008,26 @@ limit. Historical downloads are opt-in and only start through an operator
 request. Both workflows preserve original CSV responses below
 `data/raw/{modis,viirs}/automated/{product}/{year}/`.
 
-An ingestion run writes raw files first, then requests the existing
-six-stage analytical pipeline. Stages write to an isolated generation.
-Parquet outputs and schemas are checked before an atomic switch publishes
-the generation. If a stage fails, the active generation stays in place and
-downloaded source files remain available for retry. A full rebuild is
-intentional: harmonization uses empirical dataset-wide ranks, so processing
-only new rows would make old and new scores inconsistent. Existing
-harmonization, Burn Index, and anomaly formulas are unchanged.
+An ingestion run stores raw files and reports whether new files were added.
+It does not automatically rebuild the analytical datasets. The dashboard
+shows a global prompt after an NRT or historical download finishes; choose
+**Generate datasets** to run the existing six-stage pipeline, or defer it and
+generate later from the Data Pipeline page. A completed request with no new
+files reports that there is no update to process. Historical downloads that
+are cancelled or partially fail preserve completed files and offer to process
+those files or resume the remaining chunks. The prompt remains available when
+navigating between dashboard routes.
+Starting generation from that prompt uses the same `POST /api/pipeline/generate`
+workflow as the Data Pipeline page. The progress card stays non-blocking so
+the dashboard remains usable while generation runs.
+
+Pipeline stages write to an isolated generation. Parquet outputs and schemas
+are checked before an atomic switch publishes the generation. If a stage
+fails, the active generation stays in place and downloaded source files remain
+available for retry. A full rebuild is intentional: harmonization uses
+empirical dataset-wide ranks, so processing only new rows would make old and
+new scores inconsistent. Existing harmonization, Burn Index, and anomaly
+formulas are unchanged.
 
 The API resolves `data/processed` at request time, so after an atomic
 generation switch it reads from the newly published dataset generation.
@@ -2053,13 +2067,18 @@ protect resource-intensive controls; requests then require
 token is configured. In development, calls remain local and unauthenticated
 unless a token is configured.
 
-Persistent checkpoints, scheduler state, and historical jobs live in
-`data/state/`, which is ignored by Git. NRT checkpoints advance only after
-dataset generation succeeds. Interrupted historical work is recovered at
-application startup; completed chunks remain complete and only incomplete
-chunks resume. Cancellation takes effect at the next chunk boundary. NASA
-HTTP errors, invalid CSV, and timeouts are retried where appropriate.
-Failures are persisted without exposing the map key.
+Persistent checkpoints, scheduler state, historical jobs, and the last
+successful dataset-generation timestamp live in `data/state/`, which is
+ignored by Git. NRT checkpoints advance after successful downloads; dataset
+generation is a separate operator-confirmed step. Interrupted historical
+work is recovered at application startup; completed chunks remain complete
+and only incomplete chunks resume. Cancellation takes effect at the next
+chunk boundary. NASA HTTP errors, invalid CSV, and timeouts are retried where
+appropriate. Failures are persisted without exposing the map key.
+
+The Data Pipeline page displays the last successful dataset-generation time
+and includes a refresh control for the current raw-file inventory and job
+status.
 
 New management endpoints:
 
@@ -2103,8 +2122,9 @@ curl -X POST http://127.0.0.1:8000/api/ingestion/historical/JOB_ID/resume \
 ```
 
 Status includes completed, failed, and total chunks, progress percentage,
-source/date ranges, record counts, and the last error. The included Postman
-collection has a **NASA FIRMS ingestion** folder. These tests mock NASA and
+source/date ranges, record counts, added raw-file count, whether a dataset
+generation is pending, and the last error. The included Postman collection
+has a **NASA FIRMS ingestion** folder. These tests mock NASA and
 need neither a real key nor network access:
 
 ```bash
