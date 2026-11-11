@@ -22,14 +22,23 @@ interface DashboardContextValue {
   clearFilters: () => void;
 }
 
-const INITIAL_START_DATE = '2026-01-01';
-const INITIAL_END_DATE = '2026-12-31';
+function getLocalDateString(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const INITIAL_DATE = getLocalDateString();
+const INITIAL_YEAR = Number(INITIAL_DATE.slice(0, 4));
+const INITIAL_START_DATE = `${INITIAL_YEAR}-01-01`;
+const INITIAL_END_DATE = `${INITIAL_YEAR}-12-31`;
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const [selectedDate, setSelectedDateState] = useState<string | null>(null);
-  const [calendarYear, setCalendarYear] = useState(Number(INITIAL_START_DATE.slice(0, 4)));
+  const [selectedDate, setSelectedDateState] = useState<string | null>(INITIAL_DATE);
+  const [calendarYear, setCalendarYear] = useState(INITIAL_YEAR);
   const [selectedStartDate, setSelectedStartDate] = useState(INITIAL_START_DATE);
   const [selectedEndDate, setSelectedEndDate] = useState(INITIAL_END_DATE);
   const [selectedH3Cell, updateSelectedH3Cell] = useState<string | null>(null);
@@ -82,8 +91,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setSelectedDateState(null);
-    setCalendarYear(Number(INITIAL_START_DATE.slice(0, 4)));
+    setSelectedDateState(INITIAL_DATE);
+    setCalendarYear(INITIAL_YEAR);
     setSelectedStartDate(INITIAL_START_DATE);
     setSelectedEndDate(INITIAL_END_DATE);
     setSelectedH3Cell(null);
