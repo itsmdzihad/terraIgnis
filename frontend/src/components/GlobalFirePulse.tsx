@@ -843,7 +843,7 @@ export default function GlobalFirePulse() {
                 <SlidersHorizontal size={13} />
                 <span>Filters</span>
                 {activeFiltersCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-[#2563eb] text-white text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-white text-indigo-700 text-[10px] font-bold">
                     {activeFiltersCount}
                   </span>
                 )}
