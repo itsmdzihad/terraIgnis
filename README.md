@@ -2821,6 +2821,78 @@ with these endpoints.
 
 ---
 
+# Docker Deployment (AWS EC2)
+
+The project runs as two Docker services: an Nginx container serves the built
+React frontend and proxies `/api` and `/health` to a private FastAPI container.
+Only the frontend port is published. Raw FIRMS files, generated Parquet files,
+pipeline reports, and ingestion checkpoints are stored in a persistent Docker
+volume or mounted host directory; they are not copied into the backend image.
+
+## Configure
+
+Create the backend environment file and add the secrets and ingestion settings
+needed for your deployment:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+At minimum, configure `OPENAI_API_KEY` if Ignish AI is enabled and
+`FIRMS_MAP_KEY` if automated NASA FIRMS ingestion is enabled. Keep
+`FIRMS_NRT_ENABLED=false` unless scheduled NRT polling is intended. Do not put
+secrets in the Docker image or commit `backend/.env`.
+
+The Compose defaults use port `8080` and a `terraignis_data` Docker volume,
+which is convenient for local development. The volume persists
+across container rebuilds. If Docker has host-file sharing enabled, set
+`TERRAIGNIS_DATA_DIR=./backend/data` to use an existing local dataset. For EC2,
+choose a persistent disk path such as `/srv/terraignis/data` and place or sync
+the existing `backend/data` contents there before starting the services.
+
+## Build and run locally
+
+From the repository root:
+
+```bash
+HTTP_PORT=8080 docker compose up --build -d
+docker compose ps
+curl http://localhost:8080/health
+```
+
+Open `http://localhost:8080`. The single health URL checks the frontend-to-
+backend proxy path as well as the FastAPI health endpoint. Follow logs with
+`docker compose logs -f`; stop the containers with `docker compose down`.
+
+## Deploy on an Ubuntu EC2 instance
+
+Install Docker Engine and the Docker Compose plugin, clone the repository, and
+configure `backend/.env` as above. Attach a persistent EBS volume for the data
+directory when possible, mount it at `/srv/terraignis/data`, and ensure it has
+enough capacity for raw FIRMS files, processed generations, and backups. Then
+run from the repository root:
+
+```bash
+HTTP_PORT=80 TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose up --build -d
+docker compose ps
+curl http://localhost/health
+```
+
+Allow inbound TCP 80 in the EC2 security group (and SSH only from trusted
+addresses). The backend port 8000 is internal to the Compose network and is not
+published to the internet. Configure HTTPS through an AWS load balancer or a
+TLS reverse proxy before exposing the site publicly.
+
+Update by pulling the chosen Git revision and rebuilding with
+`docker compose up --build -d`. The data directory remains on the host across
+image rebuilds and container replacement. Back it up separately; `docker
+compose down -v` is not needed for routine updates.
+
+The Docker build context excludes `.env` files and `backend/data`, so image
+builds do not include credentials or large local datasets. Build images on the
+EC2 instance to match its CPU architecture, or use Docker Buildx with the
+appropriate `--platform` when building elsewhere.
+
 # License
 
 Add the project's license information here.

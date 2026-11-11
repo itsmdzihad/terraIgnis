@@ -732,7 +732,7 @@ select.glass-control option {
    ============================================================================ */
 
 .how-it-works-view {
-  --hiw-title-size: clamp(48px, 8.1vw, 124px);
+  --hiw-title-size: clamp(42px, 5.2vw, 82px);
   --hiw-frame-bg: transparent;
   --hiw-title-color: #0b1220;
   --hiw-card-bg: rgba(255, 255, 255, 0.72);
@@ -886,7 +886,7 @@ select.glass-control option {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: minmax(220px, 1fr) minmax(240px, 1.06fr);
   gap: 14px;
-  margin-top: calc(var(--hiw-title-size) * -0.37);
+  margin-top: 18px;
 }
 
 .hiw-card {
@@ -1506,20 +1506,39 @@ select.glass-control option {
 }
 
 .hiw-fo-back-link {
+  position: fixed;
+  top: 84px;
+  right: clamp(16px, 3.6vw, 56px);
+  z-index: 80;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 40px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: linear-gradient(115deg, #c2410c 0%, #b4234a 48%, #6d28d9 100%);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.26);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--hiw-fo-ink);
+  font-weight: 700;
+  color: #fff;
   text-decoration: none;
-  opacity: 0.78;
-  transition: opacity 0.16s ease, transform 0.18s ease;
+  transition: filter 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.app-shell[data-theme="dark"] .hiw-fo-back-link {
+  background: linear-gradient(115deg, #9a3412 0%, #9f1239 48%, #5b21b6 100%);
 }
 
 .hiw-fo-back-link:hover {
-  opacity: 1;
-  transform: translateX(-2px);
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.hiw-fo-back-link:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
 }
 
 .hiw-fo-hero-head {
@@ -2703,6 +2722,13 @@ select.glass-control option {
 @media (max-width: 680px) {
   .how-it-works-view--fire-overview {
     padding: 62px 0 0;
+  }
+  .hiw-fo-back-link {
+    top: 62px;
+    right: 12px;
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 11px;
   }
   .hiw-fo-bento-casing {
     border-radius: 22px;
