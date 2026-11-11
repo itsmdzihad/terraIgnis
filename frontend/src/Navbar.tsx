@@ -319,9 +319,9 @@ export default function Navbar({ theme, onThemeToggle }: NavbarProps) {
             title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
           >
             {theme === 'light' ? (
-              <Moon size={13} strokeWidth={2} />
+              <Moon size={14} strokeWidth={2} />
             ) : (
-              <Sun size={13} strokeWidth={2} />
+              <Sun size={14} strokeWidth={2} />
             )}
             <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
