@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { LayoutGroup, motion } from "motion/react";
 import {
   ChevronDown,
   X,
@@ -27,6 +28,13 @@ const MONTH_NAMES = [
 ];
 
 const PAGE_SIZE = 366;
+
+const LAYOUT_SPRING = {
+  type: "spring" as const,
+  stiffness: 260,
+  damping: 28,
+  mass: 0.9,
+};
 
 // 5 Intensity levels backed by CSS custom properties (matching reference image in light mode + dark mode support)
 const COLOR_LEVEL_VARS = [
@@ -891,7 +899,9 @@ export default function FireActivityCalendar() {
     return { cx, cy, maxR, points, polygonPoints };
   }, [radarMetrics]);
 
-  const tileHeightClass = isCalendarExpanded ? "h-[32px]" : "h-[24px] sm:h-[26px]";
+  const tileHeightClass = `${
+    isCalendarExpanded ? "h-[32px]" : "h-[24px] sm:h-[26px]"
+  } transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]`;
 
   const yearAndMetricControls = (
     <div className="flex flex-wrap items-center gap-2">
@@ -962,8 +972,394 @@ export default function FireActivityCalendar() {
     </div>
   );
 
+  const outlierGrid = (
+    <OutlierTelemetryGrid
+      outlierCards={outlierCards}
+      totalAnomalies={anomalyData?.length ?? 0}
+      anomalyLoading={anomalyLoading && !anomalyData}
+      anomalyError={anomalyError}
+      onRetryAnomalies={refetchAnomalies}
+      selectedDate={selectedDate}
+      onSelectDate={setSelectedDate}
+      className={
+        isCalendarExpanded
+          ? "order-3 lg:col-span-12"
+          : "order-2 lg:order-none lg:col-start-1 lg:col-span-8 lg:row-start-2"
+      }
+    />
+  );
+
+  const radarChartBlock = (
+    <div className="relative flex flex-col items-center justify-center my-1">
+      <svg
+        viewBox="0 0 400 265"
+        className={`w-full h-auto overflow-visible select-none ${
+          isCalendarExpanded ? "max-w-[440px] max-h-[290px]" : "max-h-[260px]"
+        }`}
+        onMouseLeave={() => setHoveredRadarKey(null)}
+      >
+        {/* 4 Concentric Shaded Target Rings (100%, 75%, 50%, 25%) */}
+        <circle
+          cx={radarGeometry.cx}
+          cy={radarGeometry.cy}
+          r={radarGeometry.maxR}
+          fill="var(--radar-r4)"
+        />
+        <circle
+          cx={radarGeometry.cx}
+          cy={radarGeometry.cy}
+          r={radarGeometry.maxR * 0.75}
+          fill="var(--radar-r3)"
+        />
+        <circle
+          cx={radarGeometry.cx}
+          cy={radarGeometry.cy}
+          r={radarGeometry.maxR * 0.5}
+          fill="var(--radar-r2)"
+        />
+        <circle
+          cx={radarGeometry.cx}
+          cy={radarGeometry.cy}
+          r={radarGeometry.maxR * 0.25}
+          fill="var(--radar-r1)"
+        />
+
+        {/* 6 Radial Spoke Lines */}
+        {radarGeometry.points.map((pt) => (
+          <line
+            key={`spoke-${pt.key}`}
+            x1={radarGeometry.cx}
+            y1={radarGeometry.cy}
+            x2={pt.spokeX}
+            y2={pt.spokeY}
+            stroke="var(--radar-spoke)"
+            strokeWidth="1"
+          />
+        ))}
+
+        {/* Data Polygon */}
+        <polygon
+          points={radarGeometry.polygonPoints}
+          fill="var(--radar-fill)"
+          stroke="var(--radar-stroke)"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+
+        {/* Vertex Dots & Axis Labels */}
+        {radarGeometry.points.map((pt) => {
+          const isHovered = hoveredRadarKey === pt.key;
+          return (
+            <g
+              key={`axis-${pt.key}`}
+              className="cursor-pointer"
+              onMouseEnter={() => setHoveredRadarKey(pt.key)}
+            >
+              {isHovered && (
+                <circle
+                  cx={pt.vx}
+                  cy={pt.vy}
+                  r="7"
+                  fill="var(--radar-stroke)"
+                  fillOpacity="0.2"
+                />
+              )}
+              <circle
+                cx={pt.vx}
+                cy={pt.vy}
+                r={isHovered ? "4.5" : "3.2"}
+                fill="var(--radar-stroke)"
+              />
+              <text
+                x={pt.lx}
+                y={pt.ly}
+                textAnchor={pt.textAnchor}
+                className={`activity-radar-label text-[11px] transition-colors ${
+                  isHovered ? "is-active" : ""
+                }`}
+              >
+                {pt.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Active Axis Detail Pill */}
+      <div className="min-h-[22px] mt-1 flex items-center justify-center text-[11px]">
+        {hoveredRadarKey ? (
+          (() => {
+            const active = radarMetrics.find((m) => m.key === hoveredRadarKey);
+            if (!active) return null;
+            return (
+              <span className="activity-radar-pill px-3 py-0.5 rounded-full font-medium">
+                {active.label}: <strong>{active.value}%</strong> · {active.detail}
+              </span>
+            );
+          })()
+        ) : (
+          <span className="activity-muted text-[10px]">
+            Hover any axis vertex to inspect metrics
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  const burnAnomalyCard = (
+    <motion.div
+      layout="position"
+      transition={LAYOUT_SPRING}
+      className={`${
+        isCalendarExpanded
+          ? "order-2 lg:col-span-12"
+          : "order-3 lg:order-none lg:col-start-9 lg:col-span-4 lg:row-start-1 justify-between"
+      } activity-card p-6 sm:p-7 flex flex-col gap-4`}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="activity-card-title text-base font-semibold">
+          Burn Anomaly Ratio
+        </h3>
+        <button
+          type="button"
+          onClick={() => setIsMethodologyOpen(true)}
+          className="glass-btn-ghost px-3 py-1 rounded-full text-xs font-medium flex items-center gap-0.5"
+        >
+          <span>Details</span>
+          <span className="text-[10px]">›</span>
+        </button>
+      </div>
+
+      <div
+        className={
+          isCalendarExpanded
+            ? "grid grid-cols-1 lg:grid-cols-12 gap-6 items-center"
+            : "flex flex-col gap-4"
+        }
+      >
+        <div
+          className={
+            isCalendarExpanded
+              ? "lg:col-span-7 lg:order-2 flex flex-col gap-4"
+              : "order-1"
+          }
+        >
+          <p
+            className={`activity-muted leading-relaxed ${
+              isCalendarExpanded ? "text-xs" : "text-[11px]"
+            }`}
+          >
+            {anomalySummaryText}
+          </p>
+
+          {isCalendarExpanded && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+              className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
+              onMouseLeave={() => setHoveredRadarKey(null)}
+            >
+              {radarMetrics.map((metric) => {
+                const isActive = hoveredRadarKey === metric.key;
+                return (
+                  <div
+                    key={metric.key}
+                    onMouseEnter={() => setHoveredRadarKey(metric.key)}
+                    className="rounded-2xl p-3.5 transition-all cursor-pointer"
+                    style={{
+                      backgroundColor: isActive ? "var(--radar-fill)" : "var(--glass-bg-soft)",
+                      boxShadow: isActive ? "inset 0 0 0 1px var(--radar-stroke)" : "none",
+                    }}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="activity-subtext text-xs font-semibold">
+                        {metric.label}
+                      </span>
+                      <span
+                        className="activity-card-title text-sm font-bold tabular-nums"
+                        style={isActive ? { color: "var(--radar-stroke)" } : undefined}
+                      >
+                        {metric.value}%
+                      </span>
+                    </div>
+                    <div
+                      className="h-1.5 rounded-full overflow-hidden mt-2"
+                      style={{ backgroundColor: "var(--glass-track-bg)" }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${metric.value}%`,
+                          backgroundColor: "var(--radar-stroke)",
+                        }}
+                      />
+                    </div>
+                    <span className="activity-muted text-[11px] mt-1.5 block truncate">
+                      {metric.detail}
+                    </span>
+                  </div>
+                );
+              })}
+            </motion.div>
+          )}
+        </div>
+
+        <motion.div
+          layout="position"
+          transition={LAYOUT_SPRING}
+          className={isCalendarExpanded ? "lg:col-span-5 lg:order-1" : "order-2"}
+        >
+          {radarChartBlock}
+        </motion.div>
+      </div>
+
+      {/* 4-Band Segmented Percentage Bar Legend (matching bottom-right reference) */}
+      <motion.div
+        layout="position"
+        transition={LAYOUT_SPRING}
+        className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2.5 glass-divider-t"
+      >
+        <div className="activity-muted text-[11px]">
+          Streak:{" "}
+          <strong className="activity-card-title">
+            {stats.longestStreak}d
+          </strong>{" "}
+          · Records:{" "}
+          <strong className="activity-card-title">
+            {data?.data?.length ?? 0}
+          </strong>
+        </div>
+
+        <div className="w-full sm:w-52 shrink-0">
+          <div className="activity-muted grid grid-cols-4 text-[9.5px] font-medium mb-1">
+            <span>0–25%</span>
+            <span>25–50%</span>
+            <span>50–75%</span>
+            <span>75–100%</span>
+          </div>
+          <div className="grid grid-cols-4 h-2.5 rounded-xs overflow-hidden">
+            <div style={{ backgroundColor: "var(--radar-leg-1)" }} />
+            <div style={{ backgroundColor: "var(--radar-leg-2)" }} />
+            <div style={{ backgroundColor: "var(--radar-leg-3)" }} />
+            <div style={{ backgroundColor: "var(--radar-leg-4)" }} />
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+
+  const activityArchiveCard = (
+    <motion.div
+      layout="position"
+      transition={LAYOUT_SPRING}
+      className={`${
+        isCalendarExpanded
+          ? "order-4 lg:col-span-12"
+          : "order-4 lg:order-none lg:col-start-9 lg:col-span-4 lg:row-start-2 lg:self-start"
+      } activity-archive-banner rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between relative overflow-hidden`}
+    >
+      <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+      <div
+        className={`relative z-10 flex ${
+          isCalendarExpanded
+            ? "flex-col lg:flex-row lg:items-center lg:justify-between gap-6 lg:pr-14"
+            : "flex-col justify-between"
+        }`}
+      >
+        <motion.div
+          layout="position"
+          transition={LAYOUT_SPRING}
+          className={`flex flex-col ${isCalendarExpanded ? "gap-2.5 max-w-2xl" : "gap-3"}`}
+        >
+          <div className="flex items-center gap-2">
+            <div className="activity-on-accent w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs">
+              TI
+            </div>
+            <span className="font-semibold text-sm tracking-tight text-white">
+              Activity Archive
+            </span>
+          </div>
+
+          <h4 className="text-xl font-bold leading-tight text-white">
+            Export annual fire activity data
+          </h4>
+
+          {isCalendarExpanded && (
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+              className="text-xs leading-relaxed text-white/80"
+            >
+              Download daily aggregated fire detections, mean and peak burn index metrics,
+              and statistical anomaly counts for {selectedYear}.{" "}
+              <span className="text-white/95 font-medium">
+                ({data?.total?.toLocaleString() ?? 0} observed calendar dates)
+              </span>
+            </motion.p>
+          )}
+        </motion.div>
+
+        <motion.div
+          layout="position"
+          transition={LAYOUT_SPRING}
+          className={
+            isCalendarExpanded
+              ? "flex flex-col lg:items-end gap-2.5 shrink-0"
+              : "mt-6 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col gap-3"
+          }
+        >
+          {!isCalendarExpanded && (
+            <span className="text-xs font-medium text-white/90">
+              {data?.total?.toLocaleString() ?? 0} observed calendar dates in {selectedYear}
+            </span>
+          )}
+
+          <div
+            className={
+              isCalendarExpanded ? "flex flex-wrap items-center gap-2.5" : "grid grid-cols-2 gap-2.5"
+            }
+          >
+            <button
+              type="button"
+              onClick={handleExportGeoJSON}
+              className={`flex items-center justify-center gap-1.5 py-2.5 bg-white/18 hover:bg-white/28 backdrop-blur-md text-white rounded-full text-xs font-semibold transition-colors ${
+                isCalendarExpanded ? "px-5" : "px-3"
+              }`}
+            >
+              <FileText size={13} />
+              <span>GeoJSON</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className={`activity-archive-csv-btn flex items-center justify-center gap-1.5 py-2.5 rounded-full text-xs font-semibold shadow-xs transition-colors ${
+                isCalendarExpanded ? "px-5" : "px-3"
+              }`}
+            >
+              <Download size={13} />
+              <span>Export CSV</span>
+            </button>
+          </div>
+
+          {exportStatus && (
+            <span className="activity-on-accent text-[11px] opacity-90 truncate">
+              ● {exportStatus}
+            </span>
+          )}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+
   return (
-    <div className="activity-dashboard flex flex-col w-full h-full min-h-0 p-3 sm:p-4 lg:p-5 gap-5 overflow-y-auto overscroll-contain">
+    <motion.div
+      layoutScroll
+      className="activity-dashboard flex flex-col w-full h-full min-h-0 p-3 sm:p-4 lg:p-5 gap-5 overflow-y-auto overscroll-contain"
+    >
       {/* Loading or Error */}
       {loading ? (
         <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
@@ -1014,15 +1410,18 @@ export default function FireActivityCalendar() {
         </div>
       ) : (
         /* MAIN DASHBOARD GRID */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* ================= DAILY FIRE ACTIVITY CALENDAR CARD ================= */}
-          <div
-            className={`${
-              isCalendarExpanded ? "lg:col-span-12" : "lg:col-span-8"
-            } flex flex-col gap-5`}
-          >
-            {/* CARD 1: CALENDAR CARD */}
-            <div className="activity-card p-6 sm:p-7 flex flex-col gap-6">
+        <LayoutGroup id="activity-dashboard-layout">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* ================= DAILY FIRE ACTIVITY CALENDAR CARD ================= */}
+            <motion.div
+              layout="position"
+              transition={LAYOUT_SPRING}
+              className={`${
+                isCalendarExpanded
+                  ? "order-1 lg:col-span-12"
+                  : "order-1 lg:order-none lg:col-start-1 lg:col-span-8 lg:row-start-1"
+              } activity-card p-6 sm:p-7 flex flex-col gap-6`}
+            >
               {/* Top Row: Icon + Title + Info Icon on left | Moved Year/Metric Controls + Action Pill Toolbar on right */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1040,7 +1439,11 @@ export default function FireActivityCalendar() {
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
+                <motion.div
+                  layout="position"
+                  transition={LAYOUT_SPRING}
+                  className="flex flex-wrap items-center gap-2.5"
+                >
                   {yearAndMetricControls}
 
                   {/* Top-Right Compact Segmented Action Toolbar [ Expand | Edit | More ] */}
@@ -1188,7 +1591,7 @@ export default function FireActivityCalendar() {
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               {/* Metrics Row & Legend: Total + Peak Single Day + Active Days on Left | Less [tiles] More on Right */}
@@ -1232,7 +1635,11 @@ export default function FireActivityCalendar() {
                 </div>
 
                 {/* Tight Rounded Legend Strip matching reference picture: Less [ ▮ ▮ ▮ ▮ ▮ ] More */}
-                <div className="activity-subtext flex items-center gap-2 text-xs font-semibold select-none self-end sm:self-auto pb-0.5">
+                <motion.div
+                  layout="position"
+                  transition={LAYOUT_SPRING}
+                  className="activity-subtext flex items-center gap-2 text-xs font-semibold select-none self-end sm:self-auto pb-0.5"
+                >
                   <span>Less</span>
                   <div className="flex items-center gap-[3.5px]">
                     {COLOR_LEVEL_VARS.map((col, idx) => (
@@ -1245,7 +1652,7 @@ export default function FireActivityCalendar() {
                     ))}
                   </div>
                   <span>More</span>
-                </div>
+                </motion.div>
               </div>
 
               {/* Heatmap Matrix with Aligned Typography */}
@@ -1312,7 +1719,7 @@ export default function FireActivityCalendar() {
                                 onClick={() => setSelectedDate(cell.date)}
                                 onMouseEnter={() => setHoveredCell(cell)}
                                 onMouseLeave={() => setHoveredCell(null)}
-                                className={`cal-day-tile w-full ${tileHeightClass} rounded-[5px] transition-all hover:scale-[1.16] hover:z-20 relative cursor-pointer ${
+                                className={`cal-day-tile w-full ${tileHeightClass} rounded-[5px] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.16] hover:z-20 relative cursor-pointer ${
                                   isSelected ? "activity-tile-selected" : ""
                                 }`}
                                 style={{ backgroundColor: colorVar }}
@@ -1380,242 +1787,13 @@ export default function FireActivityCalendar() {
                   </span>
                 )}
               </div>
-            </div>
+            </motion.div>
 
-            {/* Anomaly & Outlier Telemetry 2x2 Dot-Matrix Grid */}
-            <OutlierTelemetryGrid
-              outlierCards={outlierCards}
-              totalAnomalies={anomalyData?.length ?? 0}
-              anomalyLoading={anomalyLoading && !anomalyData}
-              anomalyError={anomalyError}
-              onRetryAnomalies={refetchAnomalies}
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-            />
+            {burnAnomalyCard}
+            {outlierGrid}
+            {activityArchiveCard}
           </div>
-
-          {/* ================= RIGHT SIDEBAR (4 COLS) ================= */}
-          {!isCalendarExpanded && (
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              {/* CARD 3: BURN ANOMALY RATIO CONCENTRIC RADAR ANALYSIS */}
-              <div className="activity-card p-6 sm:p-7 flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="activity-card-title text-base font-semibold">
-                    Burn Anomaly Ratio
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsMethodologyOpen(true)}
-                    className="glass-btn-ghost px-3 py-1 rounded-full text-xs font-medium flex items-center gap-0.5"
-                  >
-                    <span>Details</span>
-                    <span className="text-[10px]">›</span>
-                  </button>
-                </div>
-
-                {/* Real-data analytical summary paragraph matching top-left reference layout */}
-                <p className="activity-muted text-[11px] leading-relaxed">
-                  {anomalySummaryText}
-                </p>
-
-                {/* Concentric 6-Axis Radar Chart */}
-                <div className="relative flex flex-col items-center justify-center my-1">
-                  <svg
-                    viewBox="0 0 400 265"
-                    className="w-full h-auto max-h-[260px] overflow-visible select-none"
-                    onMouseLeave={() => setHoveredRadarKey(null)}
-                  >
-                    {/* 4 Concentric Shaded Target Rings (100%, 75%, 50%, 25%) */}
-                    <circle
-                      cx={radarGeometry.cx}
-                      cy={radarGeometry.cy}
-                      r={radarGeometry.maxR}
-                      fill="var(--radar-r4)"
-                    />
-                    <circle
-                      cx={radarGeometry.cx}
-                      cy={radarGeometry.cy}
-                      r={radarGeometry.maxR * 0.75}
-                      fill="var(--radar-r3)"
-                    />
-                    <circle
-                      cx={radarGeometry.cx}
-                      cy={radarGeometry.cy}
-                      r={radarGeometry.maxR * 0.5}
-                      fill="var(--radar-r2)"
-                    />
-                    <circle
-                      cx={radarGeometry.cx}
-                      cy={radarGeometry.cy}
-                      r={radarGeometry.maxR * 0.25}
-                      fill="var(--radar-r1)"
-                    />
-
-                    {/* 6 Radial Spoke Lines */}
-                    {radarGeometry.points.map((pt) => (
-                      <line
-                        key={`spoke-${pt.key}`}
-                        x1={radarGeometry.cx}
-                        y1={radarGeometry.cy}
-                        x2={pt.spokeX}
-                        y2={pt.spokeY}
-                        stroke="var(--radar-spoke)"
-                        strokeWidth="1"
-                      />
-                    ))}
-
-                    {/* Data Polygon */}
-                    <polygon
-                      points={radarGeometry.polygonPoints}
-                      fill="var(--radar-fill)"
-                      stroke="var(--radar-stroke)"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-
-                    {/* Vertex Dots & Axis Labels */}
-                    {radarGeometry.points.map((pt) => {
-                      const isHovered = hoveredRadarKey === pt.key;
-                      return (
-                        <g
-                          key={`axis-${pt.key}`}
-                          className="cursor-pointer"
-                          onMouseEnter={() => setHoveredRadarKey(pt.key)}
-                        >
-                          {isHovered && (
-                            <circle
-                              cx={pt.vx}
-                              cy={pt.vy}
-                              r="7"
-                              fill="var(--radar-stroke)"
-                              fillOpacity="0.2"
-                            />
-                          )}
-                          <circle
-                            cx={pt.vx}
-                            cy={pt.vy}
-                            r={isHovered ? "4.5" : "3.2"}
-                            fill="var(--radar-stroke)"
-                          />
-                          <text
-                            x={pt.lx}
-                            y={pt.ly}
-                            textAnchor={pt.textAnchor}
-                            className={`activity-radar-label text-[11px] transition-colors ${
-                              isHovered ? "is-active" : ""
-                            }`}
-                          >
-                            {pt.label}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-
-                  {/* Active Axis Detail Pill */}
-                  <div className="min-h-[22px] mt-1 flex items-center justify-center text-[11px]">
-                    {hoveredRadarKey ? (
-                      (() => {
-                        const active = radarMetrics.find((m) => m.key === hoveredRadarKey);
-                        if (!active) return null;
-                        return (
-                          <span className="activity-radar-pill px-3 py-0.5 rounded-full font-medium">
-                            {active.label}: <strong>{active.value}%</strong> · {active.detail}
-                          </span>
-                        );
-                      })()
-                    ) : (
-                      <span className="activity-muted text-[10px]">
-                        Hover any axis vertex to inspect metrics
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 4-Band Segmented Percentage Bar Legend (matching bottom-right reference) */}
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2.5 glass-divider-t">
-                  <div className="activity-muted text-[11px]">
-                    Streak:{" "}
-                    <strong className="activity-card-title">
-                      {stats.longestStreak}d
-                    </strong>{" "}
-                    · Records:{" "}
-                    <strong className="activity-card-title">
-                      {data?.data?.length ?? 0}
-                    </strong>
-                  </div>
-
-                  <div className="w-full sm:w-52 shrink-0">
-                    <div className="activity-muted grid grid-cols-4 text-[9.5px] font-medium mb-1">
-                      <span>0–25%</span>
-                      <span>25–50%</span>
-                      <span>50–75%</span>
-                      <span>75–100%</span>
-                    </div>
-                    <div className="grid grid-cols-4 h-2.5 rounded-xs overflow-hidden">
-                      <div style={{ backgroundColor: "var(--radar-leg-1)" }} />
-                      <div style={{ backgroundColor: "var(--radar-leg-2)" }} />
-                      <div style={{ backgroundColor: "var(--radar-leg-3)" }} />
-                      <div style={{ backgroundColor: "var(--radar-leg-4)" }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD 4: ACTIVITY ARCHIVE EXPORT BANNER */}
-              <div className="activity-archive-banner rounded-3xl p-6 sm:p-7 text-white flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-
-                <div className="relative z-10 flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="activity-on-accent w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs">
-                      TI
-                    </div>
-                    <span className="font-semibold text-sm tracking-tight text-white">
-                      Activity Archive
-                    </span>
-                  </div>
-
-                  <h4 className="text-xl font-bold leading-tight text-white">
-                    Export annual fire activity data
-                  </h4>
-                </div>
-
-                <div className="relative z-10 mt-6 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col gap-3">
-                  <span className="text-xs font-medium text-white/90">
-                    {data?.total?.toLocaleString() ?? 0} observed calendar dates in {selectedYear}
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleExportGeoJSON}
-                      className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/18 hover:bg-white/28 backdrop-blur-md text-white rounded-full text-xs font-semibold transition-colors"
-                    >
-                      <FileText size={13} />
-                      <span>GeoJSON</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleExportCSV}
-                      className="activity-archive-csv-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-full text-xs font-semibold shadow-xs transition-colors"
-                    >
-                      <Download size={13} />
-                      <span>Export CSV</span>
-                    </button>
-                  </div>
-
-                  {exportStatus && (
-                    <span className="activity-on-accent text-[11px] opacity-90 truncate">
-                      ● {exportStatus}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        </LayoutGroup>
       )}
 
       {/* Methodology Modal */}
@@ -1681,7 +1859,7 @@ export default function FireActivityCalendar() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -1714,6 +1892,7 @@ function OutlierTelemetryGrid({
   onRetryAnomalies,
   selectedDate,
   onSelectDate,
+  className = "",
 }: {
   outlierCards: OutlierCardData[];
   totalAnomalies: number;
@@ -1722,11 +1901,16 @@ function OutlierTelemetryGrid({
   onRetryAnomalies: () => void;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
+  className?: string;
 }) {
   const [hoveredBar, setHoveredBar] = useState<{ cardId: string; colIdx: number } | null>(null);
 
   return (
-    <div className="flex flex-col gap-3">
+    <motion.div
+      layout="position"
+      transition={LAYOUT_SPRING}
+      className={`flex flex-col gap-3 ${className}`}
+    >
       {/* Subtle glass section header */}
       <div className="activity-card px-5 py-3 flex items-center justify-between">
         <h3 className="activity-card-title text-sm font-semibold tracking-tight">
@@ -1756,10 +1940,13 @@ function OutlierTelemetryGrid({
           const activeColIdx = hoveredBar?.cardId === card.id ? hoveredBar.colIdx : null;
           const activeCol = activeColIdx !== null ? card.columns[activeColIdx] : null;
           return (
-            <div
+            <motion.div
               key={card.id}
+              layout="position"
+              transition={LAYOUT_SPRING}
+              whileHover={{ y: -2 }}
               onClick={() => card.targetDate && onSelectDate(card.targetDate)}
-              className={`activity-card p-6 flex flex-col justify-between gap-6 cursor-pointer transition-all hover:-translate-y-0.5 ${
+              className={`activity-card p-6 flex flex-col justify-between gap-6 cursor-pointer transition-[filter,opacity] duration-200 ${
                 isSelectedCard ? "brightness-105" : ""
               } ${anomalyLoading ? "opacity-75" : ""}`}
             >
@@ -1842,10 +2029,10 @@ function OutlierTelemetryGrid({
                   })}
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }
