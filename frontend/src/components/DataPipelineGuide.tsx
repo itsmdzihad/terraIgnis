@@ -65,10 +65,10 @@ const SHOTS: readonly ShotEntry[] = [
   {
     id: 'ingestion',
     shortLabel: 'FIRMS Ingestion',
-    title: 'Automated NRT Polling, Operator Auth & Historical Backfill',
+    title: 'Automated NRT Polling & Historical Backfill',
     zone: 'Top Card · /pipeline',
     caption:
-      'Scheduled 30-minute Near Real-Time poller, live MODIS/VIIRS product result chips, in-memory optional Bearer token drawer, and resumable ≤5-day chunked Standard Processing backfills.',
+      'Scheduled 30-minute Near Real-Time poller, live MODIS/VIIRS product result chips, and resumable ≤5-day chunked Standard Processing backfills with public controls by default.',
     src: automatedIngestionShot,
   },
   {
@@ -141,7 +141,7 @@ const COMPONENTS: readonly ComponentEntry[] = [
     metricTag: 'In-Memory Token',
     title: 'Optional Operator Bearer Authorization Drawer',
     description:
-      'Collapsible password field allowing operators to supply FIRMS_INGESTION_TOKEN when backend endpoints require elevated operator credentials, kept strictly in volatile browser memory.',
+      'Optional bearer token protection. If the backend operator configures FIRMS_INGESTION_TOKEN, protected ingestion actions require that token; otherwise the controls are public, including in production.',
     bullets: [
       'Stored solely in React tab state—never persisted to localStorage or cookies',
       'Attached exclusively to operator mutations (NRT poll, Backfill start/resume/cancel)',
@@ -452,8 +452,8 @@ export default function DataPipelineGuide({ theme = 'dark' }: { theme?: 'light' 
                 <p>
                   Both automated Near Real-Time polling and multi-day <strong>Historical backfill</strong> requests
                   preserve existing raw FIRMS archives first without overwriting served dashboard analytics unannounced.
-                  An optional <strong>Operator authorization</strong> drawer holds <code>FIRMS_INGESTION_TOKEN</code>{' '}
-                  strictly in browser memory, while an app-wide approval prompt notifies operators whenever new raw files
+                  Ingestion controls are public by default; deployments can optionally configure <code>FIRMS_INGESTION_TOKEN</code>{' '}
+                  to protect operator actions, while an app-wide approval prompt notifies operators whenever new raw files
                   await regeneration.
                 </p>
               </div>

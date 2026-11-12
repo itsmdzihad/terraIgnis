@@ -711,5 +711,15 @@ class FIRMSIngestionService:
             if changed:
                 self._save_json(self.history_path, jobs)
 
+    def reset_data_state(self) -> None:
+        """Forget persisted ingestion history after the data store is cleared."""
+        with self._thread_lock:
+            self._nrt_status = self._empty_nrt_status()
+            self._nrt_status["enabled"] = self.config.firms_nrt_enabled
+            self._save_nrt()
+
+        with _file_lock(self.history_path.with_suffix(".lock")):
+            self._save_json(self.history_path, {})
+
 
 firms_ingestion = FIRMSIngestionService()

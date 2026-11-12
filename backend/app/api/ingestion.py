@@ -16,11 +16,9 @@ router = APIRouter(prefix="/ingestion", tags=["NASA FIRMS ingestion"])
 
 
 def _authorize(authorization: str | None) -> None:
-    """Protect expensive operator actions when deployed outside development."""
+    """Require a bearer token only when an operator configures one."""
     configured_token = settings.firms_ingestion_token
     if not configured_token:
-        if settings.app_env == "production":
-            raise HTTPException(status_code=503, detail="Configure FIRMS_INGESTION_TOKEN before enabling ingestion controls.")
         return
     expected = f"Bearer {configured_token}"
     if authorization is None or not hmac.compare_digest(authorization, expected):

@@ -81,6 +81,7 @@ class Settings:
     firms_retry_backoff_seconds: float = 2.0
     firms_geographic_scope: str = "world"
     firms_ingestion_token: str = ""
+    data_reset_password: str = ""
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -152,6 +153,7 @@ class Settings:
             firms_retry_backoff_seconds=backoff,
             firms_geographic_scope=geographic_scope,
             firms_ingestion_token=values.get("FIRMS_INGESTION_TOKEN", "").strip(),
+            data_reset_password=values.get("DATA_RESET_PASSWORD", "").strip(),
         )
 
     def dataset_path(self, name: str) -> Path:

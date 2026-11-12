@@ -673,13 +673,7 @@
           "name": "Run NRT poll",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ingestion_token}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/ingestion/nrt/run",
               "host": [
@@ -723,11 +717,6 @@
               {
                 "key": "Content-Type",
                 "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ingestion_token}}",
                 "type": "text"
               }
             ],
@@ -779,13 +768,7 @@
           "name": "Resume historical job",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ingestion_token}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/ingestion/historical/{{job_id}}/resume",
               "host": [
@@ -806,13 +789,7 @@
           "name": "Cancel historical job",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ingestion_token}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/ingestion/historical/{{job_id}}/cancel",
               "host": [
@@ -915,6 +892,40 @@
             "description": "Starts the six-stage dataset generation workflow. Poll Pipeline status to follow progress."
           },
           "response": []
+        },
+        {
+          "name": "Clear all FIRMS data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{data_reset_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Destructive: permanently deletes raw FIRMS files, generated datasets, reports, and ingestion history. Requires DATA_RESET_PASSWORD and returns 409 while ingestion or generation is active.",
+            "url": {
+              "raw": "{{base_url}}/api/pipeline/reset",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pipeline",
+                "reset"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
@@ -925,11 +936,11 @@
       "value": ""
     },
     {
-      "key": "ingestion_token",
+      "key": "job_id",
       "value": ""
     },
     {
-      "key": "job_id",
+      "key": "data_reset_password",
       "value": ""
     }
   ]

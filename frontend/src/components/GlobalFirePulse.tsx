@@ -258,6 +258,18 @@ export default function GlobalFirePulse() {
     offset: 0,
   });
 
+  useEffect(() => {
+    const refreshDashboardData = () => {
+      refetch();
+      if (selectedCountry) countryFires.refetch();
+      refetchAnomalies();
+      refetchStats();
+      refetchCalendar();
+    };
+    window.addEventListener('terraignis:datasets-updated', refreshDashboardData);
+    return () => window.removeEventListener('terraignis:datasets-updated', refreshDashboardData);
+  }, [countryFires.refetch, refetch, refetchAnomalies, refetchCalendar, refetchStats, selectedCountry]);
+
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthlyAnomalyCounts = useMemo(() => {
     const counts: number[] = Array(12).fill(0);
@@ -314,6 +326,24 @@ export default function GlobalFirePulse() {
     () => [...(calendarData?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
     [calendarData]
   );
+
+  const selectedDateHasObservations = sortedCalendarDays.some((day) => day.date === selectedDate);
+  const previousAvailableDate = selectedDate
+    ? [...sortedCalendarDays].reverse().find((day) => day.date < selectedDate)?.date ?? sortedCalendarDays[0]?.date
+    : undefined;
+  const hasEarlierAvailableDate = Boolean(
+    selectedDate && previousAvailableDate && previousAvailableDate < selectedDate
+  );
+  const selectedDateHasNoObservations = Boolean(
+    selectedDate && calendarData && !calendarLoading && !calendarError && !selectedDateHasObservations
+  );
+
+  const periodMeanBurnIndex = useMemo(() => {
+    const values = sortedCalendarDays
+      .map((day) => day.mean_burn_index)
+      .filter((value): value is number => value !== null);
+    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  }, [sortedCalendarDays]);
 
   const detectionBars = useMemo(() => {
     const recent = sortedCalendarDays.slice(-22);
@@ -446,6 +476,9 @@ export default function GlobalFirePulse() {
                   <span className="text-sm sm:text-[15px] font-semibold glass-title">
                     Active Detections
                   </span>
+                  <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                    {selectedDate ? "Selected date" : activeFiltersCount > 0 ? "Filtered view" : "Full dataset"}
+                  </span>
                   <button
                     type="button"
                     title="More actions"
@@ -457,6 +490,9 @@ export default function GlobalFirePulse() {
                 </div>
                 <span className="text-[11px] glass-subtle font-medium block">
                   {selectedDate ? formatDate(selectedDate) : "Current Window"}
+                </span>
+                <span className="text-[10px] glass-muted font-medium block mt-0.5">
+                  Detection count follows this view; sensor totals below use all processed data.
                 </span>
 
                 <div className="flex items-center gap-2 mt-1 mb-2">
@@ -498,6 +534,9 @@ export default function GlobalFirePulse() {
 
               {/* Breakdown Rows */}
               <div className="space-y-1 glass-divider-t pt-2.5">
+                <div className="mb-1 inline-flex rounded-md border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                  Sensor totals · entire dataset
+                </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="glass-muted">VIIRS Detections</span>
                   <span className="font-semibold glass-title tabular-nums">
@@ -526,6 +565,9 @@ export default function GlobalFirePulse() {
                   <span className="text-sm sm:text-[15px] font-semibold glass-title">
                     H3 Active Cells
                   </span>
+                  <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                    {activeFiltersCount > 0 ? "Filtered map page" : "Full dataset"}
+                  </span>
                   <button
                     type="button"
                     title="More actions"
@@ -535,8 +577,12 @@ export default function GlobalFirePulse() {
                     <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-[11px] glass-subtle font-medium block">
-                  Unique H3 Cells
+                <span className="text-[10px] glass-muted font-medium block">
+                  {selectedDate
+                    ? `${formatDate(selectedDate)} · unique cells on current map page`
+                    : activeFiltersCount > 0
+                    ? "Unique cells on the current filtered map page"
+                    : "Unique H3 cells across all processed data"}
                 </span>
 
                 <div className="flex items-center gap-2 mt-1 mb-1.5">
@@ -599,9 +645,17 @@ export default function GlobalFirePulse() {
           {/* ROW 2: SEVERITY DISTRIBUTION */}
           <div className="dataplay-card p-4 sm:p-5 shrink-0">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-base font-semibold glass-title">
-                Burn Severity & Sensor Mix
-              </span>
+              <div>
+                <span className="text-base font-semibold glass-title block">Burn Severity &amp; Sensor Mix</span>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  <span className="rounded-md border border-sky-400/35 bg-sky-500/10 px-2 py-1 text-[9px] font-semibold text-sky-700 dark:text-sky-300">
+                    Mean Index · selected date range
+                  </span>
+                  <span className="rounded-md border border-violet-400/35 bg-violet-500/10 px-2 py-1 text-[9px] font-semibold text-violet-700 dark:text-violet-300">
+                    Outliers, sensor mix &amp; totals · entire dataset
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
                 title="More actions"
@@ -618,7 +672,7 @@ export default function GlobalFirePulse() {
                 <div>
                   <span className="text-xs glass-subtle font-medium block">Mean Index</span>
                   <div className="text-xl sm:text-2xl font-bold glass-heading tabular-nums mt-1">
-                    {formatBurnIndex(stats?.burn_index.mean)}
+                    {formatBurnIndex(periodMeanBurnIndex)}
                   </div>
                   <div className="mt-1">
                     {renderDeltaBadge(
@@ -780,7 +834,7 @@ export default function GlobalFirePulse() {
         <div className="order-1 flex-1 min-w-0 min-h-[360px] sm:min-h-[420px] lg:min-h-0 h-full relative rounded-3xl overflow-hidden glass-panel flex flex-col">
           {/* Top Floating Bar: Title + Record Count Summary on Left | Moved Toolbar Controls on Right */}
           <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-            <div className="pointer-events-auto map-floating-panel rounded-full pl-4 pr-1.5 py-1.5 flex items-center gap-2.5 max-w-full min-w-0">
+            <div className="pointer-events-auto map-floating-panel map-floating-panel-readable rounded-full pl-4 pr-1.5 py-1.5 flex items-center gap-2.5 max-w-full min-w-0">
               <h1 className="text-xs font-bold tracking-tight glass-heading whitespace-nowrap">
                 Fire Overview
               </h1>
@@ -877,7 +931,7 @@ export default function GlobalFirePulse() {
               id="fire-filter-controls"
               ref={filtersPanelRef}
               aria-label="Fire API filters"
-              className="absolute top-16 left-3.5 right-3.5 z-30 map-floating-panel rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
+              className="absolute top-16 left-3.5 right-3.5 z-30 map-floating-panel map-floating-panel-readable rounded-3xl p-4 sm:p-5 max-h-[calc(100%-5rem)] overflow-y-auto"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 glass-divider-b">
                 <div className="flex items-center gap-2">
@@ -1146,11 +1200,28 @@ export default function GlobalFirePulse() {
                 ) : (
                   <div className="map-floating-panel px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold glass-heading">
-                      No matching records
+                      {selectedDateHasNoObservations
+                        ? `No observations for ${formatDate(selectedDate)}`
+                        : "No matching records"}
                     </span>
                     <span className="block mt-1 text-xs glass-muted">
-                      No detections match the selected parameters.
+                      {selectedDateHasNoObservations
+                        ? "No FIRMS observations are available for this date. Choose an observed date to show fire locations on the map."
+                        : "No detections match the selected filters. Try changing the date, country, sensor, or severity filters."}
                     </span>
+                    {selectedDateHasNoObservations && previousAvailableDate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDate(previousAvailableDate);
+                          setOffset(0);
+                        }}
+                        className="mt-3 px-4 py-1.5 glass-btn-primary rounded-full text-xs font-semibold"
+                      >
+                        {hasEarlierAvailableDate ? "Show previous available date" : "Show earliest available date"}
+                        <span className="ml-1 font-normal">({formatDate(previousAvailableDate)})</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1158,7 +1229,7 @@ export default function GlobalFirePulse() {
           </div>
 
           {/* FLOATING LEGEND CARD (Bottom-Right) */}
-          <div className="absolute bottom-4 right-4 z-10 map-floating-panel rounded-3xl p-4 w-64 xl:w-72 pointer-events-auto">
+          <div className="absolute bottom-4 right-4 z-10 map-floating-panel map-floating-panel-readable rounded-3xl p-4 w-64 xl:w-72 pointer-events-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-bold glass-heading">Legend</span>
               <button
@@ -1211,7 +1282,7 @@ export default function GlobalFirePulse() {
                     Burn Severity
                   </span>
                   <div className="text-xl font-bold glass-heading tabular-nums">
-                    {stats?.burn_index.mean ? `${formatBurnIndex(stats.burn_index.mean)} Avg.` : "0 — 100"}
+                    {periodMeanBurnIndex !== null ? `${formatBurnIndex(periodMeanBurnIndex)} Avg.` : "No observations"}
                   </div>
                   <span className="text-[10px] glass-subtle block">
                     Relative fire-activity score

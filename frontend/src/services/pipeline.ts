@@ -25,6 +25,15 @@ export interface BatchUploadResult {
 
 export type PipelineRunState = 'idle' | 'queued' | 'running' | 'succeeded' | 'failed';
 
+const notifiedGenerationJobs = new Set<string>();
+
+/** Tell mounted dashboard views to reload after processed datasets are replaced. */
+export function notifyDatasetsUpdated(jobId: string): void {
+  if (notifiedGenerationJobs.has(jobId)) return;
+  notifiedGenerationJobs.add(jobId);
+  window.dispatchEvent(new CustomEvent('terraignis:datasets-updated', { detail: { job_id: jobId } }));
+}
+
 export interface PipelineStageState {
   name: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed';
@@ -162,6 +171,15 @@ export async function startPipeline(): Promise<{ job_id: string; status: 'queued
   const result = await readResponse<{ job_id: string; status: 'queued'; message: string }>(response);
   window.dispatchEvent(new CustomEvent('terraignis:pipeline-generation-started', { detail: result }));
   return result;
+}
+
+export async function clearPipelineData(password: string): Promise<{ status: 'cleared'; removed_entries: number; message: string }> {
+  const response = await fetch(buildApiUrl('/api/pipeline/reset'), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  return readResponse(response);
 }
 
 function operatorHeaders(token?: string): Record<string, string> {

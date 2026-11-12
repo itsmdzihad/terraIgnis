@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Database, LoaderCircle, X } from 'lucide-r
 import {
   fetchIngestionStatus,
   fetchPipelineStatus,
+  notifyDatasetsUpdated,
   startPipeline,
   type IngestionStatus,
   type PipelineStatus,
@@ -123,6 +124,7 @@ export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 
           return;
         }
         if (status.status === 'succeeded') {
+          notifyDatasetsUpdated(status.job_id);
           setPrompt({ ...prompt, kind: 'generated', title: 'Datasets regenerated', message: 'The latest downloaded FIRMS data is now included in the dashboard.' });
         } else if (status.status === 'failed') {
           setPrompt({ ...prompt, kind: 'failed', title: 'Dataset generation failed', message: status.message || 'The previous processed dataset remains active.' });

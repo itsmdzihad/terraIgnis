@@ -13,6 +13,7 @@ import {
   Radio,
   RotateCw,
   RefreshCw,
+  Trash2,
   XCircle,
   X,
   UploadCloud,
@@ -24,6 +25,8 @@ import {
   startHistoricalIngestion,
   resumeHistoricalIngestion,
   cancelHistoricalIngestion,
+  clearPipelineData,
+  notifyDatasetsUpdated,
   startPipeline,
   uploadRawFiles,
   type BatchUploadResult,
@@ -43,6 +46,16 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function explainIngestionError(message: string, action: string): string {
+  if (message.includes('FIRMS_INGESTION_TOKEN')) {
+    return `${action} requires a token because FIRMS_INGESTION_TOKEN is configured on the backend. Enter that exact token, or unset the variable to allow public ingestion.`;
+  }
+  if (message.toLowerCase().includes('authorization')) {
+    return `The ${action.toLowerCase()} request was rejected. This backend has token protection enabled; enter its configured FIRMS_INGESTION_TOKEN or ask the deployment operator to unset it.`;
+  }
+  return message;
 }
 
 function stageIcon(stageStatus: string) {
@@ -71,8 +84,13 @@ export default function DataPipeline() {
   const [historicalSources, setHistoricalSources] = useState<string[]>(['MODIS_SP', 'VIIRS_SNPP_SP', 'VIIRS_NOAA20_SP', 'VIIRS_NOAA21_SP']);
   const [historicalBusy, setHistoricalBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const nrtNoticePendingRef = useRef(false);
   const nrtNoticeBaselineRef = useRef<string | null>(null);
+  const generationJobIdRef = useRef<string | null>(null);
 
   const refreshStatus = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -120,6 +138,13 @@ export default function DataPipeline() {
     const timer = window.setInterval(() => void refreshStatus(), 1500);
     return () => window.clearInterval(timer);
   }, [refreshStatus, status?.status]);
+
+  useEffect(() => {
+    if (status?.status !== 'succeeded' || !status.job_id) return;
+    if (generationJobIdRef.current !== status.job_id) return;
+    notifyDatasetsUpdated(status.job_id);
+    generationJobIdRef.current = null;
+  }, [status?.job_id, status?.status]);
 
   useEffect(() => {
     const nrtRunning = ingestion?.nrt.status === 'running';
@@ -190,7 +215,8 @@ export default function DataPipeline() {
     setStarting(true);
     setLoadError(null);
     try {
-      await startPipeline();
+      const result = await startPipeline();
+      generationJobIdRef.current = result.job_id;
       await refreshStatus();
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Could not start dataset generation.');
@@ -205,6 +231,27 @@ export default function DataPipeline() {
     setRefreshing(false);
   };
 
+  const handleClearData = async () => {
+    if (!resetPassword) {
+      setResetError('Enter the confirmation password to continue.');
+      return;
+    }
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      const result = await clearPipelineData(resetPassword);
+      setResetModalOpen(false);
+      setResetPassword('');
+      setIngestionNotice(result.message);
+      await Promise.all([refreshStatus(), refreshIngestion()]);
+      notifyDatasetsUpdated(`data-cleared-${Date.now()}`);
+    } catch (error) {
+      setResetError(error instanceof Error ? error.message : 'Could not clear FIRMS data.');
+    } finally {
+      setResetBusy(false);
+    }
+  };
+
   const handleNrtRun = async () => {
     setHistoricalBusy(true);
     setIngestionError(null);
@@ -217,7 +264,8 @@ export default function DataPipeline() {
       await refreshIngestion();
     } catch (error) {
       nrtNoticePendingRef.current = false;
-      setIngestionError(error instanceof Error ? error.message : 'Could not start an NRT poll.');
+      const message = error instanceof Error ? error.message : 'Could not start an NRT poll.';
+      setIngestionError(explainIngestionError(message, 'NRT polling'));
     } finally {
       setHistoricalBusy(false);
     }
@@ -249,7 +297,8 @@ export default function DataPipeline() {
       setIngestionNotice(`Historical backfill queued (${job.total_chunks} date chunks).`);
       await refreshIngestion();
     } catch (error) {
-      setIngestionError(error instanceof Error ? error.message : 'Could not start the historical backfill.');
+      const message = error instanceof Error ? error.message : 'Could not start the historical backfill.';
+      setIngestionError(explainIngestionError(message, 'Historical backfill'));
     } finally {
       setHistoricalBusy(false);
     }
@@ -264,7 +313,8 @@ export default function DataPipeline() {
       else await cancelHistoricalIngestion(jobId, operatorToken);
       await refreshIngestion();
     } catch (error) {
-      setIngestionError(error instanceof Error ? error.message : `Could not ${action} this historical job.`);
+      const message = error instanceof Error ? error.message : `Could not ${action} this historical job.`;
+      setIngestionError(explainIngestionError(message, `Could not ${action} the historical job`));
     } finally {
       setHistoricalBusy(false);
     }
@@ -333,11 +383,12 @@ export default function DataPipeline() {
             <div className="mt-3 flex flex-wrap gap-2">{Object.entries(ingestion.nrt.sources).map(([source, result]) => <span key={source} className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600">{source}: {result.status}{result.downloaded_records !== undefined ? ` · ${result.downloaded_records.toLocaleString()} records` : ''}</span>)}</div>
           )}
 
-          <details className="mt-4 rounded-xl border border-slate-200 px-4 py-3">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-slate-600"><LockKeyhole size={14} /> Operator authorization (optional)</summary>
-            <label className="mt-3 block text-xs text-slate-500" htmlFor="firms-operator-token">Bearer token</label>
-            <input id="firms-operator-token" type="password" autoComplete="off" value={operatorToken} onChange={(event) => setOperatorToken(event.currentTarget.value)} placeholder="Enter FIRMS_INGESTION_TOKEN if configured" className="mt-1 w-full max-w-lg rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm" />
-            <p className="mt-1 text-xs text-slate-500">Kept only in this page while it is open; it is sent only with operator actions.</p>
+          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/55">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200"><LockKeyhole size={14} /> Optional operator authorization</summary>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Leave blank for public ingestion. A token is required only if the backend operator explicitly sets FIRMS_INGESTION_TOKEN.</p>
+            <label className="mt-3 block text-xs text-slate-500 dark:text-slate-400" htmlFor="firms-operator-token">Bearer token</label>
+            <input id="firms-operator-token" type="password" autoComplete="off" value={operatorToken} onChange={(event) => setOperatorToken(event.currentTarget.value)} placeholder="Leave blank unless token protection is enabled" className="mt-1 w-full max-w-lg rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">The token stays in this tab’s memory and is sent only with ingestion requests.</p>
           </details>
 
           <div className="mt-5 border-t border-slate-200 pt-5">
@@ -501,6 +552,14 @@ export default function DataPipeline() {
               </button>
               <button
                 type="button"
+                onClick={() => { setResetError(null); setResetPassword(''); setResetModalOpen(true); }}
+                disabled={running || uploading || historicalBusy || ingestion?.nrt.status === 'running' || ['queued', 'running', 'processing'].includes(ingestion?.historical.active_job?.status ?? '')}
+                className="inline-flex items-center gap-2 rounded-lg border border-rose-300 px-3 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+              >
+                <Trash2 size={16} /> Clear all data
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleGenerate()}
                 disabled={!canGenerate}
                 className="pipeline-action-button inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
@@ -563,6 +622,28 @@ export default function DataPipeline() {
           {!status?.status && <p className="mt-4 text-xs text-slate-500">Checking the backend raw-file inventory…</p>}
         </section>
       </div>
+
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-md" onMouseDown={(event) => { if (event.target === event.currentTarget && !resetBusy) setResetModalOpen(false); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="clear-data-title" className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-5 shadow-2xl dark:border-rose-500/30 dark:bg-slate-900 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"><AlertTriangle size={20} /></div>
+              <div className="min-w-0 flex-1">
+                <h2 id="clear-data-title" className="text-base font-bold text-slate-900 dark:text-slate-100">Clear all FIRMS data?</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">This permanently deletes uploaded and downloaded raw files, processed datasets, reports, and ingestion history from this deployment.</p>
+              </div>
+              <button type="button" onClick={() => setResetModalOpen(false)} disabled={resetBusy} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800" aria-label="Close confirmation"><X size={18} /></button>
+            </div>
+            <label htmlFor="clear-data-password" className="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirmation password</label>
+            <input id="clear-data-password" type="password" autoComplete="current-password" autoFocus value={resetPassword} onChange={(event) => { setResetPassword(event.currentTarget.value); setResetError(null); }} onKeyDown={(event) => { if (event.key === 'Enter' && !resetBusy) void handleClearData(); }} placeholder="Enter password" className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+            {resetError && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{resetError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setResetModalOpen(false)} disabled={resetBusy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</button>
+              <button type="button" onClick={() => void handleClearData()} disabled={resetBusy || !resetPassword} className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-rose-600 dark:hover:bg-rose-500">{resetBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}{resetBusy ? 'Clearing…' : 'Clear all data'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
