@@ -53,6 +53,23 @@ function formatDate(value: string | null | undefined): string {
   });
 }
 
+function parseDmsCoordinatePair(value: string): [number, number] | null {
+  const match = value.match(/^\s*(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:["″])?\s*([NS])\s*,\s*(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:["″])?\s*([EW])\s*$/i);
+  if (!match) return null;
+
+  const [, latDegrees, latMinutes, latSeconds, latHemisphere, lonDegrees, lonMinutes, lonSeconds, lonHemisphere] = match;
+  const latitudeParts = [Number(latDegrees), Number(latMinutes), Number(latSeconds)];
+  const longitudeParts = [Number(lonDegrees), Number(lonMinutes), Number(lonSeconds)];
+  const [latDeg, latMin, latSec] = latitudeParts;
+  const [lonDeg, lonMin, lonSec] = longitudeParts;
+  if (latMin >= 60 || latSec >= 60 || lonMin >= 60 || lonSec >= 60 || latDeg > 90 || lonDeg > 180) return null;
+  if ((latDeg === 90 && (latMin > 0 || latSec > 0)) || (lonDeg === 180 && (lonMin > 0 || lonSec > 0))) return null;
+
+  const latitude = latDeg + latMin / 60 + latSec / 3600;
+  const longitude = lonDeg + lonMin / 60 + lonSec / 3600;
+  return [latHemisphere.toUpperCase() === "S" ? -latitude : latitude, lonHemisphere.toUpperCase() === "W" ? -longitude : longitude];
+}
+
 function computePctChange(current: number, previous: number): number | null {
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return null;
   return ((current - previous) / previous) * 100;
@@ -85,6 +102,7 @@ export default function GlobalFirePulse() {
   const [offset, setOffset] = useState(0);
   const [latitudeInput, setLatitudeInput] = useState("");
   const [longitudeInput, setLongitudeInput] = useState("");
+  const [dmsInput, setDmsInput] = useState("");
   const [coordinateError, setCoordinateError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(5000);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -288,26 +306,40 @@ export default function GlobalFirePulse() {
 
   const maxMonthlyAnomalies = Math.max(1, ...monthlyAnomalyCounts);
 
-  const handleCoordinateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleFilterApply = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const latitude = Number(latitudeInput);
-    const longitude = Number(longitudeInput);
-    if (
-      latitudeInput.trim() === "" ||
-      longitudeInput.trim() === "" ||
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
-      setCoordinateError("Enter valid numerical coordinates.");
-      return;
-    }
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      setCoordinateError("Lat −90 to 90, Lon −180 to 180.");
-      return;
+
+    const hasLatitude = latitudeInput.trim() !== "";
+    const hasLongitude = longitudeInput.trim() !== "";
+    const hasDms = dmsInput.trim() !== "";
+    if (hasDms) {
+      const coordinates = parseDmsCoordinatePair(dmsInput);
+      if (!coordinates) {
+        setCoordinateError('Enter DMS as 48°51\'30.2"N, 2°17\'40.2"E.');
+        return;
+      }
+      setSelectedH3Cell(latLngToCell(coordinates[0], coordinates[1], 7));
+    } else if (hasLatitude || hasLongitude) {
+      if (!hasLatitude || !hasLongitude) {
+        setCoordinateError("Enter both latitude and longitude, or leave both empty.");
+        return;
+      }
+      const latitude = Number(latitudeInput);
+      const longitude = Number(longitudeInput);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        setCoordinateError("Enter valid numerical coordinates.");
+        return;
+      }
+      if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        setCoordinateError("Lat −90 to 90, Lon −180 to 180.");
+        return;
+      }
+      setSelectedH3Cell(latLngToCell(latitude, longitude, 7));
     }
 
     setCoordinateError(null);
-    setSelectedH3Cell(latLngToCell(latitude, longitude, 7));
+    setOffset(0);
+    setIsFiltersOpen(false);
   };
 
   const activeFiltersCount = useMemo(() => {
@@ -340,6 +372,27 @@ export default function GlobalFirePulse() {
   );
   const selectedDateHasNoObservations = Boolean(
     selectedDate && calendarData && !calendarLoading && !calendarError && !selectedDateHasObservations
+  );
+  const showPreviousAvailableDate = () => {
+    if (!previousAvailableDate) return;
+    setSelectedDate(previousAvailableDate);
+    setOffset(0);
+  };
+  const renderSelectedDateEmptyState = () => (
+    <div role="status" className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5">
+      <span className="block text-xs font-semibold glass-heading">No FIRMS observations for {formatDate(selectedDate)}</span>
+      <span className="mt-0.5 block text-[10px] glass-muted">These counts are zero because this date has no records in the selected dataset.</span>
+      {previousAvailableDate && (
+        <button
+          type="button"
+          onClick={showPreviousAvailableDate}
+          className="selected-date-previous-btn mt-2 rounded-full glass-btn-primary px-3 py-1 text-[10px] font-semibold"
+        >
+          {hasEarlierAvailableDate ? "Previous date" : "Earliest available"}
+          <span className="ml-1 font-normal">· {formatDate(previousAvailableDate)}</span>
+        </button>
+      )}
+    </div>
   );
 
   const periodMeanBurnIndex = useMemo(() => {
@@ -482,7 +535,7 @@ export default function GlobalFirePulse() {
                     Active Detections
                   </span>
                   <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                    {selectedDate ? "Selected date" : activeFiltersCount > 0 ? "Filtered view" : "Full dataset"}
+                    {selectedDateHasNoObservations ? "Selected date · no data" : selectedDate ? "Selected date" : activeFiltersCount > 0 ? "Filtered view" : "Full dataset"}
                   </span>
                   <button
                     type="button"
@@ -496,45 +549,51 @@ export default function GlobalFirePulse() {
                 <span className="text-[11px] glass-subtle font-medium block">
                   {selectedDate ? formatDate(selectedDate) : "Current Window"}
                 </span>
-                <span className="text-[10px] glass-muted font-medium block mt-0.5">
-                  Detection count follows this view; sensor totals below use all processed data.
-                </span>
+                {selectedDateHasNoObservations ? (
+                  renderSelectedDateEmptyState()
+                ) : (
+                  <>
+                    <span className="text-[10px] glass-muted font-medium block mt-0.5">
+                      Detection count follows this view; sensor totals below use all processed data.
+                    </span>
 
-                <div className="flex items-center gap-2 mt-1 mb-2">
-                  <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
-                    {formatCount(activeDetectionsHeadline)}
-                  </span>
-                  {renderDeltaBadge(
-                    telemetryDeltas.detectionDelta15d,
-                    "Recent 15d vs prior 15d active detections (from /api/calendar)"
-                  )}
-                </div>
+                    <div className="flex items-center gap-2 mt-1 mb-2">
+                      <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
+                        {formatCount(activeDetectionsHeadline)}
+                      </span>
+                      {renderDeltaBadge(
+                        telemetryDeltas.detectionDelta15d,
+                        "Recent 15d vs prior 15d active detections (from /api/calendar)"
+                      )}
+                    </div>
 
-                {/* Live Daily Waveform Bars (Last 22 Observed Days from /api/calendar) */}
-                <div className="flex items-center gap-[3px] h-5 py-0.5 mb-2.5">
-                  {detectionBars.length > 0
-                    ? detectionBars.map((bar, idx) => (
-                        <div
-                          key={bar.date}
-                          title={`${formatDate(bar.date)}: ${bar.fireCount.toLocaleString()} cell-dates`}
-                          className="flex-1 rounded-full transition-all duration-200"
-                          style={{
-                            height: `${bar.pct}%`,
-                            backgroundColor:
-                              idx < Math.ceil(detectionBars.length / 2)
-                                ? "var(--chart-series-muted)"
-                                : "var(--chart-series-accent)",
-                          }}
-                        />
-                      ))
-                    : Array.from({ length: 22 }, (_, idx) => (
-                        <div
-                          key={idx}
-                          className="flex-1 rounded-full bg-slate-400/25"
-                          style={{ height: "25%" }}
-                        />
-                      ))}
-                </div>
+                    {/* Live Daily Waveform Bars (Last 22 Observed Days from /api/calendar) */}
+                    <div className="flex items-center gap-[3px] h-5 py-0.5 mb-2.5">
+                      {detectionBars.length > 0
+                        ? detectionBars.map((bar, idx) => (
+                            <div
+                              key={bar.date}
+                              title={`${formatDate(bar.date)}: ${bar.fireCount.toLocaleString()} cell-dates`}
+                              className="flex-1 rounded-full transition-all duration-200"
+                              style={{
+                                height: `${bar.pct}%`,
+                                backgroundColor:
+                                  idx < Math.ceil(detectionBars.length / 2)
+                                    ? "var(--chart-series-muted)"
+                                    : "var(--chart-series-accent)",
+                              }}
+                            />
+                          ))
+                        : Array.from({ length: 22 }, (_, idx) => (
+                            <div
+                              key={idx}
+                              className="flex-1 rounded-full bg-slate-400/25"
+                              style={{ height: "25%" }}
+                            />
+                          ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Breakdown Rows */}
@@ -571,7 +630,7 @@ export default function GlobalFirePulse() {
                     H3 Active Cells
                   </span>
                   <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                    {activeFiltersCount > 0 ? "Filtered map page" : "Full dataset"}
+                    {selectedDateHasNoObservations ? "Selected date · no data" : activeFiltersCount > 0 ? "Filtered map page" : "Full dataset"}
                   </span>
                   <button
                     type="button"
@@ -582,31 +641,37 @@ export default function GlobalFirePulse() {
                     <MoreHorizontal size={15} />
                   </button>
                 </div>
-                <span className="text-[10px] glass-muted font-medium block">
-                  {selectedDate
-                    ? `${formatDate(selectedDate)} · unique cells on current map page`
-                    : activeFiltersCount > 0
-                    ? "Unique cells on the current filtered map page"
-                    : "Unique H3 cells across all processed data"}
-                </span>
+                {selectedDateHasNoObservations ? (
+                  renderSelectedDateEmptyState()
+                ) : (
+                  <>
+                    <span className="text-[10px] glass-muted font-medium block">
+                      {selectedDate
+                        ? `${formatDate(selectedDate)} · unique cells on current map page`
+                        : activeFiltersCount > 0
+                        ? "Unique cells on the current filtered map page"
+                        : "Unique H3 cells across all processed data"}
+                    </span>
 
-                <div className="flex items-center gap-2 mt-1 mb-1.5">
-                  <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
-                    {formatCount(activeCellsHeadline)}
-                  </span>
-                  {renderDeltaBadge(
-                    telemetryDeltas.monthlyAnomalyDelta,
-                    "Latest active month vs previous active month anomalies (from /api/anomalies)"
-                  )}
-                </div>
+                    <div className="flex items-center gap-2 mt-1 mb-1.5">
+                      <span className="text-xl sm:text-2xl font-bold tracking-tight glass-heading tabular-nums">
+                        {formatCount(activeCellsHeadline)}
+                      </span>
+                      {renderDeltaBadge(
+                        telemetryDeltas.monthlyAnomalyDelta,
+                        "Latest active month vs previous active month anomalies (from /api/anomalies)"
+                      )}
+                    </div>
 
-                <span className="text-[11px] glass-subtle font-medium block mb-1.5">
-                  Observed anomalies per month
-                </span>
+                    <span className="text-[11px] glass-subtle font-medium block mb-1.5">
+                      Observed anomalies per month
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Monthly Vertical Bar Chart */}
-              <div className="h-14 sm:h-16 flex items-end gap-1.5 pt-1">
+              {!selectedDateHasNoObservations && <div className="h-14 sm:h-16 flex items-end gap-1.5 pt-1">
                 {anomaliesLoading ? (
                   <span className="w-full h-full flex items-center justify-center text-xs glass-subtle">
                     Loading anomaly data…
@@ -643,7 +708,7 @@ export default function GlobalFirePulse() {
                     );
                   })
                 )}
-              </div>
+              </div>}
             </div>
           </div>
 
@@ -920,11 +985,11 @@ export default function GlobalFirePulse() {
                 }}
                 title="Refresh data"
                 aria-label="Refresh data"
-                className="map-floating-btn inline-flex items-center justify-center h-8 w-8 rounded-full"
+                className="map-refresh-data-btn inline-flex items-center justify-center h-8 w-8 rounded-full"
               >
                 <RotateCw
                   size={13}
-                  className={mapLoading || calendarLoading ? "animate-spin tone-blue" : "glass-muted"}
+                  className={mapLoading || calendarLoading ? "animate-spin" : ""}
                 />
               </button>
             </div>
@@ -962,7 +1027,7 @@ export default function GlobalFirePulse() {
                     type="button"
                     onClick={() => setIsFiltersOpen(false)}
                     aria-label="Close filters"
-                    className="glass-icon-btn p-1.5 rounded-full"
+                    className="filter-close-btn p-1.5 rounded-full"
                   >
                     <X size={15} />
                   </button>
@@ -1125,43 +1190,51 @@ export default function GlobalFirePulse() {
                   </select>
                 </label>
 
-                <form onSubmit={handleCoordinateSubmit} className="flex flex-col justify-end">
-                  <span className="text-[11px] font-medium glass-muted block mb-1">
-                    Lat / Lon Jump
-                  </span>
+                <form onSubmit={handleFilterApply} className="flex flex-col justify-end">
+                  <span className="text-[11px] font-medium glass-muted block mb-1">Find location (optional)</span>
                   <div className="flex gap-1.5">
                     <input
-                      aria-label="Latitude"
+                      aria-label="Latitude in decimal degrees"
                       type="number"
                       min="-90"
                       max="90"
                       step="any"
                       value={latitudeInput}
-                      onChange={(event) => setLatitudeInput(event.target.value)}
-                      placeholder="Lat"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                      disabled={dmsInput.trim() !== ""}
+                      onChange={(event) => { setLatitudeInput(event.target.value); setCoordinateError(null); }}
+                      placeholder="Latitude"
+                      className="w-1/2 min-w-0 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 disabled:opacity-45"
                     />
                     <input
-                      aria-label="Longitude"
+                      aria-label="Longitude in decimal degrees"
                       type="number"
                       min="-180"
                       max="180"
                       step="any"
                       value={longitudeInput}
-                      onChange={(event) => setLongitudeInput(event.target.value)}
-                      placeholder="Lon"
-                      className="w-1/2 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                      disabled={dmsInput.trim() !== ""}
+                      onChange={(event) => { setLongitudeInput(event.target.value); setCoordinateError(null); }}
+                      placeholder="Longitude"
+                      className="w-1/2 min-w-0 glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 disabled:opacity-45"
                     />
-                    <button
-                      type="submit"
-                      className="px-3.5 py-1.5 rounded-full glass-btn-primary text-xs font-semibold shrink-0"
-                    >
-                      Go
-                    </button>
                   </div>
-                  {coordinateError && (
-                    <span className="text-[10px] tone-rose mt-1">{coordinateError}</span>
-                  )}
+                  <input
+                    aria-label="Location in degrees, minutes, and seconds"
+                    type="text"
+                    value={dmsInput}
+                    disabled={latitudeInput.trim() !== "" || longitudeInput.trim() !== ""}
+                    onChange={(event) => { setDmsInput(event.target.value); setCoordinateError(null); }}
+                    placeholder={'DMS: 48°51\'30.2"N, 2°17\'40.2"E'}
+                    className="mt-1 w-full glass-control rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 disabled:opacity-45"
+                  />
+                  <span className="mt-1 text-[9px] glass-subtle">Use decimal coordinates or DMS, not both. Leave location empty to apply filters only.</span>
+                  <button
+                    type="submit"
+                    className="map-apply-filters-btn mt-2 inline-flex w-full items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    Apply filters
+                  </button>
+                  {coordinateError && <span role="alert" className="text-[10px] tone-rose mt-1">{coordinateError}</span>}
                 </form>
               </div>
 
