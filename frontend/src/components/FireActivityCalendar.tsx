@@ -22,6 +22,7 @@ import { useAnomalies } from "../hooks/useAnomalies";
 import { useStats } from "../hooks/useStats";
 import type { CalendarDay } from "../types/calendar";
 import { useDashboard } from "../context/DashboardContext";
+import DatasetSetupNotice, { isDatasetUnavailableError } from "./DatasetSetupNotice";
 
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -1411,6 +1412,19 @@ export default function FireActivityCalendar() {
               Loading daily activity...
             </span>
           </div>
+        </div>
+      ) : error && isDatasetUnavailableError(error) ? (
+        <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5" style={{ color: "var(--cal-accent)" }} />
+              <h1 className="activity-card-title text-lg font-bold tracking-tight">
+                Daily Activity Center
+              </h1>
+            </div>
+            {yearAndMetricControls}
+          </div>
+          <DatasetSetupNotice />
         </div>
       ) : error ? (
         <div className="activity-card p-6 sm:p-8 flex flex-col gap-6">

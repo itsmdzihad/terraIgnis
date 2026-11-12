@@ -1,0 +1,20 @@
+# Local environment files and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Cloud credentials, TLS material, and local backups
+.aws/
+**/certbot/
+**/letsencrypt/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.backup
+**/*.backup

@@ -1,3 +1,5 @@
+name: terraignis
+
 services:
   backend:
     build:
@@ -10,7 +12,11 @@ services:
       APP_ENV: production
       DATA_DIR: data/processed
     volumes:
-      - ${TERRAIGNIS_DATA_DIR:-terraignis_data}:/app/data
+      - type: bind
+        source: ${TERRAIGNIS_DATA_DIR:-/srv/terraignis/data}
+        target: /app/data
+        bind:
+          create_host_path: false
     expose:
       - "8000"
     restart: unless-stopped
@@ -29,12 +35,24 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        NGINX_CONFIG: nginx.prod.conf
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${HTTP_PORT:-8080}:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /srv/terraignis/certbot/www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     restart: unless-stopped
-
-volumes:
-  terraignis_data:
+    healthcheck:
+      test:
+        - CMD
+        - nginx
+        - -t
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

@@ -29,6 +29,7 @@ import { useCalendar } from "../hooks/useCalendar";
 import { useCountries } from "../hooks/useCountries";
 import { useCountryFires } from "../hooks/useCountryFires";
 import FireActivityTrendsChart from "./FireActivityTrendsChart";
+import DatasetSetupNotice, { isDatasetUnavailableError } from "./DatasetSetupNotice";
 
 function formatCount(value: number | null | undefined): string {
   if (value == null) return "—";
@@ -258,6 +259,9 @@ export default function GlobalFirePulse() {
     offset: 0,
   });
 
+  const datasetUnavailable = [mapError, anomaliesError, statsError, calendarError]
+    .some(isDatasetUnavailableError);
+
   useEffect(() => {
     const refreshDashboardData = () => {
       refetch();
@@ -463,6 +467,7 @@ export default function GlobalFirePulse() {
 
   return (
     <div className="dataplay-overview flex flex-col h-full w-full overflow-y-auto lg:overflow-hidden p-3 lg:p-4 gap-3">
+      {datasetUnavailable && <DatasetSetupNotice compact />}
       {/* MAIN CONTENT STAGE (Map on the left, dashboard analysis on the right) */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 lg:gap-4 lg:overflow-hidden">
         {/* DASHBOARD ANALYSIS COLUMN */}
@@ -1184,7 +1189,7 @@ export default function GlobalFirePulse() {
                       Loading detections...
                     </span>
                   </div>
-                ) : mapError ? (
+                ) : mapError && !datasetUnavailable ? (
                   <div className="max-w-sm map-floating-panel px-6 py-4 rounded-3xl text-center">
                     <span className="block text-xs font-semibold tone-rose">
                       Unable to load fire detections.
@@ -1196,6 +1201,15 @@ export default function GlobalFirePulse() {
                     >
                       Retry
                     </button>
+                  </div>
+                ) : datasetUnavailable ? (
+                  <div className="max-w-sm map-floating-panel-readable rounded-3xl px-6 py-4 text-center">
+                    <span className="block text-xs font-semibold glass-heading">
+                      No processed fire data to display yet
+                    </span>
+                    <span className="block mt-1 text-xs glass-muted">
+                      Follow the setup steps above to ingest FIRMS data and generate datasets.
+                    </span>
                   </div>
                 ) : (
                   <div className="map-floating-panel px-6 py-4 rounded-3xl text-center">
