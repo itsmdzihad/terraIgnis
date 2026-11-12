@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGroup, motion } from "motion/react";
+import { Link } from "react-router-dom";
 import {
   ChevronDown,
   X,
@@ -89,7 +90,7 @@ export default function FireActivityCalendar() {
   } = useDashboard();
 
   const selectedYear = calendarYear;
-  const { data: coverageStats } = useStats();
+  const { data: coverageStats, refetch: refetchCoverageStats } = useStats();
   const yearOptions = useMemo(() => {
     const dataStartYear = coverageStats?.coverage.start_date
       ? Number(coverageStats.coverage.start_date.slice(0, 4))
@@ -157,6 +158,16 @@ export default function FireActivityCalendar() {
     start_date: `${selectedYear}-01-01`,
     end_date: `${selectedYear}-12-31`,
   });
+
+  useEffect(() => {
+    const refreshActivityData = () => {
+      refetch();
+      refetchAnomalies();
+      refetchCoverageStats();
+    };
+    window.addEventListener("terraignis:datasets-updated", refreshActivityData);
+    return () => window.removeEventListener("terraignis:datasets-updated", refreshActivityData);
+  }, [refetch, refetchAnomalies, refetchCoverageStats]);
 
   const observationsByDate = useMemo(
     () => new Map((data?.data ?? []).map((day) => [day.date, day])),
@@ -401,8 +412,12 @@ export default function FireActivityCalendar() {
   }, [data, anomalyData, stats.activeDaysCount, stats.totalDays]);
 
   const anomalySummaryText = useMemo(() => {
-    const totalAnomalies = anomalyData?.length ?? 0;
-    const outlierDaysCount = (data?.data ?? []).filter((d) => d.anomaly_count > 0).length;
+    const anomalyRecords = anomalyData ?? [];
+    const calendarDays = data?.data ?? [];
+    const recordAnomalyCount = anomalyRecords.length;
+    const calendarAnomalyCount = calendarDays.reduce((sum, day) => sum + day.anomaly_count, 0);
+    const totalAnomalies = Math.max(recordAnomalyCount, calendarAnomalyCount);
+    const outlierDaysCount = calendarDays.filter((d) => d.anomaly_count > 0).length;
     const highCount = (anomalyData ?? []).filter(
       (a) => a.anomaly_level === "high" || a.anomaly_level === "extreme_high"
     ).length;
@@ -410,6 +425,9 @@ export default function FireActivityCalendar() {
 
     if (totalAnomalies === 0) {
       return `Across ${stats.activeDaysCount} active fire days in ${selectedYear}, zero statistical outliers crossed the anomaly threshold (${meanBurnItem?.detail ?? "no burn index"}).`;
+    }
+    if (recordAnomalyCount === 0 && calendarAnomalyCount > 0) {
+      return `Across ${stats.activeDaysCount} active fire days in ${selectedYear}, the calendar reports ${calendarAnomalyCount.toLocaleString()} anomalous cell-dates across ${outlierDaysCount} days; detailed outlier records are unavailable.`;
     }
     return `Across ${stats.activeDaysCount} active fire days in ${selectedYear}, ${totalAnomalies.toLocaleString()} burn anomalies occurred over ${outlierDaysCount} days, with ${highCount.toLocaleString()} classified as high or extreme severity.`;
   }, [anomalyData, data, stats.activeDaysCount, selectedYear, radarMetrics]);
@@ -421,6 +439,7 @@ export default function FireActivityCalendar() {
     const observedDays = [...(data?.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
     const totalObservedAnomalies = observedDays.reduce((s, d) => s + d.anomaly_count, 0);
     const effectiveTotalAnomalies = totalAnomalies > 0 ? totalAnomalies : totalObservedAnomalies;
+    const hasDetailedAnomalies = totalAnomalies > 0;
     const totalObservedFires = observedDays.reduce((s, d) => s + d.fire_count, 0);
 
     const getDayMetricVal = (day: CalendarDay): number => {
@@ -523,10 +542,9 @@ export default function FireActivityCalendar() {
       })[0] ?? null;
 
     const card1Date = peakPositiveAnom?.acq_date || stats.busiestDay.date;
-    const card1Pct =
-      totalAnomalies > 0
-        ? ((highExtremeAnomalies.length / totalAnomalies) * 100).toFixed(2)
-        : "0.00";
+    const card1Pct = totalAnomalies > 0
+      ? ((highExtremeAnomalies.length / totalAnomalies) * 100).toFixed(2)
+      : effectiveTotalAnomalies > 0 ? "—" : "0.00";
     const card1Positive =
       totalAnomalies > 0 ? highExtremeAnomalies.length >= totalAnomalies / 2 : false;
     const card1Sub = peakPositiveAnom
@@ -535,7 +553,9 @@ export default function FireActivityCalendar() {
             ? `Z ${peakPositiveAnom.robust_z_score > 0 ? "+" : ""}${peakPositiveAnom.robust_z_score.toFixed(2)}`
             : `Burn ${peakPositiveAnom.burn_index.toFixed(1)}`
         } (${formatDisplayDate(peakPositiveAnom.acq_date)})`
-      : `No outlier records in ${selectedYear}`;
+      : effectiveTotalAnomalies > 0
+        ? `${effectiveTotalAnomalies.toLocaleString()} anomalous cell-dates · detailed severity unavailable`
+        : `No outlier records in ${selectedYear}`;
 
     const card1Series = bucketIntoColumns(sortedAnomDates, (slice) => {
       const highSum = slice.reduce((s, x) => s + x.highCount, 0);
@@ -738,7 +758,7 @@ export default function FireActivityCalendar() {
         pct: card1Pct,
         sub: card1Sub,
         isPositive: card1Positive,
-        hasData: totalAnomalies > 0,
+        hasData: effectiveTotalAnomalies > 0 && hasDetailedAnomalies,
         dotColor: "var(--dot-purple)",
         targetDate: card1Date,
         columns: toDotColumns(card1Series),
@@ -975,9 +995,16 @@ export default function FireActivityCalendar() {
   const outlierGrid = (
     <OutlierTelemetryGrid
       outlierCards={outlierCards}
-      totalAnomalies={anomalyData?.length ?? 0}
+      totalAnomalies={Math.max(
+        anomalyData?.length ?? 0,
+        (data?.data ?? []).reduce((sum, day) => sum + day.anomaly_count, 0)
+      )}
+      totalDetections={(data?.data ?? []).reduce((sum, day) => sum + day.fire_count, 0)}
+      selectedYear={selectedYear}
       anomalyLoading={anomalyLoading && !anomalyData}
       anomalyError={anomalyError}
+      activityLoading={loading}
+      activityError={error}
       onRetryAnomalies={refetchAnomalies}
       selectedDate={selectedDate}
       onSelectDate={setSelectedDate}
@@ -1887,8 +1914,12 @@ interface OutlierCardData {
 function OutlierTelemetryGrid({
   outlierCards,
   totalAnomalies,
+  totalDetections,
+  selectedYear,
   anomalyLoading,
   anomalyError,
+  activityLoading,
+  activityError,
   onRetryAnomalies,
   selectedDate,
   onSelectDate,
@@ -1896,8 +1927,12 @@ function OutlierTelemetryGrid({
 }: {
   outlierCards: OutlierCardData[];
   totalAnomalies: number;
+  totalDetections: number;
+  selectedYear: number;
   anomalyLoading: boolean;
   anomalyError: string | null;
+  activityLoading: boolean;
+  activityError: string | null;
   onRetryAnomalies: () => void;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
@@ -1928,10 +1963,40 @@ function OutlierTelemetryGrid({
           <span className="activity-muted text-[11px] font-medium">
             {anomalyLoading
               ? "Loading outlier summary..."
-              : `${totalAnomalies.toLocaleString()} verified outliers`}
+              : `${totalAnomalies.toLocaleString()} statistical outlier records`}
           </span>
         )}
       </div>
+
+      {!anomalyLoading && !anomalyError && !activityLoading && !activityError && totalAnomalies === 0 && (
+        <div className="activity-card px-5 py-4 border-2 border-amber-400/50 bg-amber-500/10 shadow-lg shadow-amber-950/10">
+          <p className="activity-card-title text-sm font-semibold">
+            {totalDetections > 0
+              ? "Why do these outlier values show 0?"
+              : `Why is there no outlier data for ${selectedYear}?`}
+          </p>
+          <p className="activity-muted mt-1 text-xs leading-relaxed">
+            {totalDetections > 0
+              ? `An outlier is an H3 cell-date whose Burn Index is unusually high or low compared with the statistical baseline. These are computed classifications, not records manually verified by a person. This year has ${totalDetections.toLocaleString()} detections, but none crossed the anomaly threshold. The High & Extreme, Peak 7-Day Burst, and Peak Month percentages are zero because there are no outliers to count. Outlier Rate is 0 outliers ÷ ${totalDetections.toLocaleString()} detections, so it is also 0.00%.`
+              : "There are no fire detections in the selected year, so the system has no H3 cell-date Burn Index records to score. The outlier counts and percentages are zero because there is no input data."}
+          </p>
+          <p className="activity-card-title mt-3 text-xs font-semibold">
+            {totalDetections > 0 ? "To check a more complete year of data" : "To load fire data for this year"}
+          </p>
+          <p className="activity-muted mt-1 text-xs leading-relaxed">
+            Open Data Pipeline → Historical backfill and request January 1, {selectedYear}
+            {selectedYear === new Date().getFullYear() ? " through today" : ` through December 31, ${selectedYear}`}.
+            Start the backfill, then choose Generate datasets when it finishes. More coverage can
+            reveal outliers, but does not guarantee them.
+          </p>
+          <Link
+            to="/pipeline"
+            className="inline-flex mt-3 px-3 py-1.5 rounded-full glass-btn-primary text-xs font-semibold"
+          >
+            Open Data Pipeline
+          </Link>
+        </div>
+      )}
 
       {/* 2x2 Grid of 4 crisp cards matching reference image */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

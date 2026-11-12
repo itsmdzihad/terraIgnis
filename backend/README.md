@@ -1959,6 +1959,17 @@ Queues the six README pipeline stages in order and returns a job ID. The
 status endpoint can be polled until the job succeeds or fails. On failure,
 the API restores the previous processed outputs where possible.
 
+### `POST /api/pipeline/reset`
+
+Accepts JSON `{"password":"..."}` and compares it on the backend with
+`DATA_RESET_PASSWORD`. It permanently deletes raw FIRMS files, published and
+staged datasets, reports, and ingestion history under `backend/data` (or the
+mounted Docker data volume). The endpoint returns HTTP 409 while a file upload,
+dataset generation, NRT poll, or historical backfill is active. Configure
+`DATA_RESET_PASSWORD=2244` in `backend/.env` for local development and change it
+to a private value for deployment. Recreate the backend container after
+changing the setting. The password is never part of the frontend bundle.
+
 The batch upload endpoint is used by the frontend's multi-file upload flow.
 The older `POST /api/pipeline/uploads` endpoint remains available for
 single-file uploads.
@@ -2061,11 +2072,12 @@ FIRMS_INGESTION_TOKEN=
 `FIRMS_GEOGRAPHIC_SCOPE` accepts `world` or `west,south,east,north`.
 NRT lookback and historical chunks must be between one and five days. The
 scheduler is disabled by default and can be stopped with
-`FIRMS_NRT_ENABLED=false`. In production, set `FIRMS_INGESTION_TOKEN` to
-protect resource-intensive controls; requests then require
-`Authorization: Bearer <token>`. Production rejects these controls if no
-token is configured. In development, calls remain local and unauthenticated
-unless a token is configured.
+`FIRMS_NRT_ENABLED=false`. Ingestion controls are unauthenticated by default,
+including in production, so public users can run NRT polls and historical
+backfills without a shared secret. Set `FIRMS_INGESTION_TOKEN` only if the
+deployment operator intentionally wants to require the `Authorization: Bearer <token>`
+header for NRT poll and historical start/resume/cancel requests. If unset,
+those requests do not require an authorization header.
 
 Persistent checkpoints, scheduler state, historical jobs, and the last
 successful dataset-generation timestamp live in `data/state/`, which is
@@ -2097,7 +2109,6 @@ Start a backfill after setting `FIRMS_HISTORICAL_ENABLED=true`:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/ingestion/historical/start \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_INGESTION_TOKEN' \
   -d '{"start_date":"2025-01-01","end_date":"2025-01-31","area":"world","sources":["MODIS_SP","VIIRS_SNPP_SP"]}'
 ```
 
@@ -2117,8 +2128,7 @@ Check progress and resume a failed job:
 
 ```bash
 curl 'http://127.0.0.1:8000/api/ingestion/historical/status?job_id=JOB_ID'
-curl -X POST http://127.0.0.1:8000/api/ingestion/historical/JOB_ID/resume \
-  -H 'Authorization: Bearer YOUR_INGESTION_TOKEN'
+curl -X POST http://127.0.0.1:8000/api/ingestion/historical/JOB_ID/resume
 ```
 
 Status includes completed, failed, and total chunks, progress percentage,
@@ -2307,8 +2317,8 @@ Example date:
 
 The collection provides requests for analytical API routes, manual pipeline
 upload and generation, and NASA FIRMS NRT and historical ingestion. Set
-`base_url` to the backend URL; configure `ingestion_token` when operator
-authorization is enabled.
+`base_url` to the backend URL. Ingestion requests work without authorization
+unless the deployment explicitly configures `FIRMS_INGESTION_TOKEN`.
 
 # Data Quality & Validation
 

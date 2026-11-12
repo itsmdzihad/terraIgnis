@@ -6,6 +6,7 @@ import csv
 import ctypes
 import errno
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -15,15 +16,18 @@ import subprocess
 import sys
 import threading
 import uuid
+from contextlib import ExitStack
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from app.services.fire_ingestion import MODIS_REQUIRED, VIIRS_REQUIRED
+from app.core.config import settings
 from app.services.processing_lock import analytical_processing_lock
 
 logger = logging.getLogger(__name__)
@@ -58,6 +62,10 @@ GENERATIONS_ROOT = DATA_ROOT / ".generations"
 LAST_GENERATION_PATH = DATA_ROOT / "state" / "last_dataset_generation.json"
 
 
+class DataResetRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
 def _load_last_generation() -> dict[str, str | None]:
     try:
         payload = json.loads(LAST_GENERATION_PATH.read_text(encoding="utf-8"))
@@ -85,6 +93,7 @@ def _save_last_generation(finished_at: str, job_id: str) -> None:
 
 _LOCK = threading.Lock()
 _ACTIVE_UPLOADS = 0
+_RESETTING = False
 _JOB: dict[str, object] = {
     "job_id": None,
     "status": "idle",
@@ -364,6 +373,8 @@ async def upload_raw_file(
         raise HTTPException(status_code=413, detail="Each raw file must be 512 MB or smaller.")
 
     with _LOCK:
+        if _RESETTING:
+            raise HTTPException(status_code=409, detail="A data reset is in progress.")
         if _is_pipeline_running():
             raise HTTPException(status_code=409, detail="Wait for the current pipeline run to finish before uploading.")
         _ACTIVE_UPLOADS += 1
@@ -413,6 +424,8 @@ async def upload_raw_files(request: Request) -> dict[str, object]:
     """Validate and save multiple FIRMS files in one request for one sensor."""
     global _ACTIVE_UPLOADS
     with _LOCK:
+        if _RESETTING:
+            raise HTTPException(status_code=409, detail="A data reset is in progress.")
         if _is_pipeline_running():
             raise HTTPException(status_code=409, detail="Wait for the current pipeline run to finish before uploading.")
         _ACTIVE_UPLOADS += 1
@@ -535,10 +548,93 @@ def pipeline_status() -> dict[str, object]:
     return snapshot
 
 
+@router.post("/reset")
+def reset_pipeline_data(request: DataResetRequest) -> dict[str, object]:
+    """Delete all downloaded and processed FIRMS data after server-side confirmation."""
+    configured_password = settings.data_reset_password
+    if not configured_password:
+        raise HTTPException(status_code=503, detail="Data reset is not configured. Set DATA_RESET_PASSWORD in backend/.env.")
+    if not hmac.compare_digest(request.password, configured_password):
+        raise HTTPException(status_code=401, detail="The confirmation password is incorrect.")
+
+    from app.services.firms_ingestion import _file_lock, firms_ingestion
+
+    global _RESETTING
+    removed_entries = 0
+    lock_paths = (
+        DATA_ROOT / "state" / "analytical_processing.lock",
+        firms_ingestion.nrt_lock_path,
+        firms_ingestion.history_lock_path,
+    )
+    with ExitStack() as lock_stack:
+        for lock_path in lock_paths:
+            acquired = lock_stack.enter_context(_file_lock(lock_path, blocking=False))
+            if not acquired:
+                raise HTTPException(status_code=409, detail="Wait for active FIRMS ingestion or dataset generation to finish before clearing data.")
+
+        with _LOCK:
+            if _RESETTING:
+                raise HTTPException(status_code=409, detail="A data reset is already in progress.")
+            if _is_pipeline_running() or _ACTIVE_UPLOADS:
+                raise HTTPException(status_code=409, detail="Wait for active uploads or dataset generation to finish before clearing data.")
+            _RESETTING = True
+
+        try:
+            ingestion_status = firms_ingestion.get_status()
+            historical = ingestion_status.get("historical", {})
+            active_job = historical.get("active_job") if isinstance(historical, dict) else None
+            nrt = ingestion_status.get("nrt", {})
+            if (isinstance(nrt, dict) and nrt.get("status") == "running") or (
+                isinstance(active_job, dict) and active_job.get("status") in {"queued", "running", "processing"}
+            ):
+                raise HTTPException(status_code=409, detail="Wait for active FIRMS ingestion to finish before clearing data.")
+
+            DATA_ROOT.mkdir(parents=True, exist_ok=True)
+            for entry in DATA_ROOT.iterdir():
+                if entry.name == "state" and entry.is_dir() and not entry.is_symlink():
+                    for state_entry in entry.iterdir():
+                        if state_entry.name.endswith(".lock"):
+                            continue
+                        if state_entry.is_symlink() or state_entry.is_file():
+                            state_entry.unlink(missing_ok=True)
+                        elif state_entry.is_dir():
+                            shutil.rmtree(state_entry)
+                        removed_entries += 1
+                    continue
+                if entry.is_symlink() or entry.is_file():
+                    entry.unlink(missing_ok=True)
+                elif entry.is_dir():
+                    shutil.rmtree(entry)
+                removed_entries += 1
+
+            DATA_ROOT.mkdir(parents=True, exist_ok=True)
+            (DATA_ROOT / "state").mkdir(parents=True, exist_ok=True)
+            with _LOCK:
+                _JOB.update({
+                    "job_id": None,
+                    "status": "idle",
+                    "stage": None,
+                    "message": "All FIRMS raw and processed data have been cleared.",
+                    "stages": [],
+                    "logs": [],
+                    "started_at": None,
+                    "finished_at": None,
+                    "last_successful_at": None,
+                    "last_successful_job_id": None,
+                })
+            firms_ingestion.reset_data_state()
+        finally:
+            with _LOCK:
+                _RESETTING = False
+    return {"status": "cleared", "removed_entries": removed_entries, "message": "All FIRMS raw files, generated datasets, reports, and ingestion history were cleared."}
+
+
 @router.post("/generate", status_code=status.HTTP_202_ACCEPTED)
 def generate_datasets() -> dict[str, object]:
     """Start the README pipeline commands in order as a single background job."""
     with _LOCK:
+        if _RESETTING:
+            raise HTTPException(status_code=409, detail="A data reset is in progress.")
         if _is_pipeline_running():
             raise HTTPException(status_code=409, detail="A data-generation job is already running.")
         if _ACTIVE_UPLOADS:

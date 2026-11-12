@@ -1959,6 +1959,18 @@ Queues the six README pipeline stages in order and returns a job ID. The
 status endpoint can be polled until the job succeeds or fails. On failure,
 the API restores the previous processed outputs where possible.
 
+### `POST /api/pipeline/reset`
+
+Requires `{"password":"..."}` matching the backend-only `DATA_RESET_PASSWORD`
+setting. The Data Pipeline page uses this endpoint after a confirmation modal.
+It permanently removes raw FIRMS files, generated datasets, reports, and
+ingestion history from the persistent data directory. It returns HTTP 409 while
+an upload, ingestion job, or dataset generation is active. Set
+`DATA_RESET_PASSWORD` in `backend/.env` (the local example value is `2244`); use
+a private value before deployment and recreate the backend container after
+changing it. The password is checked by the backend and is never included in
+the frontend bundle.
+
 ---
 
 # Frontend Dashboard
@@ -2153,8 +2165,8 @@ Example date:
 
 The collection provides requests for analytical API routes, manual pipeline
 upload and generation, and NASA FIRMS NRT and historical ingestion. Set
-`base_url` to the backend URL; configure `ingestion_token` when operator
-authorization is enabled.
+`base_url` to the backend URL. Ingestion requests work without authorization
+unless the deployment explicitly configures `FIRMS_INGESTION_TOKEN`.
 
 # Data Quality & Validation
 

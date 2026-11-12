@@ -293,9 +293,14 @@ export default function FireActivityTrendsChart({
     <div className="dataplay-card p-4 sm:p-5 flex-1 min-h-[215px] sm:min-h-[235px] flex flex-col justify-between">
       {/* Header Row matching reference: Title on left | • Metric + Timeframe v on right */}
       <div className="relative z-30 flex items-center justify-between gap-2 mb-3 shrink-0">
-        <span className="text-base font-semibold glass-heading tracking-tight">
-          Fire Activity Trends
-        </span>
+        <div>
+          <span className="text-base font-semibold glass-heading tracking-tight block">
+            Fire Activity Trends
+          </span>
+          <span className="text-[10px] glass-subtle">
+            Trend uses observed days in the selected date range · select a point to view that date on the map
+          </span>
+        </div>
 
         <div className="flex items-center gap-2 text-[13px]">
           {/* Metric Switcher */}

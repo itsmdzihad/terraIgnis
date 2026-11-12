@@ -58,11 +58,13 @@ class IngestionApiTests(unittest.TestCase):
         self.assertEqual(authorized.status_code, 202)
         self.assertNotIn("operator-test-token", authorized.text)
 
-    def test_production_requires_an_ingestion_token(self) -> None:
+    def test_production_allows_ingestion_when_optional_token_is_unset(self) -> None:
         production = Settings.from_env({"APP_ENV": "production", "FIRMS_INGESTION_TOKEN": ""})
-        with patch("app.api.ingestion.settings", production):
+        with patch("app.api.ingestion.settings", production), patch(
+            "app.api.ingestion.firms_ingestion.start_nrt_manual", return_value={"status": "queued"}
+        ):
             response = self.request("POST", "/api/ingestion/nrt/run")
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 202)
 
     def test_historical_request_rejects_reversed_date_range(self) -> None:
         response = self.request(

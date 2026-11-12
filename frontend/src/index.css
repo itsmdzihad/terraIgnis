@@ -425,6 +425,17 @@ select.glass-control option {
     0 16px 36px -10px rgba(2, 6, 18, 0.64);
 }
 
+.map-floating-panel-readable {
+  border: 1px solid rgba(148, 163, 184, 0.24) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+}
+
+.app-shell[data-theme="dark"] .map-floating-panel-readable {
+  background: rgba(15, 23, 42, 0.86) !important;
+}
+
 .glass-btn-primary {
   border: 0 !important;
   border-radius: 9999px !important;
