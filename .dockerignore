@@ -2,6 +2,7 @@
 .git/**
 .github
 .vscode
+.aws
 **/node_modules
 **/dist
 **/coverage
@@ -20,4 +21,17 @@ frontend/.env.*
 .env
 .env.*
 !**/.env.example
+.certbot
+certbot
+**/certbot
+letsencrypt
+**/letsencrypt
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.backup
+**/*.backup
 *.log

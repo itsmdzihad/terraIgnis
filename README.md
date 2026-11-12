@@ -2833,77 +2833,175 @@ with these endpoints.
 
 ---
 
-# Docker Deployment (AWS EC2)
+# Separate Docker Environments
 
-The project runs as two Docker services: an Nginx container serves the built
-React frontend and proxies `/api` and `/health` to a private FastAPI container.
-Only the frontend port is published. Raw FIRMS files, generated Parquet files,
-pipeline reports, and ingestion checkpoints are stored in a persistent Docker
-volume or mounted host directory; they are not copied into the backend image.
+Development and production use separate Compose and Nginx configuration files:
 
-## Configure
+```text
+compose.dev.yaml          Local HTTP development
+compose.prod.yaml         EC2 production with HTTPS
+frontend/nginx.dev.conf   HTTP and API proxy for local development
+frontend/nginx.prod.conf  Let's Encrypt HTTPS and ACME challenge for production
+```
 
-Create the backend environment file and add the secrets and ingestion settings
-needed for your deployment:
+Each Compose file mounts its Nginx configuration over the image's default site.
+The frontend image does not bake in an environment-specific Nginx file, so
+rebuilding the image cannot switch the configuration selected by Compose.
+Development and production also have distinct Compose project names. The
+development data volume retains the existing local Docker volume,
+`terraignis_terraignis_data`; production uses the EBS-backed host directory
+`/srv/terraignis/data`.
+
+## Secrets and environment files
+
+Create `backend/.env` from the example on each machine and configure only that
+environment's values:
 
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-At minimum, configure `OPENAI_API_KEY` if Ignish AI is enabled and
-`FIRMS_MAP_KEY` if automated NASA FIRMS ingestion is enabled. Keep
-`FIRMS_NRT_ENABLED=false` unless scheduled NRT polling is intended. Do not put
-secrets in the Docker image or commit `backend/.env`.
+The optional `backend/.env` is read at runtime by the backend in both Compose
+files. Keep development values on the development machine and production values
+on EC2; do not copy production secrets to a development machine. `.env` files,
+AWS credentials, TLS keys/certificates, local backups, and `backend/data` are
+excluded from Git or the Docker build context. Never pass secrets as build args.
 
-The Compose defaults use port `8080` and a `terraignis_data` Docker volume,
-which is convenient for local development. The volume persists
-across container rebuilds. If Docker has host-file sharing enabled, set
-`TERRAIGNIS_DATA_DIR=./backend/data` to use an existing local dataset. For EC2,
-choose a persistent disk path such as `/srv/terraignis/data` and place or sync
-the existing `backend/data` contents there before starting the services.
+## Development on Ubuntu
 
-## Build and run locally
-
-From the repository root:
+From the repository root, validate the Compose file and start the local HTTP
+stack:
 
 ```bash
-HTTP_PORT=8080 docker compose up --build -d
-docker compose ps
+docker compose -f compose.dev.yaml config --quiet
+docker compose -f compose.dev.yaml up -d --build
+docker compose -f compose.dev.yaml ps
 curl http://localhost:8080/health
 ```
 
-Open `http://localhost:8080`. The single health URL checks the frontend-to-
-backend proxy path as well as the FastAPI health endpoint. Follow logs with
-`docker compose logs -f`; stop the containers with `docker compose down`.
+Open `http://localhost:8080`. The frontend is a built static React app served by
+Nginx; rebuild after frontend code changes. To use another local port, set
+`HTTP_PORT`, for example `HTTP_PORT=8081 docker compose -f compose.dev.yaml up -d --build`.
+The development configuration has no TLS requirement, HTTPS redirect, or
+production certificate/data paths. Its backend is reachable only inside the
+Compose network on port 8000.
 
-## Deploy on an Ubuntu EC2 instance
-
-Install Docker Engine and the Docker Compose plugin, clone the repository, and
-configure `backend/.env` as above. Attach a persistent EBS volume for the data
-directory when possible, mount it at `/srv/terraignis/data`, and ensure it has
-enough capacity for raw FIRMS files, processed generations, and backups. Then
-run from the repository root:
+Rebuild after changes with:
 
 ```bash
-HTTP_PORT=80 TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose up --build -d
-docker compose ps
-curl http://localhost/health
+docker compose -f compose.dev.yaml up -d --build
 ```
 
-Allow inbound TCP 80 in the EC2 security group (and SSH only from trusted
-addresses). The backend port 8000 is internal to the Compose network and is not
-published to the internet. Configure HTTPS through an AWS load balancer or a
-TLS reverse proxy before exposing the site publicly.
+Inspect service health and logs, and validate the mounted development Nginx
+configuration with:
 
-Update by pulling the chosen Git revision and rebuilding with
-`docker compose up --build -d`. The data directory remains on the host across
-image rebuilds and container replacement. Back it up separately; `docker
-compose down -v` is not needed for routine updates.
+```bash
+docker compose -f compose.dev.yaml ps
+docker compose -f compose.dev.yaml logs -f
+docker compose -f compose.dev.yaml exec frontend nginx -t
+```
 
-The Docker build context excludes `.env` files and `backend/data`, so image
-builds do not include credentials or large local datasets. Build images on the
-EC2 instance to match its CPU architecture, or use Docker Buildx with the
-appropriate `--platform` when building elsewhere.
+Stop only the development stack with:
+
+```bash
+docker compose -f compose.dev.yaml down
+```
+
+## Production on AWS EC2
+
+Attach and mount the existing EBS data filesystem at `/srv/terraignis/data`.
+Confirm it is mounted and contains the existing application data before
+starting the production stack. The production Compose file uses that exact path
+by default and refuses to create a missing host path. Configure the EC2-local
+`backend/.env` with production values. Keep the current Let's Encrypt
+certificates at the configured paths; this setup does not issue or renew
+certificates.
+
+From the repository root, validate and start production with the explicit data
+path:
+
+```bash
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml config --quiet
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml up -d --build
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml ps
+curl -fsS https://terraignis.mdzihad.xyz/health
+```
+
+Production publishes ports 80 and 443 on the frontend, redirects ordinary HTTP
+requests to HTTPS, and serves Let's Encrypt ACME challenges from the mounted
+webroot. The backend port 8000 remains internal and is not published. The
+backend and frontend restart unless stopped; the backend health check gates
+frontend startup. The frontend health check runs `nginx -t` against the mounted
+production config; the HTTPS `/health` request above checks the proxy path to
+the backend. Production Nginx uses the existing certificate files under
+`/etc/letsencrypt/live/terraignis.mdzihad.xyz/`.
+
+Rebuild/update production with:
+
+```bash
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml up -d --build
+```
+
+Inspect health/logs and validate the Nginx config loaded in the running frontend:
+
+```bash
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml ps
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml logs -f
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml exec frontend nginx -t
+```
+
+When intentionally stopping production, use only:
+
+```bash
+TERRAIGNIS_DATA_DIR=/srv/terraignis/data docker compose -f compose.prod.yaml down
+```
+
+Do not use `down -v` for routine updates. The dataset is stored on the EBS host
+path, and that path must remain mounted for every production start.
+
+## Migrating the existing EC2 setup
+
+The tracked legacy `compose.yaml` and `frontend/nginx.conf` are removed; the
+production stack no longer depends on server-specific edits to those files.
+Before pulling the commit that removes them:
+
+1. Confirm `/srv/terraignis/data` is the mounted EBS filesystem and preserve its
+   contents. Keep the existing `compose.yaml.backup` and
+   `frontend/nginx.conf.backup` files; do not overwrite or delete them.
+2. Make additional timestamped copies of the currently modified
+   `compose.yaml` and `frontend/nginx.conf` outside the repository, if needed.
+3. While the existing production Compose file is still available, archive its
+   tracked modifications without discarding them:
+
+   ```bash
+   git stash push -m "archive EC2 Docker config before environment split" -- compose.yaml frontend/nginx.conf
+   ```
+
+   Keep this stash for reference; do not pop it after the migration because it
+   contains the old production edits to files that are being removed.
+4. Pull the commit containing `compose.prod.yaml` and
+   `frontend/nginx.prod.conf`. Verify the production files and EBS mount, then
+   run the production `config --quiet` and `up -d --build` commands above.
+   The production Compose project name remains `terraignis`, and the data bind
+   mount remains `/srv/terraignis/data`, so Compose recreates the existing
+   project against the same persistent data instead of selecting the local
+   development volume.
+5. Check `ps`, the HTTPS health URL, and `nginx -t` as shown above. The old
+   `.backup` files and the Git stash remain available until you decide they are
+   no longer needed.
+
+After migration, future EC2 deployments can pull updates without maintaining
+production overrides in the development files. Locally, always specify
+`compose.dev.yaml`; on EC2, always specify `compose.prod.yaml`. Avoid bare
+`docker compose up/down` commands and never use `down -v` for routine work, so a
+local development command cannot target the production Compose project.
+
+## Build context and architecture
+
+The Docker build context excludes `.env` files, `.aws`, TLS material, local
+backups, `backend/data`, and generated frontend files. Build on the EC2 instance
+to match its CPU architecture, or use Docker Buildx with the appropriate
+`--platform` when building elsewhere.
 
 # License
 

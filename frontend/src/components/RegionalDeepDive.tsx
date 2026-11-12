@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { cellToLatLng } from 'h3-js';
 import { ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useCellAnomalyHistory } from '../hooks/useCellAnomalyHistory';
 import { useDashboard } from '../context/DashboardContext';
 import { useFires } from '../hooks/useFires';
@@ -10,6 +11,7 @@ import { useCountryFires } from '../hooks/useCountryFires';
 import type { FireRecord } from '../types/fire';
 import AnomalyHistoryChart from './AnomalyHistoryChart';
 import TerraIgnisMap from './TerraIgnisMap';
+import DatasetSetupNotice, { isDatasetUnavailableError } from './DatasetSetupNotice';
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
@@ -66,6 +68,7 @@ export default function RegionalDeepDive() {
   const { countries, error: countriesError } = useCountries();
   const fireLoading = selectedCountry ? countryFires.loading : fires.loading;
   const fireError = selectedCountry ? countryFires.error : fires.error;
+  const datasetUnavailable = isDatasetUnavailableError(fireError);
   const fireRecords = selectedCountry ? countryFires.records : fires.data?.data ?? [];
   const region = useRegion(selectedH3Cell);
   const history = useCellAnomalyHistory(selectedH3Cell);
@@ -120,7 +123,9 @@ export default function RegionalDeepDive() {
     return { latitude, longitude, zoom };
   }, [mapRecords, selectedH3Cell]);
 
-  const regionContent = !selectedH3Cell ? (
+  const regionContent = datasetUnavailable ? (
+    <DatasetSetupNotice />
+  ) : !selectedH3Cell ? (
     <PanelState title="No cell selected" message="Select a cell on the map or from the dropdown to inspect its fire history." />
   ) : region.loading ? (
     <PanelState title="Loading" message="Loading cell analysis..." />
@@ -264,6 +269,10 @@ export default function RegionalDeepDive() {
                 <div className="mt-1 min-h-4 text-[10px] leading-4">
                   {fireLoading ? (
                     <span className="font-medium tone-amber">Loading fire cells...</span>
+                  ) : datasetUnavailable ? (
+                    <Link to="/pipeline" className="font-semibold tone-sky underline underline-offset-2">
+                      No dataset yet · Open Data Pipeline
+                    </Link>
                   ) : fireError ? (
                     <span className="tone-rose">
                       Cell list unavailable ·{' '}
@@ -297,7 +306,11 @@ export default function RegionalDeepDive() {
             />
           </div>
           <p className="text-[10px] glass-muted shrink-0">
-            {fireError ? 'Fire observations unavailable.' : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.
+            {datasetUnavailable
+              ? 'No generated fire dataset is available. Use the Data Pipeline to ingest data and generate datasets.'
+              : fireError
+              ? 'Fire observations unavailable.'
+              : 'Click a displayed H3 cell to inspect it.'} Highlighted cell uses cyan.
           </p>
         </section>
 

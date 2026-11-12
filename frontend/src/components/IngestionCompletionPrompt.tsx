@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Database, LoaderCircle, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchIngestionStatus,
   fetchPipelineStatus,
@@ -83,6 +84,8 @@ function buildPrompt(status: IngestionStatus): PromptState | null {
 }
 
 export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 'dark' }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -158,17 +161,37 @@ export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 
     setActionError(null);
   };
 
+  const navigateToGenerationProgress = () => {
+    navigate('/pipeline#dataset-generation-process');
+    if (location.pathname === '/pipeline') {
+      window.dispatchEvent(new Event('terraignis:scroll-to-generation-process'));
+    }
+  };
+
   const generate = async () => {
     if (!prompt) return;
     setActionError(null);
     try {
       const result = await startPipeline();
-      setPrompt({ ...prompt, kind: 'generating', title: 'Generating dashboard datasets', message: 'Rebuilding processed datasets from all available raw FIRMS files.', jobId: result.job_id });
+      const progressPrompt = { ...prompt, kind: 'generating' as const, title: 'Generating dashboard datasets', message: 'Rebuilding processed datasets from all available raw FIRMS files.', jobId: result.job_id };
+      if (location.pathname === '/pipeline') {
+        setDismissedKey(prompt.key);
+        setPrompt(null);
+        navigateToGenerationProgress();
+      } else {
+        setPrompt(progressPrompt);
+      }
     } catch (error) {
       try {
         const status = await fetchPipelineStatus();
         if (status.job_id && (status.status === 'queued' || status.status === 'running')) {
-          setPrompt({ ...prompt, kind: 'generating', title: 'Dataset generation in progress', message: 'A dataset generation job is already running.', jobId: status.job_id });
+          if (location.pathname === '/pipeline') {
+            setDismissedKey(prompt.key);
+            setPrompt(null);
+            navigateToGenerationProgress();
+          } else {
+            setPrompt({ ...prompt, kind: 'generating', title: 'Dataset generation in progress', message: 'A dataset generation job is already running.', jobId: status.job_id });
+          }
           return;
         }
       } catch {
@@ -176,6 +199,13 @@ export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 
       }
       setActionError(error instanceof Error ? error.message : 'Could not start dataset generation.');
     }
+  };
+
+  const viewGenerationProgress = () => {
+    if (!prompt) return;
+    setDismissedKey(prompt.key);
+    setPrompt(null);
+    navigateToGenerationProgress();
   };
 
   if (!prompt) return null;
@@ -225,6 +255,9 @@ export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 
             {prompt.kind === 'failed' && <p className="mt-2 text-xs tone-rose">{actionError}</p>}
             {actionError && prompt.kind !== 'failed' && <p role="alert" className="mt-3 text-xs tone-rose">{actionError}</p>}
             {prompt.kind === 'generating' && <p className="mt-3 text-xs glass-muted">This may take several minutes. You can continue using the dashboard while it runs.</p>}
+            {prompt.kind === 'generating' && location.pathname !== '/pipeline' && (
+              <p className="mt-3 text-xs glass-muted">Open Data Pipeline to follow each generation stage.</p>
+            )}
           </div>
           {(prompt.kind === 'new-data' || prompt.kind === 'no-update' || isFloatingState) && (
             <button type="button" onClick={dismiss} aria-label={isFloatingState ? 'Hide generation status' : 'Close notification'} className="glass-icon-btn rounded-full p-1.5">
@@ -247,6 +280,11 @@ export default function IngestionCompletionPrompt({ theme }: { theme: 'light' | 
           {(prompt.kind === 'no-update' || prompt.kind === 'generated') && (
             <button type="button" onClick={dismiss} className="glass-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
               {prompt.kind === 'generated' ? 'Done' : 'Got it'}
+            </button>
+          )}
+          {prompt.kind === 'generating' && location.pathname !== '/pipeline' && (
+            <button type="button" onClick={viewGenerationProgress} className="glass-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
+              View generation progress
             </button>
           )}
         </div>

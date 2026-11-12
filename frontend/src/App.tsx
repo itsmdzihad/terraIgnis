@@ -72,7 +72,7 @@ function DashboardView({
   const direction = previousIndex === -1 || activeIndex >= previousIndex ? 1 : -1;
 
   return (
-    <div className="app-shell flex flex-col h-screen overflow-hidden" data-theme={theme}>
+    <div className="app-shell flex h-dvh flex-col overflow-hidden" data-theme={theme}>
       {/* Top Navbar Contract */}
       <Navbar theme={theme} onThemeToggle={onThemeToggle} />
 
