@@ -83,7 +83,7 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]):not(.hiw-card):not(.hiw-dock-
   --glass-control-hover: rgba(15, 23, 42, 0.085);
   --glass-divider: rgba(15, 23, 42, 0.08);
 
-  --nav-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.54) 0%, rgba(244, 247, 255, 0.38) 100%);
+  --nav-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 247, 255, 0.90) 100%);
   --nav-shell-highlight: rgba(255, 255, 255, 0.78);
   --nav-brand-ink: #0b1220;
   --nav-brand-accent: #2563eb;
@@ -163,7 +163,7 @@ button:not(.cal-day-tile):not([class*="mapboxgl"]):not(.hiw-card):not(.hiw-dock-
   --glass-control-hover: rgba(255, 255, 255, 0.16);
   --glass-divider: rgba(255, 255, 255, 0.10);
 
-  --nav-shell-bg: linear-gradient(180deg, rgba(23, 32, 51, 0.48) 0%, rgba(17, 24, 39, 0.34) 100%);
+  --nav-shell-bg: linear-gradient(180deg, rgba(23, 32, 51, 0.96) 0%, rgba(17, 24, 39, 0.93) 100%);
   --nav-shell-highlight: rgba(255, 255, 255, 0.16);
   --nav-brand-ink: #f8fafc;
   --nav-brand-accent: #60a5fa;
@@ -406,6 +406,44 @@ select.glass-control option {
   background: #4338ca !important;
 }
 
+.map-refresh-data-btn,
+.filter-close-btn,
+.map-apply-filters-btn {
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 5px 16px -5px rgba(37, 99, 235, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.map-refresh-data-btn:hover,
+.filter-close-btn:hover,
+.map-apply-filters-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #4338ca) !important;
+  box-shadow: 0 7px 20px -5px rgba(37, 99, 235, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+.map-refresh-data-btn:focus-visible,
+.filter-close-btn:focus-visible,
+.map-apply-filters-btn:focus-visible {
+  outline: 2px solid #93c5fd !important;
+  outline-offset: 2px;
+}
+
+.app-shell[data-theme="dark"] .map-refresh-data-btn,
+.app-shell[data-theme="dark"] .filter-close-btn,
+.app-shell[data-theme="dark"] .map-apply-filters-btn {
+  background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+  box-shadow: 0 6px 20px -5px rgba(59, 130, 246, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+}
+
+.app-shell[data-theme="dark"] .map-refresh-data-btn:hover,
+.app-shell[data-theme="dark"] .filter-close-btn:hover,
+.app-shell[data-theme="dark"] .map-apply-filters-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
+}
+
 .map-floating-panel {
   border: 0 !important;
   background: rgba(255, 255, 255, 0.58) !important;
@@ -429,13 +467,35 @@ select.glass-control option {
 
 .map-floating-panel-readable {
   border: 1px solid rgba(148, 163, 184, 0.24) !important;
-  background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(26px) saturate(160%);
-  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  background: rgba(248, 250, 252, 0.97) !important;
+  backdrop-filter: blur(30px) saturate(140%);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
+}
+
+.map-floating-panel-readable .glass-control {
+  background: rgba(226, 232, 240, 0.96) !important;
 }
 
 .app-shell[data-theme="dark"] .map-floating-panel-readable {
-  background: rgba(15, 23, 42, 0.86) !important;
+  background: rgba(10, 16, 30, 0.97) !important;
+}
+
+.app-shell[data-theme="dark"] .map-floating-panel-readable .glass-control {
+  background: rgba(38, 50, 70, 0.98) !important;
+}
+
+.selected-date-previous-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 11px !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
 }
 
 .glass-btn-primary {

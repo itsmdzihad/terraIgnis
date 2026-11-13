@@ -245,7 +245,10 @@ fire_profile.json
 build_h3_grid.py
    ↓
 h3_fire_daily.parquet
-   ↓
+   ├─→ build_landcover.py (separate Earth Engine enrichment)
+   │      ↓
+   │   h3_landcover.parquet ───────────┐
+   ↓                                   │
 build_harmonized_fire.py
    ↓
 harmonized_fire.parquet
@@ -258,7 +261,7 @@ build_anomalies.py
    ↓
 anomalies.parquet
    ↓
-FastAPI
+FastAPI ◀─────────────────────────────┘
    ↓
 React/Vite
 ```
@@ -1279,6 +1282,95 @@ Output:
 data/processed/anomalies.parquet
 ```
 
+## Optional Land-Cover Enrichment
+
+Land cover is a separate annual enrichment step. It reads unique resolution-7
+cells from `h3_fire_daily.parquet`, queries the latest available MODIS MCD12Q1
+v6.1 `LC_Type1` image through Google Earth Engine, and writes a separate
+`h3_landcover.parquet` lookup. Fire and Burn Index datasets are not modified.
+The Data Pipeline page can start and monitor this enrichment after the six
+core dashboard datasets have been generated.
+
+The first run requires an Earth Engine-enabled Google Cloud project. Install
+the backend dependencies, authenticate locally once, and provide the project
+ID for the request:
+
+```bash
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/build_landcover.py --authenticate --project YOUR_EE_CLOUD_PROJECT
+```
+
+Later runs can use the saved Earth Engine credentials without `--authenticate`:
+
+```bash
+EE_PROJECT_ID=YOUR_EE_CLOUD_PROJECT .venv/bin/python scripts/build_landcover.py
+```
+
+For a non-interactive host or container, set `EE_SERVICE_ACCOUNT`,
+`GOOGLE_APPLICATION_CREDENTIALS` (path to its key file inside the backend
+runtime), and `EE_PROJECT_ID`. Grant the service account Earth Engine access
+and mount its key file read-only into the backend. Never store the key in the
+frontend or in the data directory, which the Clear all data action removes.
+No Earth Engine API key is required: requests use OAuth user credentials or a
+service account associated with an Earth Engine-enabled Cloud project.
+
+The default request batch is 200 H3 polygons; use `--batch-size` to tune it.
+The Data Pipeline page reports cell and batch progress while each request is
+running. The worker stores completed batches in
+`data/processed/.landcover_checkpoints/`; if it stops because of a transient
+Earth Engine/network error or a container interruption, start the job again to
+resume those cells. A failed run leaves the previously published
+`h3_landcover.parquet` untouched. The final lookup is validated and atomically
+published only when every input cell has a result. Retries are bounded and use
+exponential backoff; permanent permission and configuration errors fail
+immediately so the operator can fix IAM/configuration before retrying.
+
+Batch and request behavior can be tuned through backend environment variables:
+
+```dotenv
+LANDCOVER_BATCH_SIZE=200
+LANDCOVER_REQUEST_TIMEOUT_SECONDS=120
+LANDCOVER_MAX_RETRIES=3
+LANDCOVER_RETRY_BACKOFF_SECONDS=2
+```
+
+For a local interactive OAuth login, run the script once with
+`--authenticate --project YOUR_EE_CLOUD_PROJECT`. Container deployments should
+prefer a service account with Earth Engine access and Service Usage Consumer
+on the configured project. The API status endpoint persists progress and
+checkpoint counts across backend restarts; the Data Pipeline page polls it
+while the job is queued or running.
+
+The output has `h3_cell`, `landcover_class`, and `landcover_year` columns.
+Class 12 is `Croplands`; class 13 is `Urban/Built-up`; other IGBP classes are
+named by their standard MCD12Q1 labels. Cells with no valid classified pixels
+are labeled `Unclassified`.
+
+MCD12Q1 is an annual 500 m product. The current Earth Engine catalog provides
+years 2001–2024, so the classification year can lag current FIRMS detections.
+This is a dominant land-cover label for the whole H3 cell, not a land-cover
+class measured at the fire pixel or fire date.
+
+H3 boundaries crossing ±180° are split into normalized polygon pieces before
+Earth Engine reduction; this avoids world-spanning extents while preserving
+the H3 footprint. Non-crossing cells retain their original geometry. The
+`LC_Type1` mode reducer, 500 m scale, resolution 7, and 1,000-pixel
+per-region guard are unchanged. Checkpoints remain compatible because their
+key continues to use the same sorted H3-cell fingerprint and dataset year.
+
+For development Docker, wait for any already-running land-cover worker to
+finish before rebuilding the backend image, then resume the checkpointed job:
+
+```bash
+docker compose -f compose.dev.yaml build backend
+docker compose -f compose.dev.yaml up -d backend
+docker compose -f compose.dev.yaml exec -T backend python scripts/build_landcover.py
+```
+
+The worker reuses matching checkpoint rows and requests only unclassified
+cells. Monitor it from the Data Pipeline page or `GET
+/api/pipeline/landcover/status`.
+
 ---
 
 # Running the Complete Pipeline
@@ -1299,7 +1391,9 @@ Once all scripts are available, the complete analytical workflow is:
 .venv/bin/python scripts/build_anomalies.py
 ```
 
-Each stage consumes the output of the previous stage.
+The core stages consume the output of the previous stage. Run the optional
+land-cover enrichment separately after H3 aggregation; it reads
+`h3_fire_daily.parquet` and can run independently of anomaly generation.
 
 ---
 
@@ -1849,6 +1943,7 @@ coverage
 sensors
 burn_index
 anomalies
+landcover
 ```
 
 Example:
@@ -1876,6 +1971,23 @@ Current statistics include:
 - Burn Index median
 - Burn Index P95
 - anomaly-level counts
+
+When `h3_landcover.parquet` has been generated, statistics also include
+`landcover`: its classification year, total/classified/unclassified detection
+counts, and a per-class breakdown of H3 cells, cell-date records, and FIRMS
+fire detections. If that lookup is absent, `landcover.available` is `false`.
+
+`GET /api/fires` accepts the optional `landcover` query parameter and returns
+`landcover_class` for each record. Example:
+
+```text
+GET /api/fires?landcover=Croplands
+GET /api/fires?landcover=Urban%2FBuilt-up
+```
+
+The endpoint joins the classification lookup to the anomaly records on
+`h3_cell` with a read-only DuckDB `LEFT JOIN`; all other existing fire filters
+continue to apply.
 
 ---
 
@@ -1959,6 +2071,26 @@ Queues the six README pipeline stages in order and returns a job ID. The
 status endpoint can be polled until the job succeeds or fails. On failure,
 the API restores the previous processed outputs where possible.
 
+### `GET /api/pipeline/landcover/status`
+
+Returns whether Earth Engine credentials are configured on the backend, the
+H3-cell coverage of the current land-cover lookup, the MCD12Q1 year, and the
+optional enrichment job status and logs. While generation is active it also
+returns total/classified cells, completed/total batches, current batch,
+percentage, latest progress time, and checkpoint coverage. Job state and
+progress are persisted under `data/state/landcover_job.json`; checkpoint rows
+are stored in `data/processed/.landcover_checkpoints/`. Credential paths and
+secrets are not returned.
+
+### `POST /api/pipeline/landcover/generate`
+
+Queues the separate MODIS MCD12Q1 classification job. It requires an existing
+`h3_fire_daily.parquet` and backend Earth Engine credentials. The lookup is
+written atomically after the full lookup validates and is preserved when the
+six core datasets are regenerated; the Data Pipeline page reports when new H3
+cells still need classification. Each successful batch is checkpointed so a
+retry resumes completed cells without discarding an existing published lookup.
+
 ### `POST /api/pipeline/reset`
 
 Accepts JSON `{"password":"..."}` and compares it on the backend with
@@ -1997,7 +2129,10 @@ lets users select 1,000, 2,500, 5,000, 10,000, 25,000, or 50,000 records per
 page.
 
 The Data Pipeline page supports same-sensor multi-file uploads, full dataset
-generation, NRT polling, and historical backfill start/resume/cancel controls.
+generation, optional MODIS MCD12Q1 land-cover classification, NRT polling, and
+historical backfill start/resume/cancel controls. Land-cover setup and job
+progress are shown there, and a completed classification refreshes dashboard
+data automatically.
 Cancelling a historical job stops work at a chunk boundary and preserves
 downloaded raw files and completed chunks for later resumption.
 

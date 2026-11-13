@@ -1,4 +1,6 @@
-# TerraIgnis 🔥🌍
+# NASA Space Apps Challenge 2026
+
+## TerraIgnis 🔥🌍
 
 > A satellite-powered wildfire monitoring and fire-activity analysis
 > platform that harmonizes NASA FIRMS MODIS and VIIRS active-fire
@@ -9,6 +11,9 @@
 ## Table of Contents
 
 - [About TerraIgnis](#about-terraignis)
+- [Our Team](#our-team)
+- [Demo Images](#demo-images)
+- [AI Uses](#ai-uses)
 - [Problem](#problem)
 - [Solution](#solution)
 - [Key Features](#key-features)
@@ -81,8 +86,47 @@ Anomaly Detection
 FastAPI
     ↓
 React/Vite Frontend
+````
 
 The goal is to provide a consistent spatial and temporal representation of fire activity that can be visualized and explored through an interactive application.
+
+---
+
+# Our Team
+
+## Team AstroFilos
+
+Team AstroFilos brings research, engineering, and interactive design together
+to build TerraIgnis for the NASA Space Apps Challenge 2026.
+
+![Team AstroFilos](Resource/group-photo-team-astrofilos.png)
+
+- **Md Kawsar Ahmed Zihad** — Team Lead
+- **Sheikh Mahfuz** — Designer
+- **Md. Shahriar Tahmid** — Developer
+- **Sabiha Imroj Mim** — Presenter / Storyteller
+- **Md. Musfiqur Rahman Hridoy** — Researcher
+- **Tuffajjol Islam Tuhin** — Video Editor
+
+![TerraIgnis logo](Resource/logo.png)
+
+---
+
+# Demo Images
+
+## TerraIgnis application overview
+
+![TerraIgnis application screens](Resource/all-screen.jpeg)
+
+---
+
+# AI Uses
+
+Gemini Deep Research supported research; ChatGPT helped with video scripts;
+ElevenLabs generated narration; Gemini's image-generation feature helped with
+visual assets; and Codex and ChatGPT assisted with planning and coding. AI was
+a helping hand throughout the process: the team guided the work, checked the
+results, and made the final decisions. Read the [full AI use explanation](AI%20Uses.md).
 
 ---
 
@@ -694,26 +738,26 @@ data/processed/anomalies.parquet
 
 ---
 
-## Why a Daily Baseline?
+## Data Coverage and Anomaly Baseline
 
-The current dataset covers only approximately two months.
+TerraIgnis does not depend on a fixed, preloaded daily baseline dataset.
+Fire observations are collected through NASA FIRMS Near Real-Time (NRT)
+polling, which can run automatically when enabled, and historical Standard
+Processing data can be backfilled for a selected date range from the Data
+Pipeline page. After ingestion, generate the dashboard datasets to include
+the newly collected files in the published analysis.
 
-Additionally:
+This lets an installation build its own coverage: NRT polling keeps recent
+observations up to date, while historical backfill can fill earlier dates.
+The available date range therefore depends on which NRT and backfill jobs
+have completed successfully; it is not guaranteed to include every date or
+every fire observation.
 
-```text
-Median observations per H3 cell: 1
-```
-
-and:
-
-```text
-6,458 H3 cells appear on only one date
-```
-
-Therefore, a reliable per-H3 historical baseline cannot currently be
-constructed.
-
-The anomaly system therefore uses a daily robust baseline.
+Anomaly scores are calculated from the observed H3 cell/date records for
+each date using a robust daily statistic. This is an analytical reference
+computed from the ingested observations, not a separate baseline file that
+users must obtain before starting the pipeline. A long-term, per-cell or
+seasonal climatological baseline is not currently produced.
 
 ---
 
@@ -1280,6 +1324,53 @@ Output:
 data/processed/anomalies.parquet
 ```
 
+## Optional Land-Cover Enrichment
+
+From the Data Pipeline page, generate a separate H3 land-cover lookup after
+the six core datasets are available. The backend reads unique cells from
+`h3_fire_daily.parquet`, batches Google Earth Engine mode reductions over the
+latest MODIS MCD12Q1 `LC_Type1` image, and writes `h3_landcover.parquet` without
+changing fire or Burn Index files. Class 12 is `Croplands`; class 13 is
+`Urban/Built-up`.
+
+Earth Engine does not require an API key. It requires an Earth Engine-enabled
+Google Cloud project and backend OAuth credentials or service-account
+credentials. Configure `EE_PROJECT_ID` and credentials in `backend/.env`; for a
+container, mount any service-account key read-only inside the backend. Never
+put credentials in frontend variables. The Data Pipeline page shows readiness,
+job progress, classification year, and whether new H3 cells need refreshing.
+
+MCD12Q1 is an annual 500 m product, so its latest classification can lag the
+current fire detections. The dominant class applies to the whole H3 cell, not
+to an individual fire pixel.
+
+H3 boundaries crossing ±180° are split into normalized polygon pieces before
+Earth Engine reduction, preventing an individual cell from becoming a
+world-spanning region. Ordinary cells keep their original coordinates. The
+500 m mode reduction and per-region pixel guard are unchanged. Checkpoints
+remain keyed by the same H3 input fingerprint and MCD12Q1 year, so existing
+classifications remain reusable.
+
+The job page shows classified cells and batch progress as requests complete.
+Successful batches are checkpointed under
+`backend/data/processed/.landcover_checkpoints/`, so retrying after a temporary
+Earth Engine/network failure or backend interruption resumes completed work.
+The existing published lookup remains available until the new lookup passes
+validation and is atomically replaced. Backend operators can tune
+`LANDCOVER_BATCH_SIZE` (1–1,000 H3 cells per request; default 200),
+`LANDCOVER_REQUEST_TIMEOUT_SECONDS` (120), `LANDCOVER_MAX_RETRIES` (3), and
+`LANDCOVER_RETRY_BACKOFF_SECONDS` (2) in `backend/.env`.
+The batch size is captured when a classification job starts, so environment
+changes apply to the next job; the Data Pipeline page shows the current or
+last job's batch size.
+
+The Fire Overview **Dataset Snapshot** also includes a beta summary of
+Croplands and Urban/Built-up detections across the entire processed dataset.
+It reports classified detection coverage; if the lookup does not cover the
+current fire data, it explains that the class totals are incomplete and links
+to Data Pipeline to refresh the lookup. A zero class count with complete
+coverage means no detections were assigned to that class.
+
 ---
 
 # Running the Complete Pipeline
@@ -1714,6 +1805,7 @@ h3_cell
 min_burn_index
 max_burn_index
 sensor
+landcover
 limit
 offset
 ```
@@ -1738,6 +1830,14 @@ BOTH
 
 `BOTH` represents H3 cell/date observations where both MODIS and VIIRS
 are present.
+
+When `h3_landcover.parquet` exists, each record includes `landcover_class` and
+the optional `landcover` parameter filters by IGBP class. For example:
+
+```text
+GET /api/fires?landcover=Croplands
+GET /api/fires?landcover=Urban%2FBuilt-up
+```
 
 ---
 
@@ -1850,6 +1950,7 @@ coverage
 sensors
 burn_index
 anomalies
+landcover
 ```
 
 Example:
@@ -1877,6 +1978,11 @@ Current statistics include:
 - Burn Index median
 - Burn Index P95
 - anomaly-level counts
+
+The `landcover` summary reports whether the lookup is available, its MCD12Q1
+classification year, and detection counts by IGBP class. These counts describe
+the full processed dataset; combine the country and land-cover filters on Fire
+Overview to inspect a selected country's records by class.
 
 ---
 
@@ -1959,6 +2065,20 @@ Queues the six README pipeline stages in order and returns a job ID. The
 status endpoint can be polled until the job succeeds or fails. On failure,
 the API restores the previous processed outputs where possible.
 
+### `GET /api/pipeline/landcover/status`
+
+Returns backend Earth Engine readiness, lookup coverage, classification year,
+and current job status/logs without returning credential paths or secrets.
+While a job runs, it also returns classified/total H3 cells, completed/total
+batches, current batch, percentage, and the most recent progress timestamp.
+Progress is persisted in `backend/data/state/landcover_job.json`; restart the
+job from the Data Pipeline page after an interruption to resume checkpoints.
+
+### `POST /api/pipeline/landcover/generate`
+
+Queues the optional MCD12Q1 enrichment. It requires an existing H3 fire dataset
+and configured backend Earth Engine credentials.
+
 ### `POST /api/pipeline/reset`
 
 Requires `{"password":"..."}` matching the backend-only `DATA_RESET_PASSWORD`
@@ -1980,6 +2100,7 @@ The React/Vite app in `frontend/` provides these routes:
 - `/` — Fire Overview map, statistics, filters, and Ignish chat
 - `/cells` — Cell Explorer
 - `/activity` — Daily Activity calendar and yearly analysis
+- `/landcover` — **Fire & Land Cover** beta comparison of two IGBP classes within a country
 - `/pipeline` — raw FIRMS upload, dataset generation, NRT status, and historical backfill controls
 
 Daily Activity year choices come from the processed dataset's first and last
@@ -1991,14 +2112,26 @@ Fire Overview and Cell Explorer include a country selector that filters
 observations against country boundaries. Ignish can answer country-specific
 questions from the processed dashboard data.
 
+**Fire & Land Cover** compares fire detections in a selected country across
+two MODIS MCD12Q1 IGBP classes. Choose a country, two classes, and optionally a
+date range, then run the comparison to see detection totals, active H3 cells,
+cell-date records, mean Burn Index, anomaly-record counts, monthly activity,
+and generated findings. The comparison uses the existing fire API's land-cover
+filter and matches H3 cell centers against the bundled country boundaries.
+Land cover is the dominant class assigned to an H3 cell; it does not establish
+the cause of a fire. For example, detections in Croplands do not by themselves
+prove agricultural burning. This route and the Snapshot's land-cover summary
+are marked beta.
+
 The map paginates fire records and provides previous/next controls with the
 current page and remaining-record count. **Filters → Records per map page**
 lets users choose 1,000–50,000 records per page; the map defaults to 5,000.
 The API enforces a maximum page size of 50,000.
 
 The Data Pipeline route uploads a batch of same-sensor MODIS or VIIRS files,
-then starts the six-stage generation workflow. Its automated ingestion panel
-can run NRT polls and start, resume, or cancel historical SP backfills. New
+then starts the six-stage generation workflow or optional land-cover
+classification. Its automated ingestion panel can run NRT polls and start,
+resume, or cancel historical SP backfills. New
 files downloaded by NRT or historical jobs trigger a dashboard-wide prompt to
 generate datasets; canceled and partially completed historical jobs retain
 downloaded files and offer to process them or resume. The page also shows the
@@ -2006,6 +2139,16 @@ last successful generation time and can refresh the file inventory and job
 status. Starting generation from the prompt uses the same pipeline endpoint as
 the page's Generate datasets button; a small progress card stays visible while
 the rest of the dashboard remains usable.
+
+If a generation stage exits with code `-9`, the process received signal 9 and
+was force-stopped. Memory pressure is a common cause while the ingest stage
+loads a large raw-file collection, but the exit code alone does not prove an
+out-of-memory kill. Check the Docker/runtime memory limit and system logs; on
+Docker Desktop, review **Settings → Resources → Memory**. The pipeline keeps
+the previous published generation active and discards the incomplete staged
+generation on failure; raw FIRMS files remain available. After making more
+memory available, run **Generate datasets** again without re-downloading the
+files. Repeated failures may require a more memory-efficient ingest strategy.
 
 ---
 
@@ -2467,20 +2610,14 @@ The API should not mutate the analytical datasets.
 
 ---
 
-# Important Limitations
+# Current Analytical Limitations
 
-## Limited Temporal Coverage
-
-The current dataset covers:
-
-```text
-2026-07-28 → 2026-09-26
-```
-
-This is approximately two months.
-
-Therefore, the current system does not provide a long-term
-climatological baseline.
+TerraIgnis can extend its date coverage through automatic NASA FIRMS NRT
+polling and historical backfills. Actual coverage depends on which products
+and date ranges have been ingested and successfully processed; there is no
+fixed date window that applies to every installation. The pipeline does not
+currently create a multi-year seasonal climatology or a per-cell historical
+normal.
 
 ---
 
@@ -2511,20 +2648,14 @@ zero fire activity
 
 ---
 
-## Limited Per-H3 History
+## No Per-Cell Historical Anomaly Baseline
 
-The median H3 cell appears on only one date.
-
-Additionally:
-
-```text
-6,458 cells
-```
-
-appear on only one date.
-
-Therefore, reliable long-term per-cell anomaly baselines cannot
-currently be constructed.
+Anomaly scores compare each observed H3 cell/date record with a daily
+reference distribution (with a global fallback when a date has too few
+observations). They do not compare a cell with its own historical behavior.
+Consequently, an anomaly indicates that a record is unusual relative to the
+reference population used by the calculation, not that it is unusual for
+that specific location or season.
 
 ---
 
@@ -2553,80 +2684,17 @@ It is not:
 
 ## Anomaly Limitations
 
-The anomaly system identifies unusual observations among detected-fire
-H3 cells for a date.
+The anomaly system scores observed H3 cell/date records. Dates with too few
+observations may use a global statistical fallback. The source data includes
+only cell/date combinations with detected fires, so anomaly scores do not
+describe fire-free cells or provide a complete regional activity baseline.
 
-A low anomaly does not mean:
-
-```text
-fire-free
-```
-
-or:
-
-```text
-below-normal regional activity
-```
-
-Similarly, a high anomaly does not by itself constitute a definitive
-wildfire alert.
+A low anomaly does not mean zero fire activity or below-normal activity for
+the region. A high anomaly is a statistical indicator and is not, by itself,
+a verified wildfire alert.
 
 ---
 
-# Development Workflow
-
-Create feature branches from the main branch.
-
-Example:
-
-```bash
-git checkout -b feature/fastapi
-```
-
-Other examples:
-
-```text
-feature/firms-ingestion
-feature/h3-spatial-grid
-feature/harmonization
-feature/burn-index
-feature/anomaly-detection
-feature/fastapi
-feature/frontend-integration
-```
-
----
-
-# Commit Convention
-
-Recommended commit format:
-
-```text
-feat: add MODIS and VIIRS fire data ingestion
-feat: add fire data profiling
-feat: add H3 daily fire aggregation
-feat: add MODIS VIIRS harmonization
-feat: add burn index calculation
-feat: add fire anomaly detection
-feat: add FastAPI fire endpoints
-feat: add FastAPI calendar endpoints
-feat: add FastAPI anomaly endpoints
-feat: add FastAPI statistics endpoints
-feat: add H3 region summary endpoints
-docs: add Postman API collection
-```
-
-Other prefixes:
-
-```text
-fix:
-docs:
-refactor:
-test:
-chore:
-```
-
----
 
 # Reproducibility
 

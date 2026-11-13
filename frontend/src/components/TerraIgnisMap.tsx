@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import MapboxMap, { Layer, Source } from 'react-map-gl/mapbox';
 import DeckGL from '@deck.gl/react';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
@@ -13,6 +13,15 @@ const FALLBACK_STYLE = 'mapbox://styles/mapbox/streets-v12';
 export interface FirePoint {
   h3Index: string;
   burnIndex: number;
+}
+
+interface FireCellHoverInfo {
+  h3Index: string;
+  latitude: number;
+  longitude: number;
+  burnIndex: number;
+  x: number;
+  y: number;
 }
 
 interface TerraIgnisMapProps {
@@ -49,6 +58,8 @@ export default function TerraIgnisMap({
 }: TerraIgnisMapProps) {
   const [mapStyle, setMapStyle] = useState(SATELLITE_STYLE);
   const [satelliteUnavailable, setSatelliteUnavailable] = useState(false);
+  const [hoverInfo, setHoverInfo] = useState<FireCellHoverInfo | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   
   // Manage map viewport state dynamically so it can be controlled by tabs & user panned
   const [viewState, setViewState] = useState({
@@ -89,6 +100,25 @@ export default function TerraIgnisMap({
     return [...cells.values()];
   }, [fireData]);
 
+  const firePointsByCell = useMemo(
+    () => new Map(h3Data.map((record) => [record.h3Index, record])),
+    [h3Data],
+  );
+
+  const showCellHover = useCallback((h3Index: string | undefined, x: number, y: number) => {
+    if (!h3Index) {
+      setHoverInfo(null);
+      return;
+    }
+    const record = firePointsByCell.get(h3Index);
+    if (!record) {
+      setHoverInfo(null);
+      return;
+    }
+    const [cellLatitude, cellLongitude] = cellToLatLng(h3Index);
+    setHoverInfo({ h3Index, latitude: cellLatitude, longitude: cellLongitude, burnIndex: record.burnIndex, x, y });
+  }, [firePointsByCell]);
+
   const pointFeatures = useMemo(() => ({
     type: 'FeatureCollection' as const,
     features: h3Data.map((record) => {
@@ -118,6 +148,10 @@ export default function TerraIgnisMap({
           onClick: (info) => {
             const h3Cell = (info.object as { h3Index?: string } | undefined)?.h3Index;
             if (h3Cell) onH3CellClick?.(h3Cell);
+          },
+          onHover: (info) => {
+            const h3Cell = (info.object as { h3Index?: string } | undefined)?.h3Index;
+            showCellHover(h3Cell, info.x, info.y);
           },
           wireframe: false,
           filled: true,
@@ -160,10 +194,10 @@ export default function TerraIgnisMap({
     }
 
     return list;
-  }, [globeView, h3Data, selectedH3Cell, onH3CellClick, viewState.zoom]);
+  }, [globeView, h3Data, selectedH3Cell, onH3CellClick, showCellHover, viewState.zoom]);
 
   return (
-    <div className="relative w-full h-full min-h-[350px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">
+    <div ref={mapContainerRef} className="relative w-full h-full min-h-[350px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">
       
       {/* DeckGL Stage with Nested Mapbox Base Style */}
       <DeckGL
@@ -183,6 +217,15 @@ export default function TerraIgnisMap({
             const h3Cell = event.features?.[0]?.properties?.h3Index;
             if (typeof h3Cell === 'string') onH3CellClick?.(h3Cell);
           }}
+          onMouseMove={(event) => {
+            const h3Cell = event.features?.find((feature) => typeof feature.properties?.h3Index === 'string')?.properties?.h3Index;
+            if (typeof h3Cell === 'string') {
+              showCellHover(h3Cell, event.point.x, event.point.y);
+            } else if (globeView || viewState.zoom < 6) {
+              setHoverInfo(null);
+            }
+          }}
+          onMouseLeave={() => setHoverInfo(null)}
         >
           <Source id="fire-cell-source" type="geojson" data={pointFeatures}>
             <Layer
@@ -199,6 +242,21 @@ export default function TerraIgnisMap({
           </Source>
         </MapboxMap>
       </DeckGL>
+
+      {hoverInfo && (
+        <div
+          role="status"
+          className="pointer-events-none absolute z-20 min-w-48 rounded-xl border border-slate-600/70 bg-slate-950/95 px-3 py-2.5 text-xs text-slate-100 shadow-xl backdrop-blur-md"
+          style={{
+            left: Math.max(8, Math.min(hoverInfo.x + 14, (mapContainerRef.current?.clientWidth ?? 320) - 208)),
+            top: Math.max(8, Math.min(hoverInfo.y + 14, (mapContainerRef.current?.clientHeight ?? 200) - 92)),
+          }}
+        >
+          <div className="font-semibold text-white">H3 cell</div>
+          <div className="mt-1 tabular-nums text-slate-300">Lat {hoverInfo.latitude.toFixed(5)}° · Lon {hoverInfo.longitude.toFixed(5)}°</div>
+          <div className="mt-1 font-semibold text-amber-300">Burn Index {hoverInfo.burnIndex.toFixed(2)}</div>
+        </div>
+      )}
 
       {/* Floating Scientific Legend Scale */}
       <div className="absolute bottom-4 left-4 bg-slate-950/90 border border-slate-800/80 rounded p-2.5 backdrop-blur-md text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
